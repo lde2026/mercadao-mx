@@ -1,0 +1,10 @@
+<svg width="400" height="300" viewBox="0 0 400 300" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="400" height="300" fill="#F1F5F9"/>
+  <rect x="160" y="100" width="80" height="60" rx="8" fill="#CBD5E1"/>
+  <!-- Moto icon -->
+  <circle cx="155" cy="185" r="20" stroke="#94A3B8" stroke-width="6" fill="none"/>
+  <circle cx="245" cy="185" r="20" stroke="#94A3B8" stroke-width="6" fill="none"/>
+  <path d="M175 185 L195 170 L220 170 L235 185" stroke="#94A3B8" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <path d="M195 170 L200 155 L215 155" stroke="#94A3B8" stroke-width="5" stroke-linecap="round" fill="none"/>
+  <text x="200" y="230" text-anchor="middle" font-family="system-ui, sans-serif" font-size="13" fill="#94A3B8">Sem foto</text>
+</svg>

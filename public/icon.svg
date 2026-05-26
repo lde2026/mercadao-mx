@@ -1,0 +1,24 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <!-- Orange rounded background -->
+  <rect width="512" height="512" rx="96" fill="#f97316"/>
+
+  <!-- Cart handle -->
+  <line x1="55" y1="138" x2="145" y2="138" stroke="#1e3a5f" stroke-width="28" stroke-linecap="round"/>
+
+  <!-- Cart body trapezoid -->
+  <path d="M145 138 L172 355 L380 355 L407 170 L145 170 Z" fill="#1e3a5f"/>
+
+  <!-- Cart wheels -->
+  <circle cx="212" cy="418" r="36" fill="#1e3a5f"/>
+  <circle cx="338" cy="418" r="36" fill="#1e3a5f"/>
+
+  <!-- Helmet body (white) -->
+  <ellipse cx="276" cy="252" rx="88" ry="66" fill="white"/>
+  <path d="M188 278 Q196 335 276 335 Q356 335 364 278 Z" fill="white"/>
+
+  <!-- Helmet visor accent -->
+  <path d="M218 266 Q247 250 276 250 Q305 250 334 266" stroke="#f97316" stroke-width="10" fill="none" stroke-linecap="round"/>
+
+  <!-- Helmet chin bar -->
+  <rect x="240" y="318" width="72" height="14" rx="7" fill="#e2e8f0"/>
+</svg>

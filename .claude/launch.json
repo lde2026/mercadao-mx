@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "mercadao-mx",
+      "runtimeExecutable": "cmd.exe",
+      "runtimeArgs": ["/c", "npm run dev"],
+      "cwd": "C:\\Users\\Admin\\mercadao-mx",
+      "port": 3000
+    }
+  ]
+}

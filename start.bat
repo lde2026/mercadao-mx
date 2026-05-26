@@ -1,0 +1,3 @@
+@echo off
+echo Iniciando Mercadao MX...
+"C:\Users\Admin\nodejs-portable\node-v22.16.0-win-x64\node.exe" "C:\Users\Admin\mercadao-mx\node_modules\next\dist\bin\next" dev
