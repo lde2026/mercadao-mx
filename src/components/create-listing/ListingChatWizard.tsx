@@ -200,7 +200,7 @@ export default function ListingChatWizard() {
   }
 
   return (
-    <div className="flex flex-col h-[520px]">
+    <div className="flex flex-col h-[calc(100dvh-320px)] min-h-[380px] sm:h-[520px]">
       {/* Messages */}
       <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50 rounded-2xl border border-slate-200">
         {messages.map((msg) => (

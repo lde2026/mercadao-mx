@@ -44,6 +44,14 @@ export default function Header() {
     router.push('/');
   };
 
+  const handleAnunciar = () => {
+    if (!isLoggedIn) {
+      router.push('/cadastro');
+      return;
+    }
+    setModalOpen(true);
+  };
+
   // User dropdown: calculate position from button rect for exact placement
   const toggleUserMenu = () => {
     if (!userMenuOpen && userBtnRef.current) {
@@ -251,7 +259,7 @@ export default function Header() {
                 </Link>
               )}
               <button
-                onClick={() => setModalOpen(true)}
+                onClick={handleAnunciar}
                 className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-bold text-sm px-4 py-2 rounded-xl shadow-sm shadow-orange-500/20 transition-all hover:scale-[1.02]"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -386,7 +394,7 @@ export default function Header() {
                 </>
               )}
               <button
-                onClick={() => { setMenuOpen(false); setModalOpen(true); }}
+                onClick={() => { setMenuOpen(false); handleAnunciar(); }}
                 className="w-full flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-bold text-sm px-4 py-3 rounded-xl transition-colors mt-2"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
