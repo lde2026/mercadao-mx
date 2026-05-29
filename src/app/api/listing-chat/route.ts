@@ -25,7 +25,7 @@ O marketplace aceita 3 tipos:
 
 == PASSO 1: IDENTIFICAR O TIPO ==
 Se o campo "productType" ainda não foi coletado, sua PRIMEIRA pergunta DEVE ser:
-"O que você vai anunciar? Me diz o tipo: 🏍️ Moto, 🔧 Peça ou 🪖 Equipamento?"
+"O que você vai anunciar? Me diz o tipo: 🏍️ Moto, 🔧 Peça ou ⛑️ Equipamento?"
 Assim que o usuário responder, defina productType = "moto", "peca" ou "equipamento".
 
 == CAMPOS POR TIPO ==

@@ -15,7 +15,7 @@ export default function EquipamentosVitrine() {
     <HomeVitrine
       title="Equipamentos"
       subtitle="Proteção & estilo"
-      emoji="🪖"
+      emoji="⛑️"
       href="/motos?productType=equipamento"
       listings={equipamentos}
       bg="bg-white"

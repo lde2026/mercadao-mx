@@ -31,7 +31,7 @@ const PRODUCT_TYPE_TABS = [
   { value: '', label: 'Tudo', icon: '🏍️' },
   { value: 'moto', label: 'Motos', icon: '🏍️' },
   { value: 'peca', label: 'Peças', icon: '🔧' },
-  { value: 'equipamento', label: 'Equipamentos', icon: '🪖' },
+  { value: 'equipamento', label: 'Equipamentos', icon: '⛑️' },
 ];
 
 export default function MotosContent() {

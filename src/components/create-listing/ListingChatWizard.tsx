@@ -23,7 +23,7 @@ function getRequiredFields(productType?: string): string[] {
 const FIRST_MESSAGE: BotMessage = {
   id: 'bot-0',
   role: 'assistant',
-  content: '👋 Olá! Sou o MotoBot do Mercadão MX e vou te ajudar a cadastrar seu anúncio.\n\nO que você vai anunciar? 🏍️ **Moto**, 🔧 **Peça** ou 🪖 **Equipamento**?',
+  content: '👋 Olá! Sou o MotoBot do Mercadão MX e vou te ajudar a cadastrar seu anúncio.\n\nO que você vai anunciar? 🏍️ **Moto**, 🔧 **Peça** ou ⛑️ **Equipamento**?',
   createdAt: new Date().toISOString(),
 };
 
