@@ -59,50 +59,21 @@ export const MERCADAO_MX_USER = MOCK_USERS.find((u) => u.id === 'mercadao-mx')!;
 const featuredUntil15 = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString();
 const featuredUntil7  = new Date(Date.now() +  7 * 24 * 60 * 60 * 1000).toISOString();
 
-// ── Imagens reais (Unsplash / Wikimedia Commons) ───────────────────────────────
-// Motos off-road
-const IMG_KTM_EXC = [
-  'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800&q=80',
-  'https://images.unsplash.com/photo-1558618047-f4e6e1bc3264?w=800&q=80',
-  'https://images.unsplash.com/photo-1558980664-769d59546b3d?w=800&q=80',
-];
-const IMG_GASGAS_50 = [
-  'https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?w=800&q=80',
-  'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800&q=80',
-];
-const IMG_GASGAS_MC65 = [
-  'https://images.unsplash.com/photo-1594818898109-4c46ea8c1cbc?w=800&q=80',
-  'https://images.unsplash.com/photo-1558618047-f4e6e1bc3264?w=800&q=80',
-];
-const IMG_KTM50 = [
-  'https://images.unsplash.com/photo-1558981806-ec527fa84c39?w=800&q=80',
-  'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800&q=80',
-];
+// ── Imagens via picsum.photos (estável, sem auth necessária) ─────────────────
+// Motos off-road — IDs com fotos de natureza/ação/outdoor
+const IMG_KTM_EXC      = ['https://picsum.photos/id/217/800/600', 'https://picsum.photos/id/219/800/600', 'https://picsum.photos/id/221/800/600'];
+const IMG_GASGAS_50    = ['https://picsum.photos/id/223/800/600', 'https://picsum.photos/id/225/800/600'];
+const IMG_GASGAS_MC65  = ['https://picsum.photos/id/227/800/600', 'https://picsum.photos/id/229/800/600'];
+const IMG_KTM50        = ['https://picsum.photos/id/231/800/600', 'https://picsum.photos/id/233/800/600'];
 // Equipamentos
-const IMG_CAPACETE_IMS = [
-  'https://images.unsplash.com/photo-1609630875171-b1321377ee65?w=800&q=80',
-];
-const IMG_BOTA_SIDI = [
-  'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&q=80',
-];
-const IMG_CAPACETE_MATTOS = [
-  'https://images.unsplash.com/photo-1609630875171-b1321377ee65?w=800&q=80',
-];
-const IMG_CALCA_PROTORK = [
-  'https://images.unsplash.com/photo-1571902943202-507ec2618e8f?w=800&q=80',
-];
-const IMG_BOTA_ALPI_INF = [
-  'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&q=80',
-];
-const IMG_BOTA_MX = [
-  'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&q=80',
-];
-const IMG_OCULOS_FOX = [
-  'https://images.unsplash.com/photo-1574169208507-84376144848b?w=800&q=80',
-];
-const IMG_JOELHEIRA = [
-  'https://images.unsplash.com/photo-1571902943202-507ec2618e8f?w=800&q=80',
-];
+const IMG_CAPACETE_IMS    = ['https://picsum.photos/id/250/800/600'];
+const IMG_BOTA_SIDI       = ['https://picsum.photos/id/252/800/600'];
+const IMG_CAPACETE_MATTOS = ['https://picsum.photos/id/254/800/600'];
+const IMG_CALCA_PROTORK   = ['https://picsum.photos/id/256/800/600'];
+const IMG_BOTA_ALPI_INF   = ['https://picsum.photos/id/258/800/600'];
+const IMG_BOTA_MX         = ['https://picsum.photos/id/260/800/600'];
+const IMG_OCULOS_FOX      = ['https://picsum.photos/id/262/800/600'];
+const IMG_JOELHEIRA       = ['https://picsum.photos/id/264/800/600'];
 
 export const MOCK_LISTINGS: MotoListing[] = [
 
