@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import type { MotoListing, ListingStatus } from '@/types';
+import type { MotoListing, ListingStatus, ChatConversation } from '@/types';
 import { MOCK_LISTINGS, MOCK_FAVORITES, CURRENT_USER } from '@/data/mockData';
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
 import { USE_SUPABASE, getSupabase, dbToListing, listingToDb, isUUID } from '@/lib/supabase';
@@ -29,6 +29,7 @@ interface AppContextValue {
   getListingById: (id: string) => MotoListing | undefined;
   getUserListings: () => MotoListing[];
   uploadPhoto: (file: File) => Promise<string>;
+  conversations: ChatConversation[];
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -37,6 +38,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [listings, setListings] = useState<MotoListing[]>(MOCK_LISTINGS);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [conversations, setConversations] = useState<ChatConversation[]>([]);
 
   // ─── Auth ──────────────────────────────────────────────────────────────────
 
@@ -103,6 +105,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     return () => authData.subscription.unsubscribe();
   }, []);
+
+  // ─── Conversations ───────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!authUser) {
+      setConversations([]);
+      return;
+    }
+    // Always give the user an admin welcome conversation.
+    // Real conversations (from Supabase) can be appended here in the future.
+    const welcomeConv: ChatConversation = {
+      id: 'conv-admin-welcome',
+      listingId: '',
+      buyerId: authUser.id ?? 'guest',
+      sellerId: 'mercadao-mx',
+      lastMessage: 'Bem-vindo ao Mercadão MX! 🏍️',
+      lastMessageAt: new Date().toISOString(),
+      unreadCount: 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    setConversations([welcomeConv]);
+  }, [authUser]);
 
   // ─── Listings ─────────────────────────────────────────────────────────────
 
@@ -339,6 +364,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         getListingById,
         getUserListings,
         uploadPhoto,
+        conversations,
       }}
     >
       {children}

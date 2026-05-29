@@ -1,13 +1,38 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Header from '@/components/layout/Header';
+import { useApp } from '@/context/AppContext';
 import { OLX_SEARCH_URLS } from '@/lib/olxScraper';
+
+const ADMIN_EMAILS = ['contato@mercadaomx.com.br', 'admin@mercadaomx.com.br'];
 
 type ScrapeResult = { url: string; title: string; price: number; thumb: string; city: string };
 type ImportResult = { url: string; status: 'ok' | 'error'; title?: string; error?: string };
 
 export default function AdminImportPage() {
+  const { isLoggedIn, authUser } = useApp();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      router.replace('/login');
+      return;
+    }
+    if (authUser && !ADMIN_EMAILS.includes(authUser.email)) {
+      router.replace('/');
+    }
+  }, [isLoggedIn, authUser, router]);
+
+  if (!isLoggedIn || (authUser && !ADMIN_EMAILS.includes(authUser.email))) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="animate-pulse text-slate-400 text-sm">Verificando acesso...</div>
+      </div>
+    );
+  }
+
   const [phase, setPhase] = useState<'idle' | 'searching' | 'importing' | 'done'>('idle');
   const [manualUrls, setManualUrls] = useState('');
   const [found, setFound]           = useState<ScrapeResult[]>([]);

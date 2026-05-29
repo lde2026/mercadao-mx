@@ -3,9 +3,12 @@
 import { useState, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { MOCK_CONVERSATIONS, MOCK_MESSAGES, MOCK_USERS, MOCK_LISTINGS, CURRENT_USER } from '@/data/mockData';
+import { useApp } from '@/context/AppContext';
 import { formatRelativeDate, formatCurrency } from '@/lib/utils';
 import ChatMessage from './ChatMessage';
+
+const ADMIN_ID = 'mercadao-mx';
+const ADMIN_WELCOME_CONV_ID = 'conv-admin-welcome';
 
 type LocalMessage = {
   id: string;
@@ -19,36 +22,63 @@ type LocalMessage = {
   proposalStatus?: 'pending' | 'accepted' | 'rejected';
 };
 
+const ADMIN_WELCOME_MESSAGES: LocalMessage[] = [
+  {
+    id: 'welcome-1',
+    conversationId: ADMIN_WELCOME_CONV_ID,
+    senderId: ADMIN_ID,
+    message:
+      'Olá! Bem-vindo ao Mercadão MX 🏍️ — o marketplace especializado em motos off-road, peças e equipamentos do Brasil.',
+    createdAt: new Date().toISOString(),
+    type: 'text',
+  },
+  {
+    id: 'welcome-2',
+    conversationId: ADMIN_WELCOME_CONV_ID,
+    senderId: ADMIN_ID,
+    message:
+      'Por aqui você pode anunciar sua moto, encontrar peças e negociar diretamente com outros pilotos. 🔧',
+    createdAt: new Date().toISOString(),
+    type: 'text',
+  },
+  {
+    id: 'welcome-3',
+    conversationId: ADMIN_WELCOME_CONV_ID,
+    senderId: ADMIN_ID,
+    message:
+      'Para começar, clique em "Cadastrar anúncio" no menu ao lado. Qualquer dúvida, estamos à disposição! 👋',
+    createdAt: new Date().toISOString(),
+    type: 'text',
+  },
+];
+
 export default function ChatLayout({ conversationId }: { conversationId?: string }) {
-  const [activeId, setActiveId] = useState<string | undefined>(conversationId);
+  const { conversations, authUser, listings } = useApp();
+  const [activeId, setActiveId] = useState<string | undefined>(conversationId ?? ADMIN_WELCOME_CONV_ID);
   const [newMessage, setNewMessage] = useState('');
-  const [localMessages, setLocalMessages] = useState<Record<string, LocalMessage[]>>(
-    Object.fromEntries(
-      Object.entries(MOCK_MESSAGES).map(([k, v]) => [
-        k,
-        v.map((m) => ({ ...m, type: 'text' as const })),
-      ])
-    )
-  );
+  const [localMessages, setLocalMessages] = useState<Record<string, LocalMessage[]>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const activeConv = MOCK_CONVERSATIONS.find((c) => c.id === activeId);
-  const activeListing = activeConv
-    ? MOCK_LISTINGS.find((l) => l.id === activeConv.listingId)
-    : null;
-  const messages: LocalMessage[] = activeId ? (localMessages[activeId] ?? []) : [];
+  const activeConv = conversations.find((c) => c.id === activeId);
+  const activeListing =
+    activeConv && activeConv.listingId
+      ? listings.find((l) => l.id === activeConv.listingId)
+      : null;
 
-  const getOtherUser = (conv: (typeof MOCK_CONVERSATIONS)[0]) => {
-    const otherId = conv.buyerId === CURRENT_USER.id ? conv.sellerId : conv.buyerId;
-    return MOCK_USERS.find((u) => u.id === otherId) ?? MOCK_USERS[0];
-  };
+  const isAdminWelcome = activeId === ADMIN_WELCOME_CONV_ID;
+
+  const messages: LocalMessage[] = isAdminWelcome
+    ? ADMIN_WELCOME_MESSAGES
+    : activeId
+    ? (localMessages[activeId] ?? [])
+    : [];
 
   const addMessage = (msg: Omit<LocalMessage, 'id' | 'conversationId' | 'senderId' | 'createdAt'>) => {
-    if (!activeId) return;
+    if (!activeId || isAdminWelcome) return;
     const newMsg: LocalMessage = {
       id: `msg-${Date.now()}`,
       conversationId: activeId,
-      senderId: CURRENT_USER.id,
+      senderId: authUser?.id ?? 'guest',
       createdAt: new Date().toISOString(),
       ...msg,
     };
@@ -65,7 +95,7 @@ export default function ChatLayout({ conversationId }: { conversationId?: string
   };
 
   const handleShareContact = () => {
-    const phone = CURRENT_USER.phone ?? '+55 11 99999-9999';
+    const phone = authUser ? '(WhatsApp será exibido ao vendedor)' : '(sem telefone)';
     addMessage({ type: 'contact_share', message: phone });
   };
 
@@ -82,8 +112,8 @@ export default function ChatLayout({ conversationId }: { conversationId?: string
     if (!activeId) return;
     setLocalMessages((prev) => ({
       ...prev,
-      [activeId]: prev[activeId].map((m) =>
-        m.id === msgId ? { ...m, proposalStatus: 'accepted' as const } : m
+      [activeId]: (prev[activeId] ?? []).map((m) =>
+        m.id === msgId ? { ...m, proposalStatus: 'accepted' as const } : m,
       ),
     }));
   };
@@ -92,8 +122,8 @@ export default function ChatLayout({ conversationId }: { conversationId?: string
     if (!activeId) return;
     setLocalMessages((prev) => ({
       ...prev,
-      [activeId]: prev[activeId].map((m) =>
-        m.id === msgId ? { ...m, proposalStatus: 'rejected' as const } : m
+      [activeId]: (prev[activeId] ?? []).map((m) =>
+        m.id === msgId ? { ...m, proposalStatus: 'rejected' as const } : m,
       ),
     }));
   };
@@ -101,38 +131,62 @@ export default function ChatLayout({ conversationId }: { conversationId?: string
   return (
     <div className="flex h-[calc(100vh-120px)] sm:h-[700px] bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
       {/* Conversation list */}
-      <div className={`w-full sm:w-72 flex-shrink-0 border-r border-slate-200 flex flex-col ${activeId ? 'hidden sm:flex' : 'flex'}`}>
+      <div
+        className={`w-full sm:w-72 flex-shrink-0 border-r border-slate-200 flex flex-col ${
+          activeId ? 'hidden sm:flex' : 'flex'
+        }`}
+      >
         <div className="p-4 border-b border-slate-200">
           <h2 className="text-slate-900 font-bold">Mensagens</h2>
         </div>
         <div className="flex-1 overflow-y-auto">
-          {MOCK_CONVERSATIONS.length === 0 ? (
+          {conversations.length === 0 ? (
             <div className="p-6 text-center text-slate-400 text-sm">
               Nenhuma conversa por enquanto.
             </div>
           ) : (
-            MOCK_CONVERSATIONS.map((conv) => {
-              const other = getOtherUser(conv);
-              const listing = MOCK_LISTINGS.find((l) => l.id === conv.listingId);
+            conversations.map((conv) => {
+              const isWelcome = conv.id === ADMIN_WELCOME_CONV_ID;
               const isActive = conv.id === activeId;
 
               return (
                 <button
                   key={conv.id}
                   onClick={() => setActiveId(conv.id)}
-                  className={`w-full flex items-start gap-3 p-4 hover:bg-slate-50 transition-colors text-left border-b border-slate-100 ${isActive ? 'bg-orange-50' : ''}`}
+                  className={`w-full flex items-start gap-3 p-4 hover:bg-slate-50 transition-colors text-left border-b border-slate-100 ${
+                    isActive ? 'bg-orange-50' : ''
+                  }`}
                 >
-                  <div className="relative w-10 h-10 rounded-full overflow-hidden bg-slate-200 flex-shrink-0">
-                    {other.avatar && <Image src={other.avatar} alt={other.name} fill sizes="40px" className="object-cover" />}
-                  </div>
+                  {/* Avatar */}
+                  {isWelcome ? (
+                    <div className="w-10 h-10 rounded-full bg-orange-500 flex items-center justify-center flex-shrink-0">
+                      <span className="text-white text-lg font-black">M</span>
+                    </div>
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-slate-200 flex-shrink-0 flex items-center justify-center text-slate-400">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                    </div>
+                  )}
+
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-0.5">
-                      <span className="text-slate-900 text-sm font-medium truncate">{other.name}</span>
-                      <span className="text-slate-400 text-[10px] flex-shrink-0 ml-2">{formatRelativeDate(conv.lastMessageAt)}</span>
+                      <span className="text-slate-900 text-sm font-medium truncate">
+                        {isWelcome ? 'Mercadão MX' : `Conversa #${conv.id.slice(-4)}`}
+                      </span>
+                      <span className="text-slate-400 text-[10px] flex-shrink-0 ml-2">
+                        {formatRelativeDate(conv.lastMessageAt)}
+                      </span>
                     </div>
-                    {listing && (
-                      <p className="text-orange-500 text-xs truncate mb-0.5">{listing.brand} {listing.model}</p>
-                    )}
+                    {!isWelcome && conv.listingId && (() => {
+                      const l = listings.find((x) => x.id === conv.listingId);
+                      return l ? (
+                        <p className="text-orange-500 text-xs truncate mb-0.5">
+                          {l.brand} {l.model}
+                        </p>
+                      ) : null;
+                    })()}
                     <p className="text-slate-400 text-xs truncate">{conv.lastMessage}</p>
                   </div>
                   {conv.unreadCount > 0 && (
@@ -149,7 +203,7 @@ export default function ChatLayout({ conversationId }: { conversationId?: string
 
       {/* Chat area */}
       <div className={`flex-1 flex flex-col ${activeId ? 'flex' : 'hidden sm:flex'}`}>
-        {activeConv && activeListing ? (
+        {activeConv ? (
           <>
             {/* Chat header */}
             <div className="p-4 border-b border-slate-200 flex items-center gap-3 bg-white">
@@ -161,24 +215,58 @@ export default function ChatLayout({ conversationId }: { conversationId?: string
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
               </button>
-              <div className="relative w-10 h-10 rounded-xl overflow-hidden bg-slate-100 flex-shrink-0">
-                <Image src={activeListing.mainPhoto} alt={activeListing.title} fill sizes="40px" className="object-cover" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <Link href={`/motos/${activeListing.id}`} className="text-slate-900 text-sm font-semibold hover:text-orange-500 transition-colors truncate block">
-                  {activeListing.brand} {activeListing.model} {activeListing.year}
-                </Link>
-                <p className="text-orange-500 text-xs">{formatCurrency(activeListing.price)}</p>
-              </div>
-              {activeListing.status === 'sold' && (
-                <span className="bg-red-50 text-red-500 border border-red-200 text-xs font-bold px-2 py-1 rounded-full">VENDIDA</span>
+
+              {isAdminWelcome ? (
+                /* Admin welcome header */
+                <>
+                  <div className="w-10 h-10 rounded-xl bg-orange-500 flex items-center justify-center flex-shrink-0">
+                    <span className="text-white text-lg font-black">M</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-slate-900 text-sm font-semibold">Mercadão MX</p>
+                    <p className="text-slate-400 text-xs">Canal oficial de boas-vindas</p>
+                  </div>
+                </>
+              ) : activeListing ? (
+                /* Listing conversation header */
+                <>
+                  <div className="relative w-10 h-10 rounded-xl overflow-hidden bg-slate-100 flex-shrink-0">
+                    <Image
+                      src={activeListing.mainPhoto}
+                      alt={activeListing.title}
+                      fill
+                      sizes="40px"
+                      className="object-cover"
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <Link
+                      href={`/motos/${activeListing.id}`}
+                      className="text-slate-900 text-sm font-semibold hover:text-orange-500 transition-colors truncate block"
+                    >
+                      {activeListing.brand} {activeListing.model} {activeListing.year}
+                    </Link>
+                    <p className="text-orange-500 text-xs">{formatCurrency(activeListing.price)}</p>
+                  </div>
+                  {activeListing.status === 'sold' && (
+                    <span className="bg-red-50 text-red-500 border border-red-200 text-xs font-bold px-2 py-1 rounded-full">
+                      VENDIDA
+                    </span>
+                  )}
+                </>
+              ) : (
+                <div className="flex-1 min-w-0">
+                  <p className="text-slate-900 text-sm font-semibold">Conversa</p>
+                </div>
               )}
             </div>
 
             {/* Sold notice */}
-            {activeListing.status === 'sold' && (
+            {!isAdminWelcome && activeListing?.status === 'sold' && (
               <div className="bg-red-50 border-b border-red-200 px-4 py-2">
-                <p className="text-red-500 text-xs text-center">Este anúncio foi marcado como vendido. Não é possível iniciar novas conversas.</p>
+                <p className="text-red-500 text-xs text-center">
+                  Este anúncio foi marcado como vendido. Não é possível iniciar novas conversas.
+                </p>
               </div>
             )}
 
@@ -188,7 +276,7 @@ export default function ChatLayout({ conversationId }: { conversationId?: string
                 <ChatMessage
                   key={msg.id}
                   message={msg.message}
-                  isOwn={msg.senderId === CURRENT_USER.id}
+                  isOwn={msg.senderId === (authUser?.id ?? 'guest')}
                   createdAt={msg.createdAt}
                   type={msg.type}
                   mediaUrl={msg.mediaUrl}
@@ -200,19 +288,22 @@ export default function ChatLayout({ conversationId }: { conversationId?: string
               ))}
             </div>
 
-            {/* Input bar */}
-            {activeListing.status !== 'sold' && (
+            {/* Input bar — hidden for admin welcome and sold listings */}
+            {!isAdminWelcome && (!activeListing || activeListing.status !== 'sold') && (
               <div className="p-3 border-t border-slate-200 bg-white">
-                {/* Action buttons row */}
                 <div className="flex items-center gap-2 mb-2">
-                  {/* Image upload */}
                   <button
                     onClick={() => fileInputRef.current?.click()}
                     title="Enviar foto"
                     className="w-9 h-9 flex items-center justify-center text-slate-400 hover:text-orange-500 hover:bg-orange-50 rounded-lg transition-colors"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                      />
                     </svg>
                   </button>
                   <input
@@ -223,8 +314,6 @@ export default function ChatLayout({ conversationId }: { conversationId?: string
                     onChange={(e) => handleImageSelect(e.target.files)}
                     className="hidden"
                   />
-
-                  {/* Trocar contato */}
                   <button
                     onClick={handleShareContact}
                     title="Trocar contato WhatsApp"
@@ -236,8 +325,6 @@ export default function ChatLayout({ conversationId }: { conversationId?: string
                     Trocar contato
                   </button>
                 </div>
-
-                {/* Text input row */}
                 <div className="flex gap-2">
                   <input
                     type="text"
@@ -260,13 +347,27 @@ export default function ChatLayout({ conversationId }: { conversationId?: string
                 </div>
               </div>
             )}
+
+            {/* Admin welcome footer note */}
+            {isAdminWelcome && (
+              <div className="p-3 border-t border-slate-200 bg-slate-50 text-center">
+                <p className="text-slate-400 text-xs">
+                  Este é o canal oficial do Mercadão MX. As conversas com vendedores aparecerão aqui.
+                </p>
+              </div>
+            )}
           </>
         ) : (
           <div className="flex-1 flex items-center justify-center text-center p-8 bg-slate-50">
             <div>
               <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                  />
                 </svg>
               </div>
               <p className="text-slate-900 font-semibold mb-1">Selecione uma conversa</p>
