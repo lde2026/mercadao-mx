@@ -36,6 +36,53 @@ await repo.salvarFluxo(conta.id, conexao.id, {
   ],
 });
 
+/**
+ * As outras duas existem para a tela de integracoes mostrar os tres modos.
+ * Sem elas so da para conferir o caminho automatico, que e justamente o unico
+ * que nao da trabalho a ninguem.
+ */
+const outras = [
+  {
+    plataforma: 'tray', nomeLoja: 'Purple Skate', dominio: 'purpleskate.com.br',
+    credenciais: {
+      api_address: 'https://purpleskate.commercesuite.com.br/web_api',
+      access_token: 'token-de-desenvolvimento', refresh_token: 'refresh-de-desenvolvimento',
+    },
+  },
+  {
+    // Tema padrao novo: o campo Incluir codigo HTML nao existe, entao o
+    // produto nao instala. E a pergunta de qualificacao antes da venda.
+    plataforma: 'loja_integrada', nomeLoja: 'Trilha Kids Curitiba', dominio: 'trilhakids.com.br',
+    credenciais: {
+      chave_api: 'chave-de-desenvolvimento', chave_aplicacao: 'aplicacao-de-desenvolvimento',
+      tema_permite_html: false,
+    },
+  },
+];
+
+const existentes = await repo.listarConexoes(conta.id);
+for (const nova of outras) {
+  if (existentes.some((c) => c.plataforma === nova.plataforma)) continue;
+  const criada = await repo.criarConexao({ contaId: conta.id, ...nova });
+  const resolvida = await (await import('./adapters/index.js'))
+    .adaptador(nova.plataforma)
+    .instalarScript(nova.credenciais, 'https://cdn.capta.com.br/widget.js');
+  await repo.atualizarConexao(conta.id, criada.id, {
+    modo_instalacao: resolvida.modo,
+    detalhe_status: resolvida.motivo || null,
+  });
+  await repo.salvarFluxo(conta.id, criada.id, {
+    convite: 'Ganhe 10% na primeira compra',
+    consentimento: `Ao continuar, voce concorda que a ${nova.nomeLoja} use seus dados para entrar em contato sobre esta compra.`,
+    desconto: 10,
+    perguntas: [{ texto: 'O que voce procura hoje?', opcoes: ['Moto', 'Equipamento', 'Pecas'] }],
+  });
+}
+
+// Lote de cupons da Loja Integrada, que nao cria cupom por API.
+const li = (await repo.listarConexoes(conta.id)).find((c) => c.plataforma === 'loja_integrada');
+if (li) await repo.adicionarAoLote(conta.id, li.id, ['TRILHA-A1', 'TRILHA-B2', 'TRILHA-C3']);
+
 const { consultar } = await import('./db.js');
 await consultar(
   `insert into assinaturas (conta_id, plano, ciclo, status, origem)

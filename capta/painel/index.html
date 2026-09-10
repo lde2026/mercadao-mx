@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Capta</title>
+<link rel="stylesheet" href="/painel.css">
+</head>
+<body>
+  <div id="entrada" hidden>
+    <form id="form-entrada">
+      <h1>Capta</h1>
+      <p class="sub">Painel do lojista</p>
+      <label>E-mail<input type="email" name="email" required autocomplete="email"></label>
+      <label>Senha<input type="password" name="senha" required autocomplete="current-password"></label>
+      <label id="campo-nome" hidden>Nome da loja<input type="text" name="nome" autocomplete="organization"></label>
+      <p class="erro" id="erro-entrada" hidden></p>
+      <button type="submit" id="botao-entrada">Entrar</button>
+      <p class="troca">
+        <a href="#" id="alternar">Nao tenho conta ainda</a>
+      </p>
+    </form>
+  </div>
+
+  <div id="app" hidden>
+    <aside>
+      <div class="marca">Capta</div>
+      <nav>
+        <a href="#/hoje">Hoje</a>
+        <a href="#/leads">Leads</a>
+        <a href="#/integracoes">Integracoes</a>
+        <a href="#/financeiro">Financeiro</a>
+      </nav>
+      <div class="rodape">
+        <span id="nome-conta"></span>
+        <button id="sair" type="button">Sair</button>
+      </div>
+    </aside>
+    <main>
+      <div id="faixa" hidden></div>
+      <div id="tela"></div>
+    </main>
+  </div>
+
+  <script src="/painel.js"></script>
+</body>
+</html>
