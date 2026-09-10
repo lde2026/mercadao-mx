@@ -97,7 +97,15 @@ create table if not exists leads (
   rede_mascarada  text,
   criado_em       timestamptz not null default now()
 );
+-- Lead capturado nao e lead trabalhado. Sem marcar quem ja foi contatado, o
+-- painel vira uma lista que so cresce e o lojista para de abrir.
+alter table leads add column if not exists contatado_em timestamptz;
+alter table leads add column if not exists resultado text
+  check (resultado in ('contatado','vendeu','perdeu'));
+
 create index if not exists leads_conta_idx   on leads(conta_id, criado_em desc);
+create index if not exists leads_a_contatar_idx on leads(conta_id, criado_em desc)
+  where contatado_em is null;
 create index if not exists leads_conexao_idx on leads(conexao_id, criado_em desc);
 create index if not exists leads_anonimo_idx on leads(conexao_id, anonimo_id);
 

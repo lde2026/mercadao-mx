@@ -398,12 +398,39 @@ app.put('/api/conexoes/:id/fluxo', async (req, res) => {
   res.json({ id });
 });
 
+const SITUACOES = new Set(['a_contatar', 'contatados']);
+
 app.get('/api/leads', async (req, res) => {
-  res.json(await repo.listarLeads(req.conta.id, {
-    limite: Math.min(Number(req.query.limite) || 50, 200),
-    deslocamento: Number(req.query.deslocamento) || 0,
-    conexaoId: req.query.conexao || null,
-  }));
+  const [leads, contagem] = await Promise.all([
+    repo.listarLeads(req.conta.id, {
+      limite: Math.min(Number(req.query.limite) || 100, 200),
+      deslocamento: Number(req.query.deslocamento) || 0,
+      conexaoId: req.query.conexao || null,
+      situacao: SITUACOES.has(req.query.situacao) ? req.query.situacao : null,
+    }),
+    repo.contagemDeLeads(req.conta.id),
+  ]);
+  res.json({ leads, contagem });
+});
+
+/**
+ * Marca o lead como contatado. E a unica escrita do painel que o lojista faz
+ * varias vezes por dia, entao ela precisa ser um clique e nada mais: exigir
+ * classificacao de venda aqui faz ele nao marcar, e a fila volta a mentir.
+ */
+app.post('/api/leads/:id/contato', async (req, res) => {
+  const { contatado = true, resultado = null } = req.body || {};
+  if (resultado && !['contatado', 'vendeu', 'perdeu'].includes(resultado)) {
+    return res.status(400).json({ erro: 'resultado invalido' });
+  }
+  const lead = await repo.marcarContato(req.conta.id, req.params.id, {
+    contatado: Boolean(contatado), resultado,
+  });
+  if (!lead) return res.status(404).json({ erro: 'nao encontrado' });
+  log.info('lead.contato', {
+    conta_id: req.conta.id, lead_id: lead.id, contatado: Boolean(contatado),
+  });
+  res.json(lead);
 });
 
 app.get('/api/leads/:id', async (req, res) => {

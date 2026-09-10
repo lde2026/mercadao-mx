@@ -9,37 +9,70 @@
 <body>
   <div id="entrada" hidden>
     <form id="form-entrada">
-      <h1>Capta</h1>
+      <div class="marca-grande">capta</div>
       <p class="sub">Painel do lojista</p>
       <label>E-mail<input type="email" name="email" required autocomplete="email"></label>
       <label>Senha<input type="password" name="senha" required autocomplete="current-password"></label>
       <label id="campo-nome" hidden>Nome da loja<input type="text" name="nome" autocomplete="organization"></label>
       <p class="erro" id="erro-entrada" hidden></p>
       <button type="submit" id="botao-entrada">Entrar</button>
-      <p class="troca">
-        <a href="#" id="alternar">Nao tenho conta ainda</a>
-      </p>
+      <p class="troca"><a href="#" id="alternar">Nao tenho conta ainda</a></p>
     </form>
   </div>
 
   <div id="app" hidden>
-    <aside>
-      <div class="marca">Capta</div>
-      <nav>
-        <a href="#/hoje">Hoje</a>
-        <a href="#/leads">Leads</a>
-        <a href="#/integracoes">Integracoes</a>
-        <a href="#/financeiro">Financeiro</a>
-      </nav>
-      <div class="rodape">
-        <span id="nome-conta"></span>
-        <button id="sair" type="button">Sair</button>
+    <header class="barra">
+      <div class="marca">capta</div>
+      <div class="busca">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input type="search" id="busca" placeholder="Busque um lead por nome, e-mail ou cupom" autocomplete="off">
       </div>
-    </aside>
-    <main>
-      <div id="faixa" hidden></div>
-      <div id="tela"></div>
-    </main>
+      <div class="acoes-barra">
+        <button type="button" class="icone" id="sino" aria-label="Alertas">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 1 0-12 0c0 7-2 8-2 8h16s-2-1-2-8"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+          <span class="conta-badge" id="badge-alertas" hidden>0</span>
+        </button>
+        <div class="chip-conta">
+          <span class="avatar" id="avatar">LD</span>
+          <span class="nome-conta" id="nome-conta"></span>
+          <button type="button" id="sair">Sair</button>
+        </div>
+      </div>
+    </header>
+
+    <div class="corpo">
+      <aside>
+        <nav>
+          <a href="#/hoje">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>
+            <span>Hoje</span>
+          </a>
+          <a href="#/leads">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 20v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 20v-2a4 4 0 0 0-3-3.9"/></svg>
+            <span>Leads</span>
+          </a>
+          <a href="#/integracoes">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 2v6"/><path d="M15 2v6"/><path d="M6 8h12v4a6 6 0 0 1-12 0z"/><path d="M12 18v4"/></svg>
+            <span>Integracoes</span>
+          </a>
+          <a href="#/financeiro">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v10"/><path d="M14.5 9.5h-4a1.5 1.5 0 0 0 0 3h3a1.5 1.5 0 0 1 0 3h-4"/></svg>
+            <span>Financeiro</span>
+          </a>
+        </nav>
+        <div class="rodape-lateral">
+          <div class="cartao-plano" id="cartao-plano" hidden>
+            <span class="rotulo-plano" id="rotulo-plano"></span>
+            <p id="texto-plano"></p>
+          </div>
+        </div>
+      </aside>
+
+      <main>
+        <div id="faixa" hidden></div>
+        <div id="tela"></div>
+      </main>
+    </div>
   </div>
 
   <script src="/painel.js"></script>

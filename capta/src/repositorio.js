@@ -267,9 +267,12 @@ export async function criarLead({
   return rows[0];
 }
 
-export async function listarLeads(contaId, { limite = 50, deslocamento = 0, conexaoId = null } = {}) {
+export async function listarLeads(contaId, {
+  limite = 50, deslocamento = 0, conexaoId = null, situacao = null,
+} = {}) {
   const { rows } = await consultar(
     `select l.id, l.nome, l.email, l.telefone, l.respostas, l.criado_em,
+            l.contatado_em, l.resultado,
             l.conexao_id, cx.nome_loja,
             cp.codigo as cupom, cp.status as cupom_status,
             (select coalesce(sum(p.valor), 0) from pedidos p where p.lead_id = l.id) as faturado
@@ -278,11 +281,43 @@ export async function listarLeads(contaId, { limite = 50, deslocamento = 0, cone
        left join cupons cp on cp.lead_id = l.id
       where l.conta_id = $1
         and ($2::uuid is null or l.conexao_id = $2)
+        and ($5::text is null
+             or ($5 = 'a_contatar' and l.contatado_em is null)
+             or ($5 = 'contatados' and l.contatado_em is not null))
       order by l.criado_em desc
       limit $3 offset $4`,
-    [contaId, conexaoId, limite, deslocamento],
+    [contaId, conexaoId, limite, deslocamento, situacao],
   );
   return rows;
+}
+
+/** Quantos esperam contato, para o painel dizer o tamanho da fila sem carregar tudo. */
+export async function contagemDeLeads(contaId) {
+  const { rows } = await consultar(
+    `select count(*) filter (where contatado_em is null) as a_contatar,
+            count(*) filter (where contatado_em is not null) as contatados,
+            count(*) filter (where criado_em >= now() - interval '24 hours') as novos,
+            count(*) as total
+       from leads where conta_id = $1`,
+    [contaId],
+  );
+  return rows[0];
+}
+
+/**
+ * O resultado e opcional de proposito: exigir que o lojista classifique a
+ * venda na hora do contato faz ele nao marcar nada, e a fila volta a mentir.
+ */
+export async function marcarContato(contaId, leadId, { contatado, resultado = null }) {
+  const { rows } = await consultar(
+    `update leads
+        set contatado_em = case when $3 then coalesce(contatado_em, now()) else null end,
+            resultado = case when $3 then $4 else null end
+      where id = $1 and conta_id = $2
+      returning id, contatado_em, resultado`,
+    [leadId, contaId, contatado, resultado],
+  );
+  return rows[0] || null;
 }
 
 export async function buscarLead(contaId, leadId) {
