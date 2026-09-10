@@ -223,3 +223,4 @@ pre{background:var(--escuro);color:var(--superficie);padding:13px;border-radius:
 .botao-link:hover{filter:brightness(.97)}
 .lead-acoes button{padding:9px 16px;font-size:13.5px}
 .marca-feito{margin-top:10px;font-size:12px;color:var(--fraco);border-top:1px dashed var(--linha);padding-top:8px}
+.abas .exportar{margin-left:auto;align-self:center;padding:6px 0}

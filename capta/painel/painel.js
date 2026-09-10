@@ -304,6 +304,10 @@
       aba.addEventListener('click', function () { abaLeads = par[0]; desenharLeads(); });
       abas.appendChild(aba);
     });
+    var exportar = el('a', 'Exportar planilha', 'link-acao exportar');
+    exportar.href = '/api/leads.csv' + (abaLeads === 'contatados' ? '?situacao=contatados' : '?situacao=a_contatar');
+    exportar.setAttribute('download', '');
+    abas.appendChild(exportar);
     area.appendChild(abas);
 
     var lista = cacheLeads.leads.filter(function (l) {

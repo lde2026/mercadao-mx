@@ -400,6 +400,40 @@ app.put('/api/conexoes/:id/fluxo', async (req, res) => {
 
 const SITUACOES = new Set(['a_contatar', 'contatados']);
 
+/**
+ * Planilha dos leads. Ponto e virgula e BOM porque o Excel em portugues abre
+ * CSV com virgula numa coluna so e mostra acento quebrado sem o BOM. Quem
+ * exporta e o lojista, para o proprio CRM ou para o vendedor dele.
+ */
+function celulaCsv(valor) {
+  const texto = valor == null ? '' : String(valor);
+  // Celula que comeca com = + - @ vira formula no Excel e executa ao abrir.
+  // O nome do lead e digitado por visitante anonimo, entao pode vir assim.
+  const segura = /^[=+\-@\t\r]/.test(texto) ? `'${texto}` : texto;
+  return `"${segura.replace(/"/g, '""')}"`;
+}
+
+app.get('/api/leads.csv', async (req, res) => {
+  const leads = await repo.listarLeads(req.conta.id, {
+    limite: 5000, situacao: SITUACOES.has(req.query.situacao) ? req.query.situacao : null,
+  });
+  const cabecalho = ['Nome', 'WhatsApp', 'E-mail', 'Loja', 'Cupom', 'Cupom criado',
+    'Respostas', 'Contatado em', 'Faturado', 'Entrou em'];
+  const linhas = leads.map((l) => [
+    l.nome, l.telefone, l.email, l.nome_loja, l.cupom,
+    l.cupom_status === 'criado' ? 'sim' : 'nao',
+    (l.respostas || []).map((r) => `${r.pergunta} ${r.resposta}`).join(' | '),
+    l.contatado_em ? new Date(l.contatado_em).toLocaleString('pt-BR') : '',
+    Number(l.faturado || 0).toFixed(2).replace('.', ','),
+    new Date(l.criado_em).toLocaleString('pt-BR'),
+  ].map(celulaCsv).join(';'));
+
+  log.info('leads.exportados', { conta_id: req.conta.id, quantidade: leads.length });
+  res.set('Content-Type', 'text/csv; charset=utf-8');
+  res.set('Content-Disposition', `attachment; filename="leads-${new Date().toISOString().slice(0, 10)}.csv"`);
+  res.send('\ufeff' + [cabecalho.map(celulaCsv).join(';'), ...linhas].join('\r\n'));
+});
+
 app.get('/api/leads', async (req, res) => {
   const [leads, contagem] = await Promise.all([
     repo.listarLeads(req.conta.id, {

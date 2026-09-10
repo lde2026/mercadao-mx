@@ -87,8 +87,8 @@ test('conta B apagando o lead da conta A recebe 404 e o lead continua vivo', asy
 test('a listagem de leads nunca mistura contas', async () => {
   const a = await pedir('/api/leads', { cookie: contaA.cookie });
   const b = await pedir('/api/leads', { cookie: contaB.cookie });
-  assert.deepEqual(a.json.map((l) => l.nome), ['Renata']);
-  assert.deepEqual(b.json.map((l) => l.nome), ['Marcos']);
+  assert.deepEqual(a.json.leads.map((l) => l.nome), ['Renata']);
+  assert.deepEqual(b.json.leads.map((l) => l.nome), ['Marcos']);
 });
 
 test('conta B nao alcanca a conexao da conta A', async () => {
@@ -109,8 +109,31 @@ test('a listagem de conexoes nunca mistura contas', async () => {
   assert.equal(r.json[0].nome_loja, 'Purple Skate');
 });
 
+test('a planilha exportada so traz os leads da propria conta', async () => {
+  const r = await fetch(`${base}/api/leads.csv`, { headers: { Cookie: contaB.cookie } });
+  assert.equal(r.status, 200);
+  // Bytes crus: o text() do fetch descarta o BOM ao decodificar, e o teste
+  // acusaria falta de um BOM que o servidor manda.
+  const bytes = new Uint8Array(await r.arrayBuffer());
+  assert.deepEqual([...bytes.slice(0, 3)], [0xef, 0xbb, 0xbf], 'precisa do BOM para o Excel em portugues');
+  const csv = new TextDecoder().decode(bytes);
+  assert.ok(csv.includes('Marcos'), 'o lead da propria conta tem que estar');
+  assert.ok(!csv.includes('Renata'), 'o lead da conta A nao pode aparecer na planilha da conta B');
+  assert.ok(!csv.includes('MX Kids'), 'nem a loja da conta A');
+});
+
+test('nome de lead que parece formula nao executa ao abrir a planilha', async () => {
+  await repo.criarLead({
+    contaId: contaB.id, conexaoId: lojaB.conexao.id,
+    nome: '=HYPERLINK("http://golpe.com";"clique")', email: 'x@teste.com.br', telefone: null,
+    respostas: [], anonimoId: 'anon-f', redeMascarada: null,
+  });
+  const csv = await (await fetch(`${base}/api/leads.csv`, { headers: { Cookie: contaB.cookie } })).text();
+  assert.ok(csv.includes(`"'=HYPERLINK`), 'celula que comeca com = tem que ganhar apostrofo');
+});
+
 test('nenhuma rota do painel responde sem sessao', async () => {
-  for (const caminho of ['/api/eu', '/api/leads', '/api/conexoes', '/api/financeiro', '/api/hoje']) {
+  for (const caminho of ['/api/eu', '/api/leads', '/api/leads.csv', '/api/conexoes', '/api/financeiro', '/api/hoje']) {
     const r = await pedir(caminho);
     assert.equal(r.status, 401, `${caminho} respondeu sem sessao`);
   }
