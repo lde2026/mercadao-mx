@@ -10,7 +10,7 @@
     "migrar": "node src/migrar.js",
     "semear": "node src/semear.js",
     "hoje": "node src/hoje.js",
-    "test": "node --test testes/*.test.js"
+    "test": "node --test --test-concurrency=1 testes/*.test.js"
   },
   "dependencies": {
     "express": "^4.21.2",

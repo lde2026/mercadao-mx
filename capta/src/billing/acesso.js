@@ -41,15 +41,19 @@ export function diasDeAtraso(cobrancasAbertas, hoje = new Date()) {
 
 export function calcularAcesso({ assinatura, cobrancasAbertas = [], hoje = new Date() } = {}) {
   const atraso = diasDeAtraso(cobrancasAbertas, hoje);
-  const ativa = assinatura?.status === 'ativa';
   const plano = assinatura?.plano || null;
+
+  // Conta sem assinatura nenhuma e conta em implantacao, antes da primeira
+  // cobranca existir, e nao pode nascer trancada. Quem derruba servico e
+  // cancelamento explicito ou atraso, nunca a ausencia de registro.
+  const parada = Boolean(assinatura) && assinatura.status !== 'ativa';
 
   const acesso = {
     plano,
     diasAtraso: atraso,
-    rastreamento: ativa && planoTemRastreamento(plano) && atraso < DEGRAUS.RASTREAMENTO,
-    widget: ativa && atraso < DEGRAUS.WIDGET,
-    painel: !ativa || atraso >= DEGRAUS.WIDGET ? 'leitura' : 'total',
+    rastreamento: !parada && planoTemRastreamento(plano) && atraso < DEGRAUS.RASTREAMENTO,
+    widget: !parada && atraso < DEGRAUS.WIDGET,
+    painel: parada || atraso >= DEGRAUS.WIDGET ? 'leitura' : 'total',
     // A remocao do script depende so do atraso, nunca do status da assinatura:
     // cancelamento e outro assunto e nao esta na regua que voce definiu.
     scriptNaLoja: atraso < DEGRAUS.SCRIPT,
@@ -58,7 +62,7 @@ export function calcularAcesso({ assinatura, cobrancasAbertas = [], hoje = new D
     leadsPreservados: true,
   };
 
-  if (!ativa) acesso.motivo = 'sem assinatura ativa';
+  if (parada) acesso.motivo = `assinatura ${assinatura.status}`;
   else if (atraso >= DEGRAUS.SCRIPT) acesso.motivo = `script removido da loja, ${atraso} dias de atraso`;
   else if (atraso >= DEGRAUS.WIDGET) acesso.motivo = `widget fora do ar e painel em leitura, ${atraso} dias de atraso`;
   else if (atraso >= DEGRAUS.RASTREAMENTO) acesso.motivo = `rastreamento desligado, ${atraso} dias de atraso`;

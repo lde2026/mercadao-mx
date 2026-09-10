@@ -118,9 +118,13 @@ test('assinatura cancelada derruba widget mas nao apaga lead', () => {
   assert.equal(acesso.leadsPreservados, true);
 });
 
-test('conta sem assinatura nenhuma nao quebra o calculo', () => {
+test('conta em implantacao, ainda sem assinatura, nao nasce trancada', () => {
+  // O lojista e cadastrado antes da cobranca existir. Tratar ausencia de
+  // assinatura como inadimplencia trancaria o painel dele no primeiro dia.
   const acesso = calcularAcesso({ hoje: HOJE });
-  assert.equal(acesso.widget, false);
+  assert.equal(acesso.widget, true);
+  assert.equal(acesso.painel, 'total');
+  assert.equal(acesso.rastreamento, false, 'sem plano nao ha rastreamento');
   assert.equal(acesso.diasAtraso, 0);
   assert.equal(acesso.leadsPreservados, true);
 });
