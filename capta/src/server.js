@@ -134,10 +134,29 @@ function limitar({ porChave, porIp, janela = 60 }) {
   };
 }
 
-function liberarOrigem(_req, res, proximo) {
-  // O widget roda no dominio da loja do cliente, entao a origem e sempre
-  // outra. Nao ha cookie nosso nessas rotas, entao liberar e seguro.
-  res.set('Access-Control-Allow-Origin', '*');
+/**
+ * O widget roda no dominio da loja do cliente, entao a origem e sempre outra.
+ *
+ * A origem e devolvida especifica e nao como curinga porque o sendBeacon do
+ * rastreador manda credenciais sempre, e o navegador recusa curinga nesse
+ * caso. Liberar credencial aqui nao abre nada: estas rotas nao leem cookie,
+ * autenticam pela chave da loja, e o cookie do painel e SameSite Lax, entao
+ * nem chega a viajar.
+ *
+ * Allow-Headers com Content-Type e obrigatorio: sem ele o preflight do POST
+ * com JSON e recusado e nenhum lead sai de loja nenhuma.
+ */
+function liberarOrigem(req, res, proximo) {
+  const origem = req.headers.origin;
+  if (origem) {
+    res.set('Access-Control-Allow-Origin', origem);
+    res.set('Access-Control-Allow-Credentials', 'true');
+  } else {
+    res.set('Access-Control-Allow-Origin', '*');
+  }
+  res.set('Access-Control-Allow-Headers', 'Content-Type');
+  res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.set('Access-Control-Max-Age', '86400');
   res.set('Vary', 'Origin');
   proximo();
 }
@@ -178,7 +197,7 @@ app.post('/w/lead/:chave', liberarOrigem, limitar({ porChave: 120, porIp: 10 }),
 
   const conexao = await repo.buscarConexaoPorChave(req.params.chave);
   try {
-    const { cupom } = await concluirLead({
+    const { lead, cupom } = await concluirLead({
       conexao,
       fluxo,
       nome: String(nome).slice(0, 120),
@@ -188,11 +207,15 @@ app.post('/w/lead/:chave', liberarOrigem, limitar({ porChave: 120, porIp: 10 }),
       anonimoId: anonimoId ? String(anonimoId).slice(0, 64) : null,
       redeMascarada: null,
     });
-    res.json(
-      cupom.status === 'criado'
-        ? { ok: true, cupom: cupom.codigo, desconto: cupom.desconto }
-        : { ok: true, cupom: null },
-    );
+    // O leadId volta porque o widget chama window.__captaIdentificar com ele.
+    // Conhecer o id nao da acesso a nada: /api/leads/:id exige sessao e
+    // confere o dono, que e o que o teste de isolamento garante.
+    res.json({
+      ok: true,
+      leadId: lead.id,
+      cupom: cupom.status === 'criado' ? cupom.codigo : null,
+      desconto: cupom.status === 'criado' ? cupom.desconto : null,
+    });
   } catch (erro) {
     log.erro('lead.falhou', { conexao_id: conexao?.id, motivo: erro.message });
     res.status(500).json({ erro: 'falha ao registrar' });
