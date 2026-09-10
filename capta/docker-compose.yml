@@ -1,0 +1,16 @@
+services:
+  banco:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: capta
+      POSTGRES_PASSWORD: capta
+      POSTGRES_DB: capta
+    ports: ['5432:5432']
+    volumes: ['dados:/var/lib/postgresql/data']
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U capta']
+      interval: 5s
+      retries: 10
+
+volumes:
+  dados:

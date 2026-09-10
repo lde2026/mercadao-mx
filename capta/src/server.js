@@ -11,6 +11,7 @@ import { calcularAcesso, avisoDeCobranca } from './billing/acesso.js';
 import { PLANOS, precoDoPlano, IMPLANTACAO } from './billing/planos.js';
 import * as asaas from './billing/asaas.js';
 import * as kiwify from './billing/kiwify.js';
+import { agendar } from './tarefas.js';
 import {
   carregarConta, exigirConta, aplicarRegua, entrar, montarCookie, limparCookie,
 } from './auth.js';
@@ -488,6 +489,7 @@ app.use((erro, req, res, _proximo) => {
 const porta = Number(process.env.PORTA) || 3000;
 if (process.env.NODE_ENV !== 'test') {
   app.listen(porta, () => log.info('servidor.subiu', { porta }));
+  agendar();
 }
 
 export { app };
