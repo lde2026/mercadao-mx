@@ -468,3 +468,23 @@ export async function limparLimites() {
   const janela = Math.floor(Date.now() / 1000 / 60) - 120;
   await consultar(`delete from limites where janela < $1`, [janela]);
 }
+
+export async function cancelarCobranca(origem, idExterno) {
+  await consultar(
+    `update cobrancas set status = 'cancelada', atualizado_em = now()
+      where origem = $1 and id_externo = $2`,
+    [origem, idExterno],
+  );
+}
+
+/**
+ * Estorno e chargeback devolvem a cobranca para aberta com o vencimento
+ * original, para a regua recomecar de onde estava e nao do zero.
+ */
+export async function reabrirCobranca(origem, idExterno) {
+  await consultar(
+    `update cobrancas set status = 'aberta', pago_em = null, atualizado_em = now()
+      where origem = $1 and id_externo = $2`,
+    [origem, idExterno],
+  );
+}
