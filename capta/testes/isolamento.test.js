@@ -51,18 +51,18 @@ async function lojaComLead(conta, nomeLoja, plataforma, nomePessoa) {
     nome: nomePessoa, email: `${nomePessoa.toLowerCase()}@teste.com.br`,
     telefone: '41999990000',
     respostas: [
-      { pergunta: 'Pra quem voce esta comprando?', resposta: 'Meu filho' },
-      { pergunta: 'Que idade ele tem?', resposta: '5 a 8' },
+      { pergunta: 'Qual o seu tamanho?', resposta: 'M' },
+      { pergunta: 'Qual faixa de preço você costuma procurar?', resposta: 'R$ 100 a R$ 200' },
     ],
     anonimoId: 'anon-teste', redeMascarada: '189.45.201.0/24',
   });
   return { conexao, lead };
 }
 
-const contaA = await contaLogada('MX Kids', 'pierre+a@lojadoecommerce.com.br');
-const contaB = await contaLogada('Purple Skate', 'pierre+b@lojadoecommerce.com.br');
-const lojaA = await lojaComLead(contaA, 'MX Kids', 'nuvemshop', 'Renata');
-const lojaB = await lojaComLead(contaB, 'Purple Skate', 'tray', 'Marcos');
+const contaA = await contaLogada('Bella Moda', 'pierre+a@lojadoecommerce.com.br');
+const contaB = await contaLogada('Casa Verde Decor', 'pierre+b@lojadoecommerce.com.br');
+const lojaA = await lojaComLead(contaA, 'Bella Moda', 'nuvemshop', 'Renata');
+const lojaB = await lojaComLead(contaB, 'Casa Verde Decor', 'tray', 'Marcos');
 
 test('conta B lendo o lead da conta A recebe 404', async () => {
   const r = await pedir(`/api/leads/${lojaA.lead.id}`, { cookie: contaB.cookie });
@@ -106,7 +106,7 @@ test('conta B nao alcanca a conexao da conta A', async () => {
 test('a listagem de conexoes nunca mistura contas', async () => {
   const r = await pedir('/api/conexoes', { cookie: contaB.cookie });
   assert.equal(r.json.length, 1);
-  assert.equal(r.json[0].nome_loja, 'Purple Skate');
+  assert.equal(r.json[0].nome_loja, 'Casa Verde Decor');
 });
 
 test('a planilha exportada so traz os leads da propria conta', async () => {
@@ -119,7 +119,7 @@ test('a planilha exportada so traz os leads da propria conta', async () => {
   const csv = new TextDecoder().decode(bytes);
   assert.ok(csv.includes('Marcos'), 'o lead da propria conta tem que estar');
   assert.ok(!csv.includes('Renata'), 'o lead da conta A nao pode aparecer na planilha da conta B');
-  assert.ok(!csv.includes('MX Kids'), 'nem a loja da conta A');
+  assert.ok(!csv.includes('Bella Moda'), 'nem a loja da conta A');
 });
 
 test('nome de lead que parece formula nao executa ao abrir a planilha', async () => {
@@ -155,9 +155,9 @@ test('sair invalida a sessao no banco, nao so no navegador', async () => {
 test('o endpoint publico recusa lead sem consentimento', async () => {
   await repo.salvarFluxo(contaA.id, lojaA.conexao.id, {
     convite: 'Ganhe 10% na primeira compra',
-    consentimento: 'Ao continuar, voce concorda que a MX Kids use seus dados para entrar em contato sobre esta compra.',
+    consentimento: 'Ao continuar, voce concorda que a Bella Moda use seus dados para entrar em contato sobre esta compra.',
     desconto: 10,
-    perguntas: [{ texto: 'Pra quem voce esta comprando?', opcoes: ['Meu filho', 'Minha filha', 'Presente', 'Pra mim'] }],
+    perguntas: [{ texto: 'Qual o seu tamanho?', opcoes: ['PP', 'P', 'M', 'G', 'GG', 'Plus Size'] }],
   });
   const r = await pedir(`/w/lead/${lojaA.conexao.chave_publica}`, {
     metodo: 'POST',

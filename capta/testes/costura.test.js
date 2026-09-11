@@ -15,10 +15,10 @@ await prepararBanco();
  */
 
 async function cenario() {
-  const contaA = await contaDeTeste('MX Kids', `a-${Date.now()}@teste.com.br`);
-  const contaB = await contaDeTeste('Purple Skate', `b-${Date.now()}@teste.com.br`);
-  const lojaA = await conexaoDeTeste(contaA.id, 'nuvemshop', 'MX Kids');
-  const lojaB = await conexaoDeTeste(contaB.id, 'tray', 'Purple Skate');
+  const contaA = await contaDeTeste('Bella Moda', `a-${Date.now()}@teste.com.br`);
+  const contaB = await contaDeTeste('Casa Verde Decor', `b-${Date.now()}@teste.com.br`);
+  const lojaA = await conexaoDeTeste(contaA.id, 'nuvemshop', 'Bella Moda');
+  const lojaB = await conexaoDeTeste(contaB.id, 'tray', 'Casa Verde Decor');
   return { contaA, contaB, lojaA, lojaB };
 }
 
@@ -26,7 +26,7 @@ function leadDe(conexao, nome, anonimoId) {
   return repo.criarLead({
     contaId: conexao.conta_id, conexaoId: conexao.id,
     nome, email: `${nome.toLowerCase()}@teste.com.br`, telefone: '41999990000',
-    respostas: [{ pergunta: 'Pra quem voce esta comprando?', resposta: 'Meu filho' }],
+    respostas: [{ pergunta: 'Qual o seu tamanho?', resposta: 'M' }],
     anonimoId, redeMascarada: '189.45.201.0/24',
   });
 }
@@ -36,9 +36,9 @@ test('costura atribui a navegacao anonima ao lead que se identificou', async () 
   const anonimo = 'anon-visitante-1';
 
   await registrarEvento({ conexao: lojaA, anonimoId: anonimo, tipo: 'pagina',
-    url: 'https://mxkids.com.br/', titulo: 'MX Kids', ip: '189.45.201.77' });
+    url: 'https://bellamoda.com.br/', titulo: 'Bella Moda', ip: '189.45.201.77' });
   await registrarEvento({ conexao: lojaA, anonimoId: anonimo, tipo: 'produto',
-    url: 'https://mxkids.com.br/calca-motocross-infantil', titulo: 'Calca Motocross Infantil', ip: '189.45.201.77' });
+    url: 'https://bellamoda.com.br/vestido-midi-floral', titulo: 'Vestido Midi Floral', ip: '189.45.201.77' });
 
   const lead = await leadDe(lojaA, 'Renata', anonimo);
   const costurados = await costurarEventos({
@@ -48,7 +48,7 @@ test('costura atribui a navegacao anonima ao lead que se identificou', async () 
   assert.equal(costurados, 2);
   const perfil = await perfilDoLead(lojaA.conta_id, lead.id);
   assert.equal(perfil.linhaDoTempo.length, 2);
-  assert.equal(perfil.linhaDoTempo[1].titulo, 'Calca Motocross Infantil');
+  assert.equal(perfil.linhaDoTempo[1].titulo, 'Vestido Midi Floral');
 });
 
 test('costura nao alcanca outra loja mesmo com o mesmo anonimo_id', async () => {
@@ -56,9 +56,9 @@ test('costura nao alcanca outra loja mesmo com o mesmo anonimo_id', async () => 
   const anonimo = 'anon-mesmo-navegador';
 
   await registrarEvento({ conexao: lojaA, anonimoId: anonimo, tipo: 'produto',
-    url: 'https://mxkids.com.br/bota-infantil', titulo: 'Bota Infantil', ip: '189.45.201.77' });
+    url: 'https://bellamoda.com.br/blusa-de-linho', titulo: 'Blusa de Linho', ip: '189.45.201.77' });
   await registrarEvento({ conexao: lojaB, anonimoId: anonimo, tipo: 'produto',
-    url: 'https://purpleskate.com.br/shape-8-0', titulo: 'Shape 8.0', ip: '189.45.201.77' });
+    url: 'https://casaverdedecor.com.br/luminaria-de-mesa', titulo: 'Luminaria de Mesa', ip: '189.45.201.77' });
 
   const leadA = await leadDe(lojaA, 'Renata', anonimo);
   await costurarEventos({
@@ -67,7 +67,7 @@ test('costura nao alcanca outra loja mesmo com o mesmo anonimo_id', async () => 
 
   const perfil = await perfilDoLead(lojaA.conta_id, leadA.id);
   assert.equal(perfil.linhaDoTempo.length, 1);
-  assert.equal(perfil.linhaDoTempo[0].titulo, 'Bota Infantil');
+  assert.equal(perfil.linhaDoTempo[0].titulo, 'Blusa de Linho');
 
   const { rows } = await pool.query(
     `select lead_id from eventos where conexao_id = $1`, [lojaB.id],
@@ -80,7 +80,7 @@ test('costura nao rouba evento ja atribuido a outro lead', async () => {
   const anonimo = 'anon-navegador-compartilhado';
 
   await registrarEvento({ conexao: lojaA, anonimoId: anonimo, tipo: 'produto',
-    url: 'https://mxkids.com.br/capacete', titulo: 'Capacete Infantil', ip: '189.45.201.77' });
+    url: 'https://bellamoda.com.br/jaqueta-jeans', titulo: 'Jaqueta Jeans', ip: '189.45.201.77' });
 
   const primeiro = await leadDe(lojaA, 'Renata', anonimo);
   await costurarEventos({
@@ -119,7 +119,7 @@ test('perfil do lead da conta A nao abre para a conta B', async () => {
 test('evento nunca guarda o IP inteiro', async () => {
   const { lojaA } = await cenario();
   await registrarEvento({ conexao: lojaA, anonimoId: 'anon-z', tipo: 'pagina',
-    url: 'https://mxkids.com.br/', ip: '189.45.201.77' });
+    url: 'https://bellamoda.com.br/', ip: '189.45.201.77' });
   const { rows } = await pool.query(
     `select rede_mascarada from eventos where anonimo_id = 'anon-z'`,
   );

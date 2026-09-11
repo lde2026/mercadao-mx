@@ -35,7 +35,7 @@ npm run migrar
 npm run semear
 ```
 
-O `semear` cria a conta da MX Kids com o fluxo real de motocross infantil e
+O `semear` cria a conta da Bella Moda com o fluxo padrao de moda e
 tres conexoes, uma de cada modo de instalacao: Nuvemshop automatica, Tray
 manual e Loja Integrada bloqueada. Ele imprime o e-mail e a senha de entrada.
 
@@ -63,7 +63,7 @@ Pegue a `chave` que o `semear` imprimiu e ponha numa pagina HTML local:
 | `npm run dev` | sobe com recarga automatica |
 | `npm test` | roda os testes |
 | `npm run migrar` | aplica o schema |
-| `npm run semear` | cria a conta e o fluxo da MX Kids |
+| `npm run semear` | cria a conta e o fluxo da Bella Moda |
 | `npm run hoje` | quantos leads entraram hoje, em quais lojas, quantos cupons falharam |
 
 ## Testes
