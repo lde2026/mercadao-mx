@@ -21,14 +21,17 @@ export const woocommerce = {
   plataforma: 'woocommerce',
   tokenExpira: false,
 
-  async criarCupom(credenciais, { codigo, desconto }) {
+  async criarCupom(credenciais, { codigo, desconto, frete = false }) {
     await pedir(`${base(credenciais)}/coupons`, {
       method: 'POST',
       headers: cabecalhos(credenciais),
       body: JSON.stringify({
         code: codigo,
-        discount_type: 'percent',
-        amount: String(desconto),
+        // Frete gratis no WooCommerce nao e um tipo, e uma flag num cupom de
+        // valor zero. Sem o fixed_cart zerado ele recusa criar.
+        discount_type: frete ? 'fixed_cart' : 'percent',
+        amount: frete ? '0' : String(desconto),
+        free_shipping: frete,
         usage_limit: 1,
         individual_use: true,
       }),

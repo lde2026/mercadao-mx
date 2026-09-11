@@ -34,15 +34,16 @@ export const nuvemshop = {
   plataforma: 'nuvemshop',
   tokenExpira: false,
 
-  async criarCupom(credenciais, { codigo, desconto }) {
+  async criarCupom(credenciais, { codigo, desconto, frete = false }) {
     try {
       await pedir(url(credenciais, '/coupons'), {
         method: 'POST',
         headers: cabecalhos(credenciais),
         body: JSON.stringify({
           code: codigo,
-          type: 'percentage',
-          value: String(desconto),
+          // shipping e o tipo de frete gratis na Nuvemshop; o value e ignorado nele.
+          type: frete ? 'shipping' : 'percentage',
+          value: frete ? '0' : String(desconto),
           max_uses: 1,
           valid: true,
         }),

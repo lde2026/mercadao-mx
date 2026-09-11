@@ -186,23 +186,26 @@ export async function conexoesParaVarrer(minutos = 30) {
 
 // ----------------------------------------------------------------- fluxo ---
 
-export async function salvarFluxo(contaId, conexaoId, { convite, consentimento, desconto, perguntas }) {
+export async function salvarFluxo(contaId, conexaoId, {
+  convite, consentimento, desconto, perguntas, recompensa = 'cupom',
+}) {
   if (perguntas.length > 3) {
     // A quarta pergunta e a de contato, fixa. Tres configuraveis e o teto.
     throw new Error('maximo de tres perguntas configuraveis antes da de contato');
   }
   return emTransacao(async (cliente) => {
     const { rows } = await cliente.query(
-      `insert into fluxos (conta_id, conexao_id, convite, consentimento, desconto)
-       select $1, $2, $3, $4, $5
+      `insert into fluxos (conta_id, conexao_id, convite, consentimento, desconto, recompensa)
+       select $1, $2, $3, $4, $5, $6
         where exists (select 1 from conexoes where id = $2 and conta_id = $1)
        on conflict (conexao_id) do update
           set convite = excluded.convite,
               consentimento = excluded.consentimento,
               desconto = excluded.desconto,
+              recompensa = excluded.recompensa,
               atualizado_em = now()
        returning id`,
-      [contaId, conexaoId, convite, consentimento, desconto],
+      [contaId, conexaoId, convite, consentimento, desconto, recompensa],
     );
     if (!rows[0]) return null;
     const fluxoId = rows[0].id;
@@ -220,7 +223,7 @@ export async function salvarFluxo(contaId, conexaoId, { convite, consentimento, 
 export async function fluxoPorChave(chave) {
   const { rows } = await consultar(
     `select f.id, f.conta_id, f.conexao_id, f.convite, f.consentimento,
-            f.desconto, f.ativo, c.plataforma, c.status as status_conexao,
+            f.desconto, f.recompensa, f.ativo, c.plataforma, c.status as status_conexao,
             coalesce(
               (select json_agg(json_build_object('texto', p.texto, 'opcoes', p.opcoes)
                                order by p.ordem)
@@ -237,7 +240,7 @@ export async function fluxoPorChave(chave) {
 
 export async function fluxoDaConexao(contaId, conexaoId) {
   const { rows } = await consultar(
-    `select f.id, f.convite, f.consentimento, f.desconto, f.ativo,
+    `select f.id, f.convite, f.consentimento, f.desconto, f.recompensa, f.ativo,
             coalesce(
               (select json_agg(json_build_object('texto', p.texto, 'opcoes', p.opcoes)
                                order by p.ordem)
@@ -344,11 +347,13 @@ export async function apagarLead(contaId, leadId) {
 
 // ---------------------------------------------------------------- cupons ---
 
-export async function registrarCupomPendente({ contaId, conexaoId, leadId, codigo, desconto }) {
+export async function registrarCupomPendente({
+  contaId, conexaoId, leadId, codigo, desconto, tipo = 'percentual',
+}) {
   const { rows } = await consultar(
-    `insert into cupons (conta_id, conexao_id, lead_id, codigo, desconto)
-     values ($1, $2, $3, $4, $5) returning id`,
-    [contaId, conexaoId, leadId, codigo, desconto],
+    `insert into cupons (conta_id, conexao_id, lead_id, codigo, desconto, tipo)
+     values ($1, $2, $3, $4, $5, $6) returning id`,
+    [contaId, conexaoId, leadId, codigo, desconto, tipo],
   );
   return rows[0];
 }

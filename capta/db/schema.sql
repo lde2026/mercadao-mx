@@ -68,6 +68,13 @@ create table if not exists fluxos (
   criado_em     timestamptz not null default now(),
   atualizado_em timestamptz not null default now()
 );
+-- O beneficio do fim do chat. Loja oferece cupom ou frete gratis, que viram
+-- cupom na plataforma. Operacao que nao e loja oferece diagnostico, conversa
+-- com especialista ou consultoria, que nao criam nada: o lead vai para a
+-- fila e a recompensa e o contato humano.
+alter table fluxos add column if not exists recompensa text not null default 'cupom'
+  check (recompensa in ('cupom','frete_gratis','diagnostico','especialista','consultoria'));
+
 create unique index if not exists fluxos_conexao_idx on fluxos(conexao_id);
 
 -- Teto de quatro perguntas no banco, nao so na tela: a ultima e a de contato
@@ -125,6 +132,9 @@ create table if not exists cupons (
   usado_em   timestamptz,
   unique (conexao_id, codigo)
 );
+alter table cupons add column if not exists tipo text not null default 'percentual'
+  check (tipo in ('percentual','frete'));
+
 create index if not exists cupons_lead_idx   on cupons(lead_id);
 create index if not exists cupons_status_idx on cupons(status, criado_em desc);
 

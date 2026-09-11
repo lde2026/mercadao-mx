@@ -483,6 +483,482 @@
     });
   }
 
+  // ------------------------------------------------------------------ chat ---
+
+  /**
+   * Construtor do fluxo. Cartoes ligados em linha, um por etapa, no formato
+   * de ferramenta de automacao que o lojista ja conhece. E linear de
+   * proposito: tres perguntas configuraveis, a de contato fixa no fim, e o
+   * cupom. Ramificacao e mais pergunta derrubam a taxa de resposta, e o
+   * lojista cancela culpando a ferramenta.
+   */
+  var construtor = null;
+  var modelos = null;
+
+  var FLUXO_VAZIO = {
+    convite: 'Ganhe cupom',
+    consentimento: '',
+    desconto: 10,
+    recompensa: 'cupom',
+    perguntas: [],
+  };
+
+  var RECOMPENSAS = [
+    ['Loja virtual', [
+      ['cupom', 'Cupom de desconto'],
+      ['frete_gratis', 'Frete grátis na primeira compra'],
+    ]],
+    ['Outro tipo de operação', [
+      ['diagnostico', 'Diagnóstico gratuito'],
+      ['especialista', 'Fale com um especialista'],
+      ['consultoria', 'Ganhe uma consultoria'],
+    ]],
+  ];
+  var NOME_RECOMPENSA = {};
+  RECOMPENSAS.forEach(function (g) { g[1].forEach(function (r) { NOME_RECOMPENSA[r[0]] = r[1]; }); });
+
+  function verChat() {
+    var alvo = pintar('Chat', 'Monte as perguntas que o visitante responde antes de ganhar o cupom.');
+    Promise.all([api('/conexoes'), modelos ? Promise.resolve(modelos) : api('/modelos')])
+      .then(function (r) {
+        var conexoes = r[0];
+        modelos = r[1];
+        if (!conexoes.length) {
+          alvo.appendChild(el('p', 'Conecte uma loja em Integracoes antes de montar o chat.', 'vazio'));
+          return;
+        }
+        var atual = construtor && conexoes.some(function (c) { return c.id === construtor.conexaoId; })
+          ? construtor.conexaoId : conexoes[0].id;
+        carregarConstrutor(alvo, conexoes, atual);
+      });
+  }
+
+  function carregarConstrutor(alvo, conexoes, conexaoId) {
+    var conexao = conexoes.filter(function (c) { return c.id === conexaoId; })[0];
+    api('/conexoes/' + conexaoId + '/fluxo').then(function (fluxo) {
+      var vazio = !fluxo;
+      construtor = {
+        conexaoId: conexaoId,
+        nomeLoja: conexao.nome_loja,
+        fluxo: fluxo ? {
+          convite: fluxo.convite, consentimento: fluxo.consentimento,
+          desconto: fluxo.desconto, recompensa: fluxo.recompensa || 'cupom',
+          perguntas: (fluxo.perguntas || []).map(function (p) {
+            return { texto: p.texto, opcoes: (p.opcoes || []).slice() };
+          }),
+        } : JSON.parse(JSON.stringify(FLUXO_VAZIO)),
+        selecionado: 'convite',
+        sujo: false,
+      };
+      if (vazio) {
+        construtor.fluxo.consentimento = 'Ao continuar, você concorda que a ' + conexao.nome_loja
+          + ' use seus dados para entrar em contato sobre esta compra.';
+      }
+      desenharConstrutor(alvo, conexoes);
+      if (vazio) abrirModelos();
+    });
+  }
+
+  function desenharConstrutor(alvo, conexoes) {
+    var antigo = alvo.querySelector('.construtor');
+    if (antigo) antigo.remove();
+    var caixa = el('div', null, 'construtor');
+
+    var topo = el('div', null, 'construtor-topo');
+    if (conexoes.length > 1) {
+      var escolha = el('select');
+      conexoes.forEach(function (c) {
+        var op = el('option', c.nome_loja);
+        op.value = c.id;
+        if (c.id === construtor.conexaoId) op.selected = true;
+        escolha.appendChild(op);
+      });
+      escolha.addEventListener('change', function () {
+        if (construtor.sujo && !confirm('Ha mudancas nao publicadas. Trocar de loja e perder?')) {
+          escolha.value = construtor.conexaoId; return;
+        }
+        carregarConstrutor(alvo, conexoes, escolha.value);
+      });
+      topo.appendChild(escolha);
+    } else {
+      topo.appendChild(el('strong', construtor.nomeLoja));
+    }
+    var usarModelo = el('button', 'Usar um modelo', 'secundario');
+    usarModelo.type = 'button';
+    usarModelo.addEventListener('click', abrirModelos);
+    topo.appendChild(usarModelo);
+
+    var estado = el('span', '', 'hora estado-publicacao');
+    var publicar = el('button', 'Publicar no widget');
+    publicar.type = 'button';
+    publicar.addEventListener('click', function () {
+      var f = construtor.fluxo;
+      if (!f.consentimento.trim()) { estado.textContent = 'A linha de consentimento e obrigatoria.'; return; }
+      var semTexto = f.perguntas.some(function (p) { return !p.texto.trim(); });
+      if (semTexto) { estado.textContent = 'Tem pergunta sem texto.'; return; }
+      publicar.disabled = true;
+      estado.textContent = 'Publicando...';
+      api('/conexoes/' + construtor.conexaoId + '/fluxo', { method: 'PUT', corpo: f })
+        .then(function () {
+          construtor.sujo = false;
+          publicar.disabled = false;
+          estado.textContent = 'Publicado as ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) + '. O widget ja mostra assim.';
+        })
+        .catch(function (e) {
+          publicar.disabled = false;
+          estado.textContent = e.dados && e.dados.explicacao ? e.dados.explicacao : e.message;
+        });
+    });
+    topo.appendChild(estado);
+    topo.appendChild(publicar);
+    caixa.appendChild(topo);
+
+    var corpo = el('div', null, 'construtor-corpo');
+    corpo.appendChild(el('div', null, 'quadro'));
+    corpo.appendChild(el('aside', null, 'previa'));
+    caixa.appendChild(corpo);
+    alvo.appendChild(caixa);
+
+    desenharQuadro();
+    desenharPrevia();
+  }
+
+  function marcarSujo() {
+    construtor.sujo = true;
+    var estado = document.querySelector('.estado-publicacao');
+    if (estado) estado.textContent = 'Mudancas nao publicadas';
+  }
+
+  function no(tipo, titulo, chave) {
+    var cartao = el('section', null, 'no ' + tipo + (construtor.selecionado === chave ? ' selecionado' : ''));
+    var cab = el('header');
+    cab.appendChild(el('span', titulo));
+    cartao.appendChild(cab);
+    cartao.addEventListener('click', function () {
+      if (construtor.selecionado === chave) return;
+      construtor.selecionado = chave;
+      document.querySelectorAll('.no').forEach(function (n) { n.classList.remove('selecionado'); });
+      cartao.classList.add('selecionado');
+      desenharPrevia();
+    });
+    return cartao;
+  }
+
+  function ligacao() {
+    var l = el('div', null, 'ligacao');
+    l.setAttribute('aria-hidden', 'true');
+    return l;
+  }
+
+  function desenharQuadro() {
+    var quadro = document.querySelector('.quadro');
+    if (!quadro) return;
+    quadro.textContent = '';
+    var f = construtor.fluxo;
+
+    // Convite
+    var convite = no('convite', 'Convite', 'convite');
+    var corpoConvite = el('div', null, 'no-corpo');
+    var rotuloConvite = el('label', 'Texto do botao flutuante');
+    var campoConvite = el('input');
+    campoConvite.value = f.convite;
+    campoConvite.maxLength = 60;
+    campoConvite.addEventListener('input', function () { f.convite = campoConvite.value; marcarSujo(); desenharPrevia(); });
+    rotuloConvite.appendChild(campoConvite);
+    corpoConvite.appendChild(rotuloConvite);
+    convite.appendChild(corpoConvite);
+    quadro.appendChild(convite);
+
+    // Perguntas
+    f.perguntas.forEach(function (pergunta, indice) {
+      quadro.appendChild(ligacao());
+      var cartao = no('pergunta', 'Pergunta ' + (indice + 1), indice);
+      var acoes = el('span', null, 'no-acoes');
+      [['↑', 'Mover para cima', function () { mover(indice, -1); }],
+       ['↓', 'Mover para baixo', function () { mover(indice, 1); }],
+       ['×', 'Remover pergunta', function () { remover(indice); }]].forEach(function (a) {
+        var b = el('button', a[0], 'no-botao');
+        b.type = 'button'; b.title = a[1];
+        b.addEventListener('click', function (e) { e.stopPropagation(); a[2](); });
+        acoes.appendChild(b);
+      });
+      cartao.querySelector('header').appendChild(acoes);
+
+      var corpo = el('div', null, 'no-corpo');
+      var rotulo = el('label', 'Pergunta');
+      var texto = el('textarea');
+      texto.rows = 2; texto.maxLength = 160;
+      texto.value = pergunta.texto;
+      texto.placeholder = 'Ex.: Qual o seu tamanho?';
+      texto.addEventListener('input', function () { pergunta.texto = texto.value; marcarSujo(); desenharPrevia(); });
+      rotulo.appendChild(texto);
+      corpo.appendChild(rotulo);
+
+      corpo.appendChild(el('div', pergunta.opcoes.length ? 'Respostas' : 'Resposta livre, o visitante escreve', 'rotulo'));
+      var chips = el('div', null, 'chips');
+      pergunta.opcoes.forEach(function (opcao, i) {
+        var chip = el('span', null, 'chip');
+        chip.appendChild(document.createTextNode(opcao));
+        var tirar = el('button', '×', 'chip-x');
+        tirar.type = 'button'; tirar.title = 'Remover resposta';
+        tirar.addEventListener('click', function (e) {
+          e.stopPropagation(); pergunta.opcoes.splice(i, 1); marcarSujo(); desenharQuadro(); desenharPrevia();
+        });
+        chip.appendChild(tirar);
+        chips.appendChild(chip);
+      });
+      corpo.appendChild(chips);
+
+      if (pergunta.opcoes.length < 8) {
+        var nova = el('input');
+        nova.placeholder = pergunta.opcoes.length ? 'Nova resposta e Enter' : 'Adicionar resposta e Enter';
+        nova.maxLength = 60;
+        nova.className = 'nova-opcao';
+        nova.addEventListener('keydown', function (e) {
+          if (e.key !== 'Enter') return;
+          e.preventDefault();
+          var v = nova.value.trim();
+          if (!v) return;
+          pergunta.opcoes.push(v); marcarSujo(); desenharQuadro(); desenharPrevia();
+          var campos = document.querySelectorAll('.no.pergunta .nova-opcao');
+          if (campos[indice]) campos[indice].focus();
+        });
+        corpo.appendChild(nova);
+      }
+      cartao.appendChild(corpo);
+      quadro.appendChild(cartao);
+    });
+
+    // Adicionar
+    if (f.perguntas.length < 3) {
+      quadro.appendChild(ligacao());
+      var adicionar = el('button', null, 'no adicionar');
+      adicionar.type = 'button';
+      adicionar.appendChild(el('strong', '+ Adicionar pergunta'));
+      adicionar.appendChild(el('span', f.perguntas.length + ' de 3', 'hora'));
+      adicionar.addEventListener('click', function () {
+        f.perguntas.push({ texto: '', opcoes: [] });
+        construtor.selecionado = f.perguntas.length - 1;
+        marcarSujo(); desenharQuadro(); desenharPrevia();
+        var areas = document.querySelectorAll('.no.pergunta textarea');
+        if (areas.length) areas[areas.length - 1].focus();
+      });
+      quadro.appendChild(adicionar);
+    }
+
+    // Contato, fixo
+    quadro.appendChild(ligacao());
+    var contato = no('contato', 'Contato', 'contato');
+    contato.querySelector('header').appendChild(el('span', 'fixo, sempre a ultima', 'no-fixo'));
+    var corpoContato = el('div', null, 'no-corpo');
+    corpoContato.appendChild(el('div', 'O visitante deixa', 'rotulo'));
+    var fixos = el('div', null, 'chips');
+    ['Nome', 'WhatsApp', 'E-mail'].forEach(function (c) { fixos.appendChild(el('span', c, 'chip fixo')); });
+    corpoContato.appendChild(fixos);
+    var rotuloLgpd = el('label', 'Linha de consentimento (LGPD)');
+    var lgpd = el('textarea');
+    lgpd.rows = 3; lgpd.maxLength = 300;
+    lgpd.value = f.consentimento;
+    lgpd.addEventListener('input', function () { f.consentimento = lgpd.value; marcarSujo(); desenharPrevia(); });
+    rotuloLgpd.appendChild(lgpd);
+    corpoContato.appendChild(rotuloLgpd);
+    contato.appendChild(corpoContato);
+    quadro.appendChild(contato);
+
+    // Beneficio
+    quadro.appendChild(ligacao());
+    var beneficio = no('cupom', 'Benefício', 'cupom');
+    var corpoBen = el('div', null, 'no-corpo');
+    var rotuloTipo = el('label', 'O que o visitante ganha');
+    var tipo = el('select');
+    RECOMPENSAS.forEach(function (grupo) {
+      var og = document.createElement('optgroup');
+      og.label = grupo[0];
+      grupo[1].forEach(function (r) {
+        var op = el('option', r[1]);
+        op.value = r[0];
+        if (f.recompensa === r[0]) op.selected = true;
+        og.appendChild(op);
+      });
+      tipo.appendChild(og);
+    });
+    tipo.addEventListener('click', function (e) { e.stopPropagation(); });
+    tipo.addEventListener('change', function () {
+      f.recompensa = tipo.value;
+      // Quem troca o beneficio quer ver como ele aparece, entao a previa vai junto.
+      construtor.selecionado = 'cupom';
+      marcarSujo(); desenharQuadro(); desenharPrevia();
+    });
+    rotuloTipo.appendChild(tipo);
+    corpoBen.appendChild(rotuloTipo);
+
+    if (f.recompensa === 'cupom') {
+      var rotuloDesc = el('label', 'Desconto em %');
+      var desc = el('input');
+      desc.type = 'number'; desc.min = 1; desc.max = 90; desc.value = f.desconto;
+      desc.addEventListener('input', function () { f.desconto = Number(desc.value) || 10; marcarSujo(); desenharPrevia(); });
+      rotuloDesc.appendChild(desc);
+      corpoBen.appendChild(rotuloDesc);
+      corpoBen.appendChild(el('p', 'Um código único por pessoa, criado na hora na sua plataforma.', 'hora'));
+    } else if (f.recompensa === 'frete_gratis') {
+      corpoBen.appendChild(el('p', 'Um cupom único de frete grátis, criado na hora na sua plataforma.', 'hora'));
+    } else {
+      corpoBen.appendChild(el('p', 'Não cria nada na loja. O lead entra na fila para você chamar no WhatsApp.', 'hora'));
+    }
+    beneficio.appendChild(corpoBen);
+    quadro.appendChild(beneficio);
+  }
+
+  function mover(indice, passo) {
+    var p = construtor.fluxo.perguntas;
+    var destino = indice + passo;
+    if (destino < 0 || destino >= p.length) return;
+    var tmp = p[indice]; p[indice] = p[destino]; p[destino] = tmp;
+    construtor.selecionado = destino;
+    marcarSujo(); desenharQuadro(); desenharPrevia();
+  }
+
+  function remover(indice) {
+    construtor.fluxo.perguntas.splice(indice, 1);
+    construtor.selecionado = 'convite';
+    marcarSujo(); desenharQuadro(); desenharPrevia();
+  }
+
+  /** O que o visitante ve, na etapa selecionada. */
+  function desenharPrevia() {
+    var previa = document.querySelector('.previa');
+    if (!previa) return;
+    previa.textContent = '';
+    var f = construtor.fluxo;
+    var sel = construtor.selecionado;
+    previa.appendChild(el('div', 'Como o visitante ve', 'rotulo'));
+
+    var tela = el('div', null, 'previa-tela');
+    if (sel === 'convite') {
+      var botao = el('div', f.convite || 'Ganhe cupom', 'previa-botao');
+      tela.appendChild(el('div', null, 'previa-loja'));
+      tela.appendChild(botao);
+      previa.appendChild(tela);
+      previa.appendChild(el('p', 'Botao flutuante no canto da loja. Clicar abre o chat.', 'hora'));
+      return;
+    }
+
+    var painel = el('div', null, 'previa-painel');
+    var cab = el('div', null, 'previa-cab');
+    cab.appendChild(el('strong', f.convite || 'Ganhe cupom'));
+    cab.appendChild(el('span', '×'));
+    painel.appendChild(cab);
+    var corpo = el('div', null, 'previa-corpo');
+
+    var total = f.perguntas.length + 1;
+    var passo = typeof sel === 'number' ? sel : sel === 'contato' ? f.perguntas.length : total;
+    var barra = el('div', null, 'previa-barra');
+    var dentro = el('i');
+    dentro.style.width = Math.round((passo / total) * 100) + '%';
+    barra.appendChild(dentro);
+    corpo.appendChild(barra);
+
+    if (typeof sel === 'number') {
+      var p = f.perguntas[sel];
+      corpo.appendChild(el('div', p.texto || 'Sua pergunta aqui', 'previa-q'));
+      if (p.opcoes.length) {
+        p.opcoes.forEach(function (o) { corpo.appendChild(el('div', o, 'previa-op')); });
+      } else {
+        var campo = el('div', 'Escreva aqui', 'previa-campo');
+        corpo.appendChild(campo);
+        corpo.appendChild(el('div', 'Continuar', 'previa-enviar'));
+      }
+    } else if (sel === 'contato') {
+      var comCupom = f.recompensa === 'cupom' || f.recompensa === 'frete_gratis';
+      corpo.appendChild(el('div', comCupom ? 'Onde eu te mando o cupom?' : 'Onde a gente fala com você?', 'previa-q'));
+      [['Seu nome', 'Renata'], ['WhatsApp', '(41) 99999-0000'], ['E-mail', 'renata@email.com.br']].forEach(function (c) {
+        corpo.appendChild(el('div', c[0], 'previa-rotulo'));
+        corpo.appendChild(el('div', c[1], 'previa-campo'));
+      });
+      corpo.appendChild(el('p', f.consentimento || 'Linha de consentimento', 'previa-lgpd'));
+      var cta = { cupom: 'Quero meu cupom', frete_gratis: 'Quero frete grátis', diagnostico: 'Quero meu diagnóstico',
+        especialista: 'Falar com especialista', consultoria: 'Quero a consultoria' };
+      corpo.appendChild(el('div', cta[f.recompensa] || cta.cupom, 'previa-enviar'));
+    } else if (f.recompensa === 'cupom' || f.recompensa === 'frete_gratis') {
+      corpo.appendChild(el('p', f.recompensa === 'cupom' ? 'Pronto! Use este cupom no carrinho:' : 'Pronto! Use este cupom e o frete sai de graça:', 'previa-msg'));
+      var prefixo = String(construtor.nomeLoja).normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .toUpperCase().replace(/[^A-Z]/g, '').slice(0, 6) || 'CUPOM';
+      corpo.appendChild(el('div', prefixo + '-7K2QXR', 'previa-cupom'));
+      corpo.appendChild(el('p', f.recompensa === 'cupom' ? 'Ele é só seu e vale uma vez. ' + f.desconto + '% de desconto.' : 'Ele é só seu e vale uma vez.', 'previa-msg'));
+    } else {
+      var finais = {
+        diagnostico: 'Recebemos suas respostas. Em breve um especialista manda seu diagnóstico no WhatsApp.',
+        especialista: 'Recebemos seus dados. Um especialista vai falar com você no WhatsApp em breve.',
+        consultoria: 'Recebemos suas respostas. Vamos combinar sua consultoria pelo WhatsApp em breve.',
+      };
+      corpo.appendChild(el('p', finais[f.recompensa], 'previa-msg'));
+      corpo.appendChild(el('p', 'Sem cupom: o benefício é o contato humano.', 'hora'));
+    }
+    painel.appendChild(corpo);
+    tela.appendChild(painel);
+    previa.appendChild(tela);
+    previa.appendChild(el('p', 'Clique num cartao do quadro para ver aquela etapa.', 'hora'));
+  }
+
+  /** Modal de modelos, em sanfona por nicho como a ferramenta que o lojista ja usa. */
+  function abrirModelos() {
+    var existente = document.querySelector('.sobreposicao');
+    if (existente) existente.remove();
+    var fundo = el('div', null, 'sobreposicao');
+    var modal = el('div', null, 'modal');
+    var cab = el('div', null, 'modal-cab');
+    cab.appendChild(el('strong', 'Selecione um modelo'));
+    var fechar = el('button', '×', 'icone');
+    fechar.type = 'button'; fechar.setAttribute('aria-label', 'Fechar');
+    fechar.addEventListener('click', function () { fundo.remove(); });
+    cab.appendChild(fechar);
+    modal.appendChild(cab);
+    modal.appendChild(el('p', 'Comece por um padrao do seu nicho e ajuste o texto do seu jeito.', 'legenda'));
+
+    var nichos = {};
+    modelos.forEach(function (m) { (nichos[m.nicho] = nichos[m.nicho] || []).push(m); });
+    Object.keys(nichos).forEach(function (nicho, i) {
+      var grupo = el('div', null, 'sanfona' + (i === 0 ? ' aberta' : ''));
+      var cabGrupo = el('button', null, 'sanfona-cab');
+      cabGrupo.type = 'button';
+      cabGrupo.appendChild(el('span', nicho));
+      cabGrupo.appendChild(el('span', '⌄', 'seta'));
+      cabGrupo.addEventListener('click', function () { grupo.classList.toggle('aberta'); });
+      grupo.appendChild(cabGrupo);
+      var itens = el('div', null, 'sanfona-itens');
+      nichos[nicho].forEach(function (m) {
+        var item = el('button', null, 'modelo');
+        item.type = 'button';
+        item.appendChild(el('strong', m.nome));
+        item.appendChild(el('span', NOME_RECOMPENSA[m.recompensa] || 'Cupom de desconto', 'selo criado'));
+        item.appendChild(el('span', m.perguntas.map(function (p) { return p.texto; }).join('  \u00b7  '), 'hora'));
+        item.addEventListener('click', function () { aplicarModelo(m); fundo.remove(); });
+        itens.appendChild(item);
+      });
+      grupo.appendChild(itens);
+      modal.appendChild(grupo);
+    });
+
+    fundo.appendChild(modal);
+    fundo.addEventListener('click', function (e) { if (e.target === fundo) fundo.remove(); });
+    document.body.appendChild(fundo);
+  }
+
+  function aplicarModelo(m) {
+    var f = construtor.fluxo;
+    f.convite = m.convite;
+    f.consentimento = m.consentimento.replace(/\{loja\}/g, construtor.nomeLoja);
+    f.desconto = m.desconto;
+    f.recompensa = m.recompensa || 'cupom';
+    f.perguntas = m.perguntas.map(function (p) { return { texto: p.texto, opcoes: p.opcoes.slice() }; });
+    construtor.selecionado = 0;
+    marcarSujo(); desenharQuadro(); desenharPrevia();
+  }
+
+  window.addEventListener('beforeunload', function (e) {
+    if (construtor && construtor.sujo) { e.preventDefault(); e.returnValue = ''; }
+  });
+
   // ----------------------------------------------------------- integracoes ---
 
   var TEXTO_MODO = {
@@ -621,7 +1097,7 @@
   // ------------------------------------------------------------- navegacao ---
 
   var ROTAS = {
-    '#/hoje': verHoje, '#/leads': verLeads,
+    '#/hoje': verHoje, '#/leads': verLeads, '#/chat': verChat,
     '#/integracoes': verIntegracoes, '#/financeiro': verFinanceiro,
   };
 

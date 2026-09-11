@@ -54,11 +54,14 @@ export const tray = {
    * discount_coupons aceita form-urlencoded e recusa JSON, ao contrario do
    * resto da API. Enviar JSON aqui volta 400 sem explicacao util.
    */
-  async criarCupom(credenciais, { codigo, desconto }) {
+  async criarCupom(credenciais, { codigo, desconto, frete = false }) {
+    // O valor do tipo para frete gratis precisa ser confirmado na loja de
+    // homologacao da Tray. Se estiver errado, o cupom falha e gera alerta,
+    // que e o comportamento certo ate a confirmacao.
     const corpo = new URLSearchParams({
       'DiscountCoupon[code]': codigo,
-      'DiscountCoupon[type]': 'percentual',
-      'DiscountCoupon[value]': String(desconto),
+      'DiscountCoupon[type]': frete ? 'frete' : 'percentual',
+      'DiscountCoupon[value]': frete ? '0' : String(desconto),
       'DiscountCoupon[usage_counter_limit]': '1',
       'DiscountCoupon[active]': '1',
     });

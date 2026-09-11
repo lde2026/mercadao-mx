@@ -34,13 +34,24 @@ export async function concluirLead({
     });
   }
 
-  const cupom = await entregarCupom({ conexao, fluxo, lead });
-  return { lead, cupom };
+  const recompensa = fluxo.recompensa || 'cupom';
+
+  // Diagnostico, especialista e consultoria nao criam nada na plataforma: a
+  // recompensa e o contato humano, e o lead ja esta na fila para isso.
+  const cupom = CRIAM_CUPOM.has(recompensa)
+    ? await entregarCupom({ conexao, fluxo, lead })
+    : { status: 'sem_cupom' };
+
+  return { lead, cupom, recompensa };
 }
+
+const CRIAM_CUPOM = new Set(['cupom', 'frete_gratis']);
 
 async function entregarCupom({ conexao, fluxo, lead }) {
   const api = adaptador(conexao.plataforma);
-  const desconto = fluxo.desconto;
+  const frete = fluxo.recompensa === 'frete_gratis';
+  const desconto = frete ? 0 : fluxo.desconto;
+  const tipo = frete ? 'frete' : 'percentual';
 
   // Na Loja Integrada o codigo sai do lote que o lojista cadastrou antes,
   // porque a v1 publica nao expoe endpoint de cupom.
@@ -51,7 +62,7 @@ async function entregarCupom({ conexao, fluxo, lead }) {
       return { status: 'falhou', motivo: 'lote_vazio' };
     }
     const registro = await repo.registrarCupomPendente({
-      contaId: conexao.conta_id, conexaoId: conexao.id, leadId: lead.id, codigo, desconto,
+      contaId: conexao.conta_id, conexaoId: conexao.id, leadId: lead.id, codigo, desconto, tipo,
     });
     await repo.marcarCupom(registro.id, 'criado');
     log.info('cupom.entregue', {
@@ -63,7 +74,7 @@ async function entregarCupom({ conexao, fluxo, lead }) {
   let codigo;
   let registro;
   try {
-    ({ codigo, registro } = await reservarCodigo(conexao, lead, desconto));
+    ({ codigo, registro } = await reservarCodigo(conexao, lead, desconto, tipo));
   } catch (erro) {
     await falhou({ conexao, lead, desconto, motivo: erro.message });
     return { status: 'falhou', motivo: erro.message };
@@ -81,12 +92,12 @@ async function entregarCupom({ conexao, fluxo, lead }) {
       credenciais = novas;
     }
 
-    await api.criarCupom(credenciais, { codigo, desconto });
+    await api.criarCupom(credenciais, { codigo, desconto, frete });
     await repo.marcarCupom(registro.id, 'criado');
     log.info('cupom.entregue', {
       conta_id: conexao.conta_id, conexao_id: conexao.id, lead_id: lead.id, origem: 'api',
     });
-    return { status: 'criado', codigo, desconto };
+    return { status: 'criado', codigo, desconto, frete };
   } catch (erro) {
     await repo.marcarCupom(registro.id, 'falhou', erro.message);
 
@@ -110,12 +121,12 @@ async function entregarCupom({ conexao, fluxo, lead }) {
  * unique por conexao. Repetir o sorteio custa nada; deixar estourar custa um
  * lead sem cupom e um alerta que ninguem precisa investigar.
  */
-async function reservarCodigo(conexao, lead, desconto, tentativas = 5) {
+async function reservarCodigo(conexao, lead, desconto, tipo = 'percentual', tentativas = 5) {
   for (let i = 0; i < tentativas; i += 1) {
     const codigo = gerarCodigo(conexao.nome_loja);
     try {
       const registro = await repo.registrarCupomPendente({
-        contaId: conexao.conta_id, conexaoId: conexao.id, leadId: lead.id, codigo, desconto,
+        contaId: conexao.conta_id, conexaoId: conexao.id, leadId: lead.id, codigo, desconto, tipo,
       });
       return { codigo, registro };
     } catch (erro) {

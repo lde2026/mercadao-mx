@@ -99,7 +99,17 @@
       '.b{right:8px;left:8px;bottom:8px;max-width:none;text-align:center}}',
     ].join('');
 
+    // O que muda por beneficio: a pergunta de contato, o botao e a tela final.
+    var TEXTOS = {
+      cupom: ['Onde eu te mando o cupom?', 'Quero meu cupom', 'Pronto! Use este cupom no carrinho:'],
+      frete_gratis: ['Onde eu te mando o cupom?', 'Quero frete gr\u00e1tis', 'Pronto! Use este cupom e o frete sai de gra\u00e7a:'],
+      diagnostico: ['Onde a gente fala com voc\u00ea?', 'Quero meu diagn\u00f3stico', 'Recebemos suas respostas. Em breve um especialista manda seu diagn\u00f3stico no WhatsApp.'],
+      especialista: ['Onde a gente fala com voc\u00ea?', 'Falar com especialista', 'Recebemos seus dados. Um especialista vai falar com voc\u00ea no WhatsApp em breve.'],
+      consultoria: ['Onde a gente fala com voc\u00ea?', 'Quero a consultoria', 'Recebemos suas respostas. Vamos combinar sua consultoria pelo WhatsApp em breve.'],
+    };
+
     function montar(fluxo) {
+      var textos = TEXTOS[fluxo.recompensa] || TEXTOS.cupom;
       var hospedeiro = document.createElement('div');
       hospedeiro.setAttribute('data-capta', '');
       // Aberto e nao fechado: o isolamento de CSS e identico, porque nenhum
@@ -174,7 +184,35 @@
         titulo.textContent = pergunta.texto;
         area.appendChild(titulo);
 
-        (pergunta.opcoes || []).forEach(function (opcao) {
+        var opcoes = pergunta.opcoes || [];
+
+        // Pergunta sem opcoes e de resposta livre: um campo e um botao.
+        if (!opcoes.length) {
+          var campo = document.createElement('input');
+          campo.type = 'text';
+          campo.maxLength = 120;
+          campo.placeholder = 'Escreva aqui';
+          var seguir = document.createElement('button');
+          seguir.className = 's';
+          seguir.type = 'button';
+          seguir.textContent = 'Continuar';
+          seguir.style.marginTop = '10px';
+          var responder = function () {
+            var valor = campo.value.trim();
+            if (!valor) { campo.focus(); return; }
+            respostas.push({ pergunta: pergunta.texto, resposta: valor });
+            passo += 1;
+            desenhar();
+          };
+          seguir.addEventListener('click', responder);
+          campo.addEventListener('keydown', function (e) { if (e.key === 'Enter') responder(); });
+          area.appendChild(campo);
+          area.appendChild(seguir);
+          campo.focus();
+          return;
+        }
+
+        opcoes.forEach(function (opcao) {
           var escolha = document.createElement('button');
           escolha.className = 'o';
           escolha.type = 'button';
@@ -191,7 +229,7 @@
       function desenharContato(area) {
         var titulo = document.createElement('div');
         titulo.className = 'q';
-        titulo.textContent = 'Onde eu te mando o cupom?';
+        titulo.textContent = textos[0];
         area.appendChild(titulo);
 
         var campos = [
@@ -223,7 +261,7 @@
         var enviar = document.createElement('button');
         enviar.className = 's';
         enviar.type = 'button';
-        enviar.textContent = 'Quero meu cupom';
+        enviar.textContent = textos[1];
         enviar.addEventListener('click', function () {
           var nome = entradas.nome.value.trim();
           var email = entradas.email.value.trim();
@@ -275,7 +313,7 @@
         if (dados && dados.cupom) {
           var msg = document.createElement('p');
           msg.className = 'msg';
-          msg.textContent = 'Pronto! Use este cupom no carrinho:';
+          msg.textContent = textos[2];
           var cod = document.createElement('div');
           cod.className = 'cod';
           cod.textContent = dados.cupom;
@@ -290,7 +328,10 @@
           // deixar o contato: o lead esta gravado e o envio sai depois.
           var aviso = document.createElement('p');
           aviso.className = 'msg';
-          aviso.textContent = 'Recebemos seus dados. Seu cupom chega em instantes no WhatsApp e no e-mail que voce deixou.';
+          var semCupom = fluxo.recompensa && fluxo.recompensa !== 'cupom' && fluxo.recompensa !== 'frete_gratis';
+          aviso.textContent = semCupom
+            ? textos[2]
+            : 'Recebemos seus dados. Seu cupom chega em instantes no WhatsApp e no e-mail que voc\u00ea deixou.';
           caixa.appendChild(aviso);
         }
         area.appendChild(caixa);

@@ -9,6 +9,7 @@ import { concluirLead } from './fluxo-lead.js';
 import { registrarEvento, perfilDoLead, esquecerLead } from './eventos.js';
 import { calcularAcesso, avisoDeCobranca } from './billing/acesso.js';
 import { PLANOS, precoDoPlano, IMPLANTACAO } from './billing/planos.js';
+import { MODELOS } from './modelos.js';
 import * as asaas from './billing/asaas.js';
 import * as kiwify from './billing/kiwify.js';
 import { agendar } from './tarefas.js';
@@ -178,6 +179,7 @@ app.get('/w/fluxo/:chave', liberarOrigem, limitar({ porChave: 600, porIp: 60 }),
     convite: fluxo.convite,
     consentimento: fluxo.consentimento,
     perguntas: (fluxo.perguntas || []).slice(0, 3),
+    recompensa: fluxo.recompensa || 'cupom',
     rastrear: acesso.rastreamento,
   });
 });
@@ -198,7 +200,7 @@ app.post('/w/lead/:chave', liberarOrigem, limitar({ porChave: 120, porIp: 10 }),
 
   const conexao = await repo.buscarConexaoPorChave(req.params.chave);
   try {
-    const { lead, cupom } = await concluirLead({
+    const { lead, cupom, recompensa } = await concluirLead({
       conexao,
       fluxo,
       nome: String(nome).slice(0, 120),
@@ -214,6 +216,7 @@ app.post('/w/lead/:chave', liberarOrigem, limitar({ porChave: 120, porIp: 10 }),
     res.json({
       ok: true,
       leadId: lead.id,
+      recompensa,
       cupom: cupom.status === 'criado' ? cupom.codigo : null,
       desconto: cupom.status === 'criado' ? cupom.desconto : null,
     });
@@ -371,6 +374,11 @@ app.post('/api/conexoes/:id/lote', async (req, res) => {
   res.json({ inseridos, saldo: await repo.saldoDoLote(req.conta.id, conexao.id) });
 });
 
+app.get('/api/modelos', (_req, res) => {
+  res.set('Cache-Control', 'private, max-age=3600');
+  res.json(MODELOS);
+});
+
 app.get('/api/conexoes/:id/fluxo', async (req, res) => {
   const conexao = await repo.buscarConexao(req.conta.id, req.params.id);
   if (!conexao) return res.status(404).json({ erro: 'nao encontrada' });
@@ -381,24 +389,35 @@ app.put('/api/conexoes/:id/fluxo', async (req, res) => {
   const conexao = await repo.buscarConexao(req.conta.id, req.params.id);
   if (!conexao) return res.status(404).json({ erro: 'nao encontrada' });
 
-  const { convite, consentimento, desconto, perguntas } = req.body || {};
+  const { convite, consentimento, desconto, perguntas, recompensa = 'cupom' } = req.body || {};
   if (!consentimento) return res.status(400).json({ erro: 'a linha de consentimento e obrigatoria' });
+  if (!RECOMPENSAS.has(recompensa)) return res.status(400).json({ erro: 'beneficio invalido' });
   if ((perguntas || []).length > 3) {
     return res.status(400).json({
       erro: 'maximo de tres perguntas antes da de contato',
       explicacao: 'A quarta pergunta e sempre a de contato e nao pode ser removida.',
     });
   }
+  const limpas = (perguntas || [])
+    .map((p) => ({
+      texto: String(p.texto || '').trim().slice(0, 160),
+      opcoes: (Array.isArray(p.opcoes) ? p.opcoes : [])
+        .map((o) => String(o).trim().slice(0, 60)).filter(Boolean).slice(0, 8),
+    }))
+    .filter((p) => p.texto);
+  const pct = Math.min(Math.max(Number(desconto) || 10, 1), 90);
   const id = await repo.salvarFluxo(req.conta.id, conexao.id, {
-    convite: convite || 'Ganhe cupom',
-    consentimento,
-    desconto: Number(desconto) || 10,
-    perguntas: perguntas || [],
+    convite: String(convite || 'Ganhe cupom').trim().slice(0, 60),
+    consentimento: String(consentimento).trim().slice(0, 300),
+    desconto: pct,
+    perguntas: limpas,
+    recompensa,
   });
-  res.json({ id });
+  res.json({ id, perguntas: limpas.length });
 });
 
 const SITUACOES = new Set(['a_contatar', 'contatados']);
+const RECOMPENSAS = new Set(['cupom', 'frete_gratis', 'diagnostico', 'especialista', 'consultoria']);
 
 /**
  * Planilha dos leads. Ponto e virgula e BOM porque o Excel em portugues abre
