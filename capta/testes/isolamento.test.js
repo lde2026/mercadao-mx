@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { prepararBanco } from './ajuda.js';
 
 process.env.NODE_ENV = 'test';
+process.env.OPERADOR_EMAILS = 'contato@lojadoecommerce.com.br';
 
 const { pool } = await import('../src/db.js');
 await prepararBanco();
@@ -188,6 +189,37 @@ test('o endpoint publico corta por limite de requisicoes', async () => {
     if (r.status === 429) { bloqueou = true; break; }
   }
   assert.ok(bloqueou, 'o teto por IP tinha que ter cortado antes de 15 tentativas');
+});
+
+test('lojista comum nao alcanca as rotas do operador', async () => {
+  for (const [caminho, metodo] of [['/api/admin/resumo', 'GET'], ['/api/admin/contas', 'GET'],
+    [`/api/admin/contas/${contaA.id}/entrar`, 'POST']]) {
+    const r = await pedir(caminho, { metodo, cookie: contaB.cookie });
+    assert.equal(r.status, 403, `${metodo} ${caminho} tinha que ser 403 para lojista`);
+  }
+  const eu = await pedir('/api/eu', { cookie: contaB.cookie });
+  assert.equal(eu.json.conta.operador, false);
+});
+
+test('o operador ve o Capta inteiro e entra na conta de um cliente', async () => {
+  const operador = await contaLogada('Loja do E-commerce', 'contato@lojadoecommerce.com.br');
+  const eu = await pedir('/api/eu', { cookie: operador.cookie });
+  assert.equal(eu.json.conta.operador, true);
+
+  const resumo = await pedir('/api/admin/resumo', { cookie: operador.cookie });
+  assert.equal(resumo.status, 200);
+  assert.ok(resumo.json.contas >= 3);
+  assert.equal(typeof resumo.json.mrr, 'number');
+
+  const contas = await pedir('/api/admin/contas', { cookie: operador.cookie });
+  assert.ok(contas.json.some((c) => c.nome === 'Bella Moda'));
+
+  // Entra na conta A e passa a ver so o que e da conta A.
+  const entrada = await pedir(`/api/admin/contas/${contaA.id}/entrar`, { metodo: 'POST', cookie: operador.cookie });
+  assert.equal(entrada.status, 200);
+  const cookieA = entrada.cookie.split(';')[0];
+  const leads = await pedir('/api/leads', { cookie: cookieA });
+  assert.deepEqual(leads.json.leads.map((l) => l.nome), ['Renata']);
 });
 
 // Por ultimo: consome o teto do IP e derrubaria qualquer cadastro depois dele.

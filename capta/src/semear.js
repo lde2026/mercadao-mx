@@ -67,7 +67,7 @@ for (const nova of outras) {
   const criada = await repo.criarConexao({ contaId: conta.id, ...nova });
   const resolvida = await (await import('./adapters/index.js'))
     .adaptador(nova.plataforma)
-    .instalarScript(nova.credenciais, 'https://cdn.capta.com.br/widget.js');
+    .instalarScript(nova.credenciais, `${process.env.URL_PUBLICA || 'https://captapp.lojadoecommerce.com.br'}/widget.js`);
   await repo.atualizarConexao(conta.id, criada.id, {
     modo_instalacao: resolvida.modo,
     detalhe_status: resolvida.motivo || null,

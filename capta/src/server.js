@@ -14,7 +14,8 @@ import * as asaas from './billing/asaas.js';
 import * as kiwify from './billing/kiwify.js';
 import { agendar } from './tarefas.js';
 import {
-  carregarConta, exigirConta, aplicarRegua, entrar, montarCookie, limparCookie,
+  carregarConta, exigirConta, exigirOperador, ehOperador, aplicarRegua, entrar,
+  montarCookie, limparCookie,
 } from './auth.js';
 
 const aqui = path.dirname(fileURLToPath(import.meta.url));
@@ -342,7 +343,7 @@ app.use('/api', exigirConta, aplicarRegua);
 app.get('/api/eu', async (req, res) => {
   const assinatura = await repo.assinaturaDaConta(req.conta.id);
   res.json({
-    conta: req.conta,
+    conta: { ...req.conta, operador: ehOperador(req.conta.email) },
     assinatura,
     acesso: req.acesso,
     aviso: avisoDeCobranca(req.acesso) || avisoDeCota(req.acesso),
@@ -671,6 +672,41 @@ app.get('/api/alertas', async (req, res) => {
     [req.conta.id],
   );
   res.json(rows);
+});
+
+// -------------------------------------------------------------- operador ---
+
+app.get('/api/admin/resumo', exigirOperador, async (_req, res) => {
+  const resumo = await repo.resumoGeral();
+  // Receita mensal recorrente: mensal conta o preco, anual conta um doze avos.
+  const mrr = resumo.assinantes.reduce((soma, a) => {
+    const preco = precoDoPlano(a.plano, a.ciclo);
+    return soma + (a.ciclo === 'anual' ? preco / 12 : preco) * a.n;
+  }, 0);
+  res.json({ ...resumo, mrr: Math.round(mrr * 100) / 100, planos: PLANOS });
+});
+
+app.get('/api/admin/contas', exigirOperador, async (_req, res) => {
+  const contas = await repo.listarContas();
+  const hoje = Date.now();
+  res.json(contas.map((c) => ({
+    ...c,
+    diasAtraso: c.vencida_desde
+      ? Math.floor((hoje - new Date(c.vencida_desde).getTime()) / 86400000) : 0,
+  })));
+});
+
+/**
+ * Entrar na conta de um cliente para fazer a implantacao. E o que a equipe
+ * precisa para conectar loja e montar o fluxo sem mexer no banco. Fica em
+ * log com quem entrou e onde.
+ */
+app.post('/api/admin/contas/:id/entrar', exigirOperador, async (req, res) => {
+  const alvo = await repo.buscarConta(req.params.id);
+  if (!alvo) return res.status(404).json({ erro: 'conta nao encontrada' });
+  const sessaoId = await repo.criarSessao(alvo.id, 1);
+  log.aviso('operador.entrou', { operador_id: req.conta.id, conta_id: alvo.id });
+  res.set('Set-Cookie', montarCookie(sessaoId)).json({ conta: { id: alvo.id, nome: alvo.nome } });
 });
 
 // -------------------------------------------------------------- estaticos ---

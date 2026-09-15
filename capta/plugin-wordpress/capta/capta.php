@@ -19,7 +19,7 @@ if (!defined('ABSPATH')) {
 
 const CAPTA_OPCAO_CHAVE = 'capta_chave_loja';
 const CAPTA_OPCAO_API = 'capta_url_api';
-const CAPTA_API_PADRAO = 'https://api.capta.com.br';
+const CAPTA_API_PADRAO = 'https://captapp.lojadoecommerce.com.br';
 
 /**
  * Os dois scripts entram no rodape e assincronos. O widget e baixado por todo

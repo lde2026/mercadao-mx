@@ -60,6 +60,23 @@ export async function carregarConta(req, _res, proximo) {
   proximo();
 }
 
+/**
+ * Operador e quem administra o Capta, nao o lojista. A lista vem do ambiente
+ * e nao de coluna no banco, para nao existir rota capaz de promover alguem.
+ */
+export function ehOperador(email) {
+  const lista = (process.env.OPERADOR_EMAILS || '')
+    .split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
+  return lista.includes(String(email || '').toLowerCase());
+}
+
+export function exigirOperador(req, res, proximo) {
+  if (!req.conta || !ehOperador(req.conta.email)) {
+    return res.status(403).json({ erro: 'somente operador' });
+  }
+  proximo();
+}
+
 export function exigirConta(req, res, proximo) {
   if (!req.conta) return res.status(401).json({ erro: 'nao autenticado' });
   proximo();

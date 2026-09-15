@@ -1158,11 +1158,109 @@
       .catch(function (e) { alert(e.message); });
   }
 
+  // ----------------------------------------------------------------- admin ---
+
+  /** Visao do operador: o Capta inteiro, nao uma conta. */
+  function verAdmin() {
+    var alvo = pintar('Admin', 'O Capta inteiro: assinantes, receita, inadimplência e o que precisa de atenção.');
+    Promise.all([api('/admin/resumo'), api('/admin/contas')]).then(function (r) {
+      var resumo = r[0];
+      var contas = r[1];
+      var assinantes = resumo.assinantes.reduce(function (t, a) { return t + a.n; }, 0);
+
+      var grade = el('div', null, 'grade-num');
+      grade.appendChild(cartaoNumero({
+        rotulo: 'Assinantes', valor: String(assinantes), nomeIcone: 'plano', tom: 'acento',
+        detalhe: resumo.contas + ' contas no total',
+        rodape: { texto: (resumo.contas - assinantes) + ' sem plano ativo' },
+      }));
+      grade.appendChild(cartaoNumero({
+        rotulo: 'Receita mensal recorrente', valor: dinheiro(resumo.mrr), nomeIcone: 'dinheiro', tom: 'bom',
+        detalhe: 'anual contado por doze avos',
+        rodape: { texto: 'Só mensalidades, sem implantação' },
+      }));
+      grade.appendChild(cartaoNumero({
+        rotulo: 'Inadimplentes', valor: String(resumo.inadimplentes), nomeIcone: 'alerta',
+        tom: resumo.inadimplentes ? 'ruim' : 'bom',
+        detalhe: 'com fatura vencida em aberto',
+        rodape: { texto: 'Dia 7 corta rastreamento, dia 10 o chat' },
+      }));
+      grade.appendChild(cartaoNumero({
+        rotulo: 'Leads hoje', valor: String(resumo.leadsHoje), nomeIcone: 'leads',
+        detalhe: resumo.leadsMes + ' no mês, todas as lojas',
+        rodape: { texto: resumo.cuponsFalhosHoje + ' cupons falharam hoje' },
+      }));
+      grade.appendChild(cartaoNumero({
+        rotulo: 'Alertas abertos', valor: String(resumo.alertasAbertos), nomeIcone: 'alerta',
+        tom: resumo.alertasAbertos ? '' : 'bom',
+        detalhe: 'cupom falho, webhook, cota',
+        rodape: { texto: 'Um por conta, na tela Hoje de cada uma' },
+      }));
+      alvo.appendChild(grade);
+
+      var porPlano = el('div', null, 'cartao');
+      porPlano.appendChild(el('div', 'Assinantes por plano', 'rotulo'));
+      var linhasPlano = Object.keys(resumo.planos).map(function (id) {
+        var mensal = resumo.assinantes.filter(function (a) { return a.plano === id && a.ciclo === 'mensal'; }).reduce(function (t, a) { return t + a.n; }, 0);
+        var anual = resumo.assinantes.filter(function (a) { return a.plano === id && a.ciclo === 'anual'; }).reduce(function (t, a) { return t + a.n; }, 0);
+        return { celulas: [resumo.planos[id].nome, dinheiro(resumo.planos[id].mensal) + '/mês', mensal, anual, mensal + anual] };
+      });
+      porPlano.appendChild(tabela(['Plano', 'Mensalidade', 'Mensal', 'Anual', 'Total'], linhasPlano));
+      alvo.appendChild(porPlano);
+
+      var lojas = el('div', null, 'cartao');
+      lojas.appendChild(el('div', 'Lojas conectadas por plataforma', 'rotulo'));
+      if (resumo.conexoes.length) {
+        lojas.appendChild(tabela(['Plataforma', 'Instalação', 'Lojas'], resumo.conexoes.map(function (c) {
+          return { celulas: [c.plataforma, selo(c.modo_instalacao, c.modo_instalacao), c.n] };
+        })));
+      } else {
+        lojas.appendChild(el('p', 'Nenhuma loja conectada ainda.', 'vazio'));
+      }
+      alvo.appendChild(lojas);
+
+      var lista = el('div', null, 'cartao');
+      lista.appendChild(el('div', 'Contas', 'rotulo'));
+      lista.appendChild(tabela(
+        ['Conta', 'Plano', 'Leads no mês', 'Total', 'Último lead', 'Lojas', 'Atraso', ''],
+        contas.map(function (c) {
+          var entrar = el('button', 'Entrar como', 'secundario');
+          entrar.type = 'button';
+          entrar.style.padding = '6px 10px';
+          entrar.addEventListener('click', function (e) {
+            e.stopPropagation();
+            if (!confirm('Entrar na conta ' + c.nome + ' como operador? Fica registrado.')) return;
+            api('/admin/contas/' + c.id + '/entrar', { method: 'POST' }).then(function () {
+              cacheLeads = null; construtor = null;
+              location.hash = '#/hoje';
+              iniciar();
+            });
+          });
+          var nome = el('div');
+          nome.appendChild(el('strong', c.nome));
+          nome.appendChild(el('div', c.email, 'hora'));
+          return { celulas: [
+            nome,
+            c.plano ? selo(resumo.planos[c.plano].nome + (c.ciclo === 'anual' ? ' anual' : ''), 'criado') : selo('sem plano', 'pendente'),
+            c.leads_mes, c.leads_total,
+            c.ultimo_lead ? tempoRelativo(c.ultimo_lead) : 'nunca',
+            c.conexoes,
+            c.diasAtraso ? selo(c.diasAtraso + ' dias', 'falhou') : selo('em dia', 'criado'),
+            entrar,
+          ] };
+        }),
+      ));
+      alvo.appendChild(lista);
+    }).catch(function (e) {
+      alvo.appendChild(el('p', e.message === 'somente operador' ? 'Esta tela é só do operador do Capta.' : e.message, 'vazio'));
+    });
+  }
+
   // ------------------------------------------------------------- navegacao ---
 
   var ROTAS = {
     '#/hoje': verHoje, '#/leads': verLeads, '#/chat': verChat,
-    '#/integracoes': verIntegracoes, '#/financeiro': verFinanceiro,
+    '#/integracoes': verIntegracoes, '#/financeiro': verFinanceiro, '#/admin': verAdmin,
   };
 
   function navegar() {
@@ -1190,6 +1288,7 @@
       document.getElementById('app').hidden = false;
       document.getElementById('nome-conta').textContent = dados.conta.nome;
       document.getElementById('avatar').textContent = iniciais(dados.conta.nome);
+      document.getElementById('menu-admin').hidden = !dados.conta.operador;
 
       var faixa = document.getElementById('faixa');
       if (dados.aviso) {

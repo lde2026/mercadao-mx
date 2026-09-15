@@ -601,3 +601,48 @@ export async function reabrirCobranca(origem, idExterno) {
     [origem, idExterno],
   );
 }
+
+// --------------------------------------------------------------- operador ---
+
+/** Visao geral do Capta inteiro. So o operador chama. */
+export async function resumoGeral() {
+  const [contas, assinantes, inadimplentes, leadsHoje, leadsMes, conexoes, cuponsFalhos, alertas] =
+    await Promise.all([
+      consultar(`select count(*)::int as n from contas`),
+      consultar(`select plano, ciclo, count(*)::int as n from assinaturas where status = 'ativa' group by 1, 2`),
+      consultar(`select count(distinct conta_id)::int as n from cobrancas where status = 'aberta' and vence_em < current_date`),
+      consultar(`select count(*)::int as n from leads where criado_em >= current_date`),
+      consultar(`select count(*)::int as n from leads where criado_em >= date_trunc('month', now())`),
+      consultar(`select plataforma, modo_instalacao, count(*)::int as n from conexoes group by 1, 2 order by 1, 2`),
+      consultar(`select count(*)::int as n from cupons where status = 'falhou' and criado_em >= current_date`),
+      consultar(`select count(*)::int as n from alertas where resolvido = false`),
+    ]);
+  return {
+    contas: contas.rows[0].n,
+    assinantes: assinantes.rows,
+    inadimplentes: inadimplentes.rows[0].n,
+    leadsHoje: leadsHoje.rows[0].n,
+    leadsMes: leadsMes.rows[0].n,
+    conexoes: conexoes.rows,
+    cuponsFalhosHoje: cuponsFalhos.rows[0].n,
+    alertasAbertos: alertas.rows[0].n,
+  };
+}
+
+export async function listarContas() {
+  const { rows } = await consultar(
+    `select c.id, c.nome, c.email, c.criado_em,
+            a.plano, a.ciclo, a.origem,
+            (select count(*)::int from leads l where l.conta_id = c.id
+               and l.criado_em >= date_trunc('month', now())) as leads_mes,
+            (select count(*)::int from leads l where l.conta_id = c.id) as leads_total,
+            (select max(criado_em) from leads l where l.conta_id = c.id) as ultimo_lead,
+            (select count(*)::int from conexoes x where x.conta_id = c.id) as conexoes,
+            (select min(vence_em) from cobrancas b where b.conta_id = c.id
+               and b.status = 'aberta' and b.vence_em < current_date) as vencida_desde
+       from contas c
+       left join assinaturas a on a.conta_id = c.id and a.status = 'ativa'
+      order by c.criado_em desc`,
+  );
+  return rows;
+}
