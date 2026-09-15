@@ -684,7 +684,7 @@
     var linhaCor = el('label', 'Cor do botão e do cabeçalho');
     var caixaCor = el('div', null, 'cor-linha');
     var campoCor = el('input');
-    campoCor.type = 'color'; campoCor.value = f.cor || '#111318';
+    campoCor.type = 'color'; campoCor.value = f.cor || '#15803d';
     campoCor.addEventListener('input', function () { f.cor = campoCor.value; marcarSujo(); desenharPrevia(); });
     var padrao = el('button', 'Padrão', 'secundario');
     padrao.type = 'button';

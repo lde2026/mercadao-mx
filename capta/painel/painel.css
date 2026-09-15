@@ -345,7 +345,7 @@ pre{background:var(--escuro);color:var(--superficie);padding:13px;border-radius:
 .cor-linha{display:flex;gap:8px;align-items:center;margin-top:5px}
 .cor-linha input[type=color]{width:52px;height:36px;padding:2px;margin:0;border-radius:8px;cursor:pointer}
 .cor-linha button{padding:7px 12px;font-size:12.5px}
-.previa-tela{--cor-widget:#111}
+.previa-tela{--cor-widget:#15803d}
 .previa-botao,.previa-cab,.previa-enviar{background:var(--cor-widget)}
 .previa-cupom{border-color:var(--cor-widget)}
 .previa-barra i{background:var(--cor-widget)}
