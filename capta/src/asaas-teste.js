@@ -33,7 +33,7 @@ if (producao) {
 
 const cliente = await pedir(`${base}/customers`, {
   method: 'POST', headers: cabecalhos,
-  body: JSON.stringify({ name: 'Teste Capta', email: 'teste@capta.local', cpfCnpj: '24971563792' }),
+  body: JSON.stringify({ name: 'Teste Captapp', email: 'teste@capta.local', cpfCnpj: '24971563792' }),
 }, { plataforma: 'asaas' });
 console.log(`cliente criado: ${cliente.id}`);
 
@@ -42,7 +42,7 @@ const assinatura = await pedir(`${base}/subscriptions`, {
   method: 'POST', headers: cabecalhos,
   body: JSON.stringify({
     customer: cliente.id, billingType: 'UNDEFINED', value: 99, nextDueDate: proximo,
-    cycle: 'MONTHLY', description: 'Capta essencial mensal (teste)',
+    cycle: 'MONTHLY', description: 'Captapp essencial mensal (teste)',
   }),
 }, { plataforma: 'asaas' });
 console.log(`assinatura criada: ${assinatura.id} (${assinatura.cycle}, R$ ${assinatura.value})`);

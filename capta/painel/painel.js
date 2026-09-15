@@ -1037,7 +1037,7 @@
   var cicloEscolhido = 'mensal';
 
   function verFinanceiro() {
-    var alvo = pintar('Financeiro', 'Seu plano, sua cota de leads e as cobranças do Capta.');
+    var alvo = pintar('Financeiro', 'Seu plano, sua cota de leads e as cobranças do Captapp.');
     api('/financeiro').then(function (dados) { desenharFinanceiro(alvo, dados); });
   }
 
@@ -1119,7 +1119,7 @@
     });
     planosCx.appendChild(colunas);
     if (!dados.cobrancaAutomatica) {
-      planosCx.appendChild(el('p', 'A cobrança automática ainda não está ligada nesta conta. A troca de plano vale na hora e a cobrança é combinada com a equipe do Capta.', 'hora'));
+      planosCx.appendChild(el('p', 'A cobrança automática ainda não está ligada nesta conta. A troca de plano vale na hora e a cobrança é combinada com a equipe do Captapp.', 'hora'));
     }
     area.appendChild(planosCx);
 
@@ -1160,9 +1160,9 @@
 
   // ----------------------------------------------------------------- admin ---
 
-  /** Visao do operador: o Capta inteiro, nao uma conta. */
+  /** Visao do operador: o Captapp inteiro, nao uma conta. */
   function verAdmin() {
-    var alvo = pintar('Admin', 'O Capta inteiro: assinantes, receita, inadimplência e o que precisa de atenção.');
+    var alvo = pintar('Admin', 'O Captapp inteiro: assinantes, receita, inadimplência e o que precisa de atenção.');
     Promise.all([api('/admin/resumo'), api('/admin/contas')]).then(function (r) {
       var resumo = r[0];
       var contas = r[1];
@@ -1252,7 +1252,7 @@
       ));
       alvo.appendChild(lista);
     }).catch(function (e) {
-      alvo.appendChild(el('p', e.message === 'somente operador' ? 'Esta tela é só do operador do Capta.' : e.message, 'vazio'));
+      alvo.appendChild(el('p', e.message === 'somente operador' ? 'Esta tela é só do operador do Captapp.' : e.message, 'vazio'));
     });
   }
 

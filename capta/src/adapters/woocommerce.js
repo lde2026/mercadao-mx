@@ -49,8 +49,8 @@ export const woocommerce = {
     return {
       modo: 'manual',
       instrucoes: [
-        'Instale o plugin Capta no WordPress da loja, em Plugins e Adicionar novo.',
-        'Em Configuracoes e Capta, cole a chave da loja mostrada nesta tela.',
+        'Instale o plugin Captapp no WordPress da loja, em Plugins e Adicionar novo.',
+        'Em Configuracoes e Captapp, cole a chave da loja mostrada nesta tela.',
         'O plugin injeta o widget sozinho e mantem a atualizacao.',
       ],
       urlScript,
@@ -62,7 +62,7 @@ export const woocommerce = {
       method: 'POST',
       headers: cabecalhos(credenciais),
       body: JSON.stringify({
-        name: 'Capta pedido pago',
+        name: 'Captapp pedido pago',
         topic: 'order.updated',
         delivery_url: urlDestino,
         secret: segredo,

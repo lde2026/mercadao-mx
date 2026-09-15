@@ -1,4 +1,4 @@
-=== Capta ===
+=== Captapp ===
 Contributors: lojadoecommerce
 Tags: woocommerce, leads, cupom, popup, captacao
 Requires at least: 6.0
@@ -19,13 +19,13 @@ O widget nao usa framework, carrega assincrono, fica isolado do CSS do seu
 tema e ocupa menos de 5kb comprimidos. Se a API nao responder em 3 segundos,
 ele desiste em silencio e a loja segue funcionando.
 
-Requer uma conta no Capta.
+Requer uma conta no Captapp.
 
 == Installation ==
 
 1. Instale e ative o plugin.
-2. Va em Configuracoes e Capta.
-3. Cole a chave da loja, que esta na tela de Integracoes do painel do Capta.
+2. Va em Configuracoes e Captapp.
+3. Cole a chave da loja, que esta na tela de Integracoes do painel do Captapp.
 
 == Changelog ==
 

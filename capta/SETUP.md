@@ -1,4 +1,4 @@
-# Subir o Capta na sua maquina
+# Subir o Captapp na sua maquina
 
 Node 20 ou mais novo, e Docker para o Postgres.
 

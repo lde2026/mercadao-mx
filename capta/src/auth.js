@@ -61,7 +61,7 @@ export async function carregarConta(req, _res, proximo) {
 }
 
 /**
- * Operador e quem administra o Capta, nao o lojista. A lista vem do ambiente
+ * Operador e quem administra o Captapp, nao o lojista. A lista vem do ambiente
  * e nao de coluna no banco, para nao existir rota capaz de promover alguem.
  */
 export function ehOperador(email) {

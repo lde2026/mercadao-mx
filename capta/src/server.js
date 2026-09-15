@@ -552,7 +552,7 @@ app.delete('/api/leads/:id', async (req, res) => {
 
 /**
  * O Financeiro e da ferramenta, nao da loja: plano, mensalidade, cota de
- * leads e as cobrancas do Capta. Faturamento atribuido ao chat fica na fila
+ * leads e as cobrancas do Captapp. Faturamento atribuido ao chat fica na fila
  * e no perfil do lead, nao aqui.
  */
 app.get('/api/financeiro', async (req, res) => {

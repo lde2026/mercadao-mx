@@ -37,7 +37,7 @@ export async function criarAssinatura({ clienteExterno, plano, ciclo, formaPagam
       value: valor,
       nextDueDate: proximo,
       cycle: ciclo === 'anual' ? 'YEARLY' : 'MONTHLY',
-      description: `Capta ${plano} ${ciclo}`,
+      description: `Captapp ${plano} ${ciclo}`,
     }),
   }, { plataforma: 'asaas' });
 }
@@ -51,7 +51,7 @@ export async function cobrarImplantacao({ clienteExterno, venceEm }) {
       billingType: 'UNDEFINED',
       value: IMPLANTACAO,
       dueDate: venceEm,
-      description: 'Implantacao Capta',
+      description: 'Implantacao Captapp',
     }),
   }, { plataforma: 'asaas' });
 }

@@ -3,7 +3,7 @@ import { pedir, ErroPlataforma } from './http.js';
 
 const BASE = 'https://api.tiendanube.com/v1';
 // A Nuvemshop rejeita requisicao sem User-Agent identificavel.
-const AGENTE = 'Capta (contato@lojadoecommerce.com.br)';
+const AGENTE = 'Captapp (contato@lojadoecommerce.com.br)';
 
 function cabecalhos(credenciais) {
   return {

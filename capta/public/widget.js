@@ -1,5 +1,5 @@
 /**
- * Widget de captacao do Capta.
+ * Widget de captacao do Captapp.
  *
  * Este arquivo e baixado por todo visitante de toda loja cliente. Ele mexe no
  * tempo de carregamento do site de outra pessoa, e isso afeta o Google dela.

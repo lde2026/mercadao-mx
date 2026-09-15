@@ -201,7 +201,7 @@ test('lojista comum nao alcanca as rotas do operador', async () => {
   assert.equal(eu.json.conta.operador, false);
 });
 
-test('o operador ve o Capta inteiro e entra na conta de um cliente', async () => {
+test('o operador ve o Captapp inteiro e entra na conta de um cliente', async () => {
   const operador = await contaLogada('Loja do E-commerce', 'contato@lojadoecommerce.com.br');
   const eu = await pedir('/api/eu', { cookie: operador.cookie });
   assert.equal(eu.json.conta.operador, true);

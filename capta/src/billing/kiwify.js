@@ -37,7 +37,7 @@ export async function processarWebhook(corpo) {
     await repo.alertar({
       tipo: 'webhook_cobranca_sem_conta',
       gravidade: 'erro',
-      mensagem: 'Webhook da Kiwify para email sem conta no Capta',
+      mensagem: 'Webhook da Kiwify para email sem conta no Captapp',
       dados: { origem: 'kiwify', id_externo: idExterno },
     });
     return { tratado: false };

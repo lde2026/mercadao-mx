@@ -1,4 +1,4 @@
--- Esquema do Capta.
+-- Esquema do Captapp.
 -- A camada de conta, conexao e cobranca e generica de proposito: o chat de
 -- captacao e o primeiro modulo, nao o unico. Nada aqui referencia "chat".
 

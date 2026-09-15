@@ -1,4 +1,4 @@
-# Capta
+# Captapp
 
 Chat de captacao de leads para loja virtual. O visitante clica num botao
 flutuante, responde ate quatro perguntas, deixa contato e recebe um cupom
@@ -68,7 +68,7 @@ Implantacao de R$ 990, cobrada uma vez. Mensalidades de R$ 99, R$ 199 e
 R$ 299, e a diferenca entre elas e a cota de leads captados no mes; o de
 R$ 299 nao tem teto. Cota atingida tira o chat do ar na loja ate o dia 1 ou
 ate o upgrade. O anual tem 20% de desconto. O Financeiro do painel mostra so isso: o que a loja paga
-pelo Capta. Faturamento atribuido ao chat aparece na fila e no perfil do
+pelo Captapp. Faturamento atribuido ao chat aparece na fila e no perfil do
 lead, nunca no Financeiro.
 
 ## Decisoes que nao se mexe sem conversa

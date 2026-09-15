@@ -90,7 +90,7 @@ export function avisoDeCobranca({ nomeConta, aviso, diasAtraso }) {
   return {
     assunto: diasAtraso >= 10
       ? 'Seu widget saiu do ar por pendencia financeira'
-      : 'Fatura em aberto no Capta',
+      : 'Fatura em aberto no Captapp',
     texto,
     html: moldura('Pendencia financeira',
       `<p>Ola, ${nomeConta}.</p><p>${aviso}</p>

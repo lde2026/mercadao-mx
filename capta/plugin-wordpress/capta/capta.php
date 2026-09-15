@@ -1,6 +1,6 @@
 <?php
 /**
- * Plugin Name: Capta
+ * Plugin Name: Captapp
  * Description: Chat de captacao de leads com cupom unico por pessoa.
  * Version: 0.1.0
  * Requires at least: 6.0
@@ -61,8 +61,8 @@ add_filter('script_loader_tag', 'capta_marcar_async', 10, 2);
 function capta_menu()
 {
     add_options_page(
-        'Capta',
-        'Capta',
+        'Captapp',
+        'Captapp',
         'manage_options',
         'capta',
         'capta_tela_ajustes'
@@ -93,7 +93,7 @@ function capta_limpar_chave($valor)
         add_settings_error(
             CAPTA_OPCAO_CHAVE,
             'capta_chave_invalida',
-            'A chave da loja nao confere. Ela comeca com pk_ e esta na tela de Integracoes do painel do Capta.'
+            'A chave da loja nao confere. Ela comeca com pk_ e esta na tela de Integracoes do painel do Captapp.'
         );
         return (string) get_option(CAPTA_OPCAO_CHAVE, '');
     }
@@ -107,8 +107,8 @@ function capta_tela_ajustes()
     }
     ?>
     <div class="wrap">
-        <h1>Capta</h1>
-        <p>Cole aqui a chave da loja, que esta na tela de Integracoes do painel do Capta.</p>
+        <h1>Captapp</h1>
+        <p>Cole aqui a chave da loja, que esta na tela de Integracoes do painel do Captapp.</p>
         <form action="options.php" method="post">
             <?php settings_fields('capta'); ?>
             <table class="form-table" role="presentation">
@@ -127,7 +127,7 @@ function capta_tela_ajustes()
                         <input type="url" id="capta_api" class="regular-text code"
                                name="<?php echo esc_attr(CAPTA_OPCAO_API); ?>"
                                value="<?php echo esc_attr(get_option(CAPTA_OPCAO_API, CAPTA_API_PADRAO)); ?>">
-                        <p class="description">So mude isso se a equipe do Capta pedir.</p>
+                        <p class="description">So mude isso se a equipe do Captapp pedir.</p>
                     </td>
                 </tr>
             </table>

@@ -1,4 +1,4 @@
-# Colocar o Capta no ar
+# Colocar o Captapp no ar
 
 Dois hosts no mesmo dominio:
 
@@ -30,7 +30,7 @@ todo visitante de toda loja cliente.
    | `ASAAS_WEBHOOK_TOKEN` | token cadastrado no webhook do Asaas |
    | `ASAAS_BASE` | `https://api.asaas.com/v3` |
    | `EMAIL_PROVEDOR`, `EMAIL_CHAVE`, `EMAIL_REMETENTE` | quando o e-mail estiver ligado |
-   | `OPERADOR_EMAILS` | e-mails de quem administra o Capta, separados por virgula. So eles veem a tela Admin |
+   | `OPERADOR_EMAILS` | e-mails de quem administra o Captapp, separados por virgula. So eles veem a tela Admin |
 
 5. Deploy. O container roda `migrar` e depois sobe o servidor; o Railway
    considera saudavel quando `/saude` responder 200, e `/saude` so responde

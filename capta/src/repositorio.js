@@ -604,7 +604,7 @@ export async function reabrirCobranca(origem, idExterno) {
 
 // --------------------------------------------------------------- operador ---
 
-/** Visao geral do Capta inteiro. So o operador chama. */
+/** Visao geral do Captapp inteiro. So o operador chama. */
 export async function resumoGeral() {
   const [contas, assinantes, inadimplentes, leadsHoje, leadsMes, conexoes, cuponsFalhos, alertas] =
     await Promise.all([
