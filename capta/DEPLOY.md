@@ -100,3 +100,17 @@ widget.
 
 Entre no painel, crie a primeira conta, e rode `npm run hoje` apontando
 para producao para ver a tabela vazia. A partir dai, e lojista de verdade.
+
+## 7. O que ainda depende de gente, nao de codigo
+
+| Item | Onde |
+|---|---|
+| Programa de parceiros da Tray: cadastro do app com callback `https://captapp.lojadoecommerce.com.br/tray/callback`, chaves por e-mail, loja de teste e homologacao por chamado | `docs/tray-api.md` |
+| App na Nuvemshop com redirecionamento `https://captapp.lojadoecommerce.com.br/nuvemshop/callback` | painel de parceiros da Nuvemshop |
+| Webhook `order` da Tray por chamado no suporte, apontando para `/webhook/loja/<chave>` | `docs/tray-api.md` |
+| Provedor de e-mail (Resend ou Postmark) para lead novo, cobranca, operador e recuperacao de senha | `EMAIL_*` no ambiente |
+| Webhook do Asaas e `npm run asaas:teste` | secao 4 |
+| Video da landing (`data-url` em `landing/index.html`) | secao 3 |
+
+Sem essas chaves o produto funciona: conexao manual por token, e-mail vira
+linha de log e a cobranca fica manual.
