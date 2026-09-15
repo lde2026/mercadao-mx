@@ -23,6 +23,38 @@ app.disable('x-powered-by');
 app.set('trust proxy', true);
 
 const URL_PUBLICA = process.env.URL_PUBLICA || 'http://localhost:3000';
+const PRODUCAO = process.env.NODE_ENV === 'production';
+
+/**
+ * Cabecalhos de seguranca. O widget e o rastreador sao carregados dentro da
+ * loja do cliente, entao eles ficam de fora do frame-ancestors; o painel
+ * nunca deve abrir dentro de iframe de terceiro.
+ */
+app.use((req, res, proximo) => {
+  res.set('X-Content-Type-Options', 'nosniff');
+  res.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  if (PRODUCAO) res.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  const publico = req.path === '/widget.js' || req.path === '/rastreador.js'
+    || req.path.startsWith('/w/') || req.path === '/e' || req.path.startsWith('/webhook/');
+  if (!publico) {
+    res.set('X-Frame-Options', 'DENY');
+    res.set('Content-Security-Policy',
+      "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
+      + "connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
+  }
+  proximo();
+});
+
+/** Para o Railway e para o monitoramento. Confere o banco, nao so o processo. */
+app.get('/saude', async (_req, res) => {
+  try {
+    const { consultar } = await import('./db.js');
+    await consultar('select 1');
+    res.json({ ok: true, banco: true });
+  } catch (erro) {
+    res.status(503).json({ ok: false, banco: false });
+  }
+});
 
 // --------------------------------------------------------------- webhooks ---
 // Corpo cru antes do parser de JSON: a assinatura e conferida sobre os bytes
@@ -265,7 +297,17 @@ async function acessoDaConta(contaId) {
 
 app.use(carregarConta);
 
-app.post('/api/cadastro', async (req, res) => {
+/** Sem teto, o login e forca bruta livre. Dez por minuto por IP e folgado para gente e apertado para robo. */
+async function limitarEntrada(req, res, proximo) {
+  const ok = await repo.consumirLimite(`entrada:${req.ip || 'sem-ip'}`, 60, 10);
+  if (!ok) {
+    log.aviso('limite.estourado', { rota: req.path, por: 'ip' });
+    return res.status(429).json({ erro: 'muitas tentativas, espere um minuto' });
+  }
+  proximo();
+}
+
+app.post('/api/cadastro', limitarEntrada, async (req, res) => {
   const { nome, email, senha } = req.body || {};
   if (!nome || !email || !senha) return res.status(400).json({ erro: 'campos obrigatorios' });
   if (String(senha).length < 8) return res.status(400).json({ erro: 'senha de no minimo 8 caracteres' });
@@ -282,7 +324,7 @@ app.post('/api/cadastro', async (req, res) => {
   }
 });
 
-app.post('/api/login', async (req, res) => {
+app.post('/api/login', limitarEntrada, async (req, res) => {
   const { email, senha } = req.body || {};
   const entrada = await entrar(String(email || ''), String(senha || ''));
   if (!entrada) return res.status(401).json({ erro: 'email ou senha invalidos' });
@@ -633,9 +675,16 @@ app.get('/api/alertas', async (req, res) => {
 
 // -------------------------------------------------------------- estaticos ---
 
+// Uma hora de cache e stale-while-revalidate: o Cloudflare segura o
+// widget.js por todo visitante de toda loja, e uma versao nova chega em ate
+// uma hora sem ninguem precisar limpar cache. Se precisar antes, purga no
+// Cloudflare.
 app.use(express.static(path.join(aqui, '..', 'public'), {
-  maxAge: '5m',
-  setHeaders: (res) => res.set('Access-Control-Allow-Origin', '*'),
+  maxAge: '1h',
+  setHeaders: (res) => {
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
+  },
 }));
 app.use(express.static(path.join(aqui, '..', 'painel')));
 

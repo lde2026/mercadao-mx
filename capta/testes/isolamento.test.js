@@ -132,6 +132,12 @@ test('nome de lead que parece formula nao executa ao abrir a planilha', async ()
   assert.ok(csv.includes(`"'=HYPERLINK`), 'celula que comeca com = tem que ganhar apostrofo');
 });
 
+test('a saude responde sem sessao e confere o banco', async () => {
+  const r = await fetch(`${base}/saude`);
+  assert.equal(r.status, 200);
+  assert.deepEqual(await r.json(), { ok: true, banco: true });
+});
+
 test('nenhuma rota do painel responde sem sessao', async () => {
   for (const caminho of ['/api/eu', '/api/leads', '/api/leads.csv', '/api/conexoes', '/api/financeiro', '/api/hoje']) {
     const r = await pedir(caminho);
@@ -182,6 +188,16 @@ test('o endpoint publico corta por limite de requisicoes', async () => {
     if (r.status === 429) { bloqueou = true; break; }
   }
   assert.ok(bloqueou, 'o teto por IP tinha que ter cortado antes de 15 tentativas');
+});
+
+// Por ultimo: consome o teto do IP e derrubaria qualquer cadastro depois dele.
+test('o login corta por teto de tentativas por IP', async () => {
+  let cortou = false;
+  for (let i = 0; i < 12; i += 1) {
+    const r = await pedir('/api/login', { metodo: 'POST', corpo: { email: 'ninguem@x.com', senha: 'errada' } });
+    if (r.status === 429) { cortou = true; break; }
+  }
+  assert.ok(cortou, 'doze senhas erradas seguidas tinham que ser cortadas');
 });
 
 test.after(async () => {
