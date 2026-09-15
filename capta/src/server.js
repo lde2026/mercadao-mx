@@ -387,7 +387,7 @@ app.get('/api/conexoes', async (req, res) => {
   const conexoes = await repo.listarConexoes(req.conta.id);
   res.json(await Promise.all(conexoes.map(async (conexao) => ({
     ...conexao,
-    lote: conexao.plataforma === 'loja_integrada'
+    lote: adaptador(conexao.plataforma).criaCupomPorApi === false
       ? await repo.saldoDoLote(req.conta.id, conexao.id)
       : null,
   }))));

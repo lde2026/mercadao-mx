@@ -1082,15 +1082,91 @@
     pendente: 'Ainda nao resolvido.',
   };
 
+  var NOME_PLATAFORMA = { nuvemshop: 'Nuvemshop', tray: 'Tray', woocommerce: 'WooCommerce', loja_integrada: 'Loja Integrada' };
+
+  var PLATAFORMAS = [
+    { id: 'nuvemshop', nome: 'Nuvemshop', resumo: 'Instalacao automatica e cupom por API.' },
+    { id: 'tray', nome: 'Tray', resumo: 'Instalacao automatica e cupom por API.' },
+    { id: 'woocommerce', nome: 'WooCommerce', resumo: 'Cupom por API. O widget entra pelo nosso plugin.' },
+    { id: 'loja_integrada', nome: 'Loja Integrada', resumo: 'Codigo colado no tema e cupons em lote.' },
+  ];
+
+  /** Campos que cada plataforma pede na conexao manual. */
+  var CAMPOS_CONEXAO = {
+    nuvemshop: [
+      ['store_id', 'ID da loja (user_id)', 'text', 'Ex.: 1234567'],
+      ['access_token', 'Access token', 'password', ''],
+    ],
+    tray: [
+      ['api_address', 'Endereco da API (api_address)', 'url', 'https://sualoja.commercesuite.com.br/web_api'],
+      ['access_token', 'Access token', 'password', ''],
+      ['refresh_token', 'Refresh token', 'password', ''],
+      ['store_id', 'Codigo da loja (store_id)', 'text', 'Ex.: 391250'],
+    ],
+    woocommerce: [
+      ['url', 'Endereco da loja', 'url', 'https://sualoja.com.br'],
+      ['consumer_key', 'Consumer key', 'text', 'ck_...'],
+      ['consumer_secret', 'Consumer secret', 'password', 'cs_...'],
+    ],
+    loja_integrada: [
+      ['chave_api', 'Chave de API', 'password', ''],
+      ['chave_aplicacao', 'Chave de aplicacao', 'password', ''],
+    ],
+  };
+
+  var AJUDA_CONEXAO = {
+    nuvemshop: 'Sem o app na loja de aplicativos, o token sai do painel de parceiros da Nuvemshop.',
+    tray: 'Os tokens vem da autorizacao do aplicativo. Sem o botao acima, gere o code em Meus aplicativos e troque pelos tokens conforme docs/tray-api.md.',
+    woocommerce: 'Em WooCommerce, Configuracoes, Avancado e REST API, crie uma chave com permissao de leitura e escrita.',
+    loja_integrada: 'A chave de API sai do painel da Loja Integrada (so em plano pago). A chave de aplicacao a equipe deles emite em 3 a 5 dias uteis.',
+  };
+
+  /**
+   * Bilhete de OAuth: a callback da plataforma trocou o code por token e
+   * mandou o resultado cifrado no endereco. Aqui ele vira conexao da conta
+   * logada. O endereco e limpo antes de qualquer coisa, para um F5 nao
+   * tentar usar o bilhete de novo.
+   */
+  function bilheteNoEndereco() {
+    var partes = location.hash.split('?');
+    if (partes.length < 2) return null;
+    var bilhete = new URLSearchParams(partes[1]).get('bilhete');
+    history.replaceState(null, '', location.pathname + partes[0]);
+    return bilhete;
+  }
+
   function verIntegracoes() {
-    var alvo = pintar('Integracoes', 'Cada plataforma instala de um jeito. O caminho certo aparece aqui.');
-    api('/conexoes').then(function (conexoes) {
-      if (!conexoes.length) alvo.appendChild(el('p', 'Nenhuma loja conectada ainda.', 'vazio'));
+    var alvo = pintar('Integracoes', 'Conecte a loja, resolva a instalacao e o chat entra no ar.');
+    var bilhete = bilheteNoEndereco();
+    if (bilhete) {
+      var aviso = el('p', 'Fechando a conexao com a loja autorizada...', 'legenda');
+      alvo.appendChild(aviso);
+      api('/conexoes/oauth', { method: 'POST', corpo: { bilhete: bilhete } })
+        .then(function (r) {
+          aviso.textContent = r.conexao.nome_loja + ' conectada' + (r.instalacao && r.instalacao.modo === 'auto' ? ' e widget instalado.' : '.');
+          aviso.className = 'ok';
+          listarConexoes(alvo);
+        })
+        .catch(function (e) { aviso.textContent = 'Nao deu para fechar a conexao: ' + e.message; aviso.className = 'erro'; listarConexoes(alvo); });
+      return;
+    }
+    listarConexoes(alvo);
+  }
+
+  function listarConexoes(alvo) {
+    var area = alvo.querySelector('.area-conexoes');
+    if (area) area.remove();
+    area = el('div', null, 'area-conexoes');
+    alvo.appendChild(area);
+    Promise.all([api('/conexoes'), api('/conexoes/oauth')]).then(function (r) {
+      var conexoes = r[0];
+      area.appendChild(cartaoConectar(r[1], function () { listarConexoes(alvo); }));
+      if (!conexoes.length) area.appendChild(el('p', 'Nenhuma loja conectada ainda. Comece pelo cartao acima.', 'vazio'));
       conexoes.forEach(function (conexao) {
         var cartao = el('div', null, 'cartao');
         var topo = el('div', null, 'titulo-conexao');
         topo.appendChild(el('strong', conexao.nome_loja));
-        topo.appendChild(el('span', conexao.plataforma, 'rotulo'));
+        topo.appendChild(el('span', NOME_PLATAFORMA[conexao.plataforma] || conexao.plataforma, 'rotulo'));
         topo.appendChild(selo(conexao.modo_instalacao, conexao.modo_instalacao));
         cartao.appendChild(topo);
         cartao.appendChild(el('p', TEXTO_MODO[conexao.modo_instalacao] || '', 'legenda'));
@@ -1116,10 +1192,153 @@
             });
         });
         acoes.appendChild(instalar);
+        var verChave = el('button', 'Chave e codigo da loja', 'secundario');
+        verChave.type = 'button';
+        verChave.addEventListener('click', function () { mostrarChave(cartao, conexao); });
+        acoes.appendChild(verChave);
         cartao.appendChild(acoes);
-        alvo.appendChild(cartao);
+        if (conexao.lote) cartao.appendChild(formularioLote(conexao, function () { listarConexoes(alvo); }));
+        area.appendChild(cartao);
       });
+    }).catch(function (e) { area.appendChild(el('p', e.message, 'erro')); });
+  }
+
+  /** A chave publica identifica a loja no widget e no plugin. Nao e segredo, mas so aparece quando pedida. */
+  function mostrarChave(cartao, conexao) {
+    var antigo = cartao.querySelector('.chave-loja');
+    if (antigo) { antigo.remove(); return; }
+    var caixa = el('div', null, 'chave-loja instrucoes');
+    caixa.appendChild(el('div', 'Chave da loja (para o plugin do WordPress)', 'rotulo'));
+    caixa.appendChild(el('pre', conexao.chave_publica));
+    caixa.appendChild(el('div', 'Tag para colar no tema, quando a instalacao for manual', 'rotulo'));
+    caixa.appendChild(el('pre', '<script async src="' + location.origin + '/widget.js?k=' + conexao.chave_publica + '"></script>'));
+    cartao.appendChild(caixa);
+  }
+
+  /**
+   * Conectar loja. Nuvemshop e Tray entram pelo OAuth quando o servidor tem
+   * as chaves do aplicativo; o formulario manual fica como saida para as
+   * outras duas e para quem ja tem o token em maos.
+   */
+  function cartaoConectar(oauth, aoConectar) {
+    var cartao = el('div', null, 'cartao conectar');
+    cartao.appendChild(el('div', 'Conectar uma loja', 'rotulo'));
+    cartao.appendChild(el('p', 'Escolha a plataforma. O que cada uma pede aparece em seguida.', 'legenda'));
+    var grade = el('div', null, 'plataformas');
+    var formulario = el('div', null, 'form-conexao');
+    formulario.hidden = true;
+    PLATAFORMAS.forEach(function (p) {
+      var botao = el('button', null, 'plataforma');
+      botao.type = 'button';
+      botao.appendChild(el('strong', p.nome));
+      botao.appendChild(el('span', p.resumo, 'hora'));
+      botao.addEventListener('click', function () {
+        grade.querySelectorAll('.plataforma').forEach(function (b) { b.classList.remove('ativa'); });
+        botao.classList.add('ativa');
+        desenharFormConexao(formulario, p, oauth, aoConectar);
+        formulario.hidden = false;
+      });
+      grade.appendChild(botao);
     });
+    cartao.appendChild(grade);
+    cartao.appendChild(formulario);
+    return cartao;
+  }
+
+  function desenharFormConexao(caixa, plataforma, oauth, aoConectar) {
+    caixa.textContent = '';
+    if (plataforma.id === 'tray' && oauth.tray) {
+      var passoTray = el('div', null, 'oauth-passo');
+      passoTray.appendChild(el('strong', 'Pelo painel da Tray, sem copiar token'));
+      passoTray.appendChild(el('p', 'Na sua loja Tray, entre em Meus aplicativos, procure Captapp e clique em Instalar. A Tray pede sua autorizacao e devolve voce para esta tela com a loja conectada.', 'legenda'));
+      caixa.appendChild(passoTray);
+    }
+    if (plataforma.id === 'nuvemshop' && oauth.nuvemshop) {
+      var passoNs = el('div', null, 'oauth-passo');
+      passoNs.appendChild(el('strong', 'Pela Nuvemshop, sem copiar token'));
+      var irNs = el('a', 'Conectar pela Nuvemshop', 'botao-link');
+      irNs.href = oauth.nuvemshopUrl; irNs.rel = 'noopener';
+      passoNs.appendChild(irNs);
+      caixa.appendChild(passoNs);
+    }
+
+    var form = el('form');
+    form.appendChild(el('div', 'Conexao manual', 'rotulo'));
+    var nome = el('label', 'Nome da loja');
+    var inputNome = el('input'); inputNome.name = 'nomeLoja'; inputNome.required = true; inputNome.placeholder = 'Como aparece para voce no painel';
+    nome.appendChild(inputNome);
+    form.appendChild(nome);
+    CAMPOS_CONEXAO[plataforma.id].forEach(function (c) {
+      var rotulo = el('label', c[1]);
+      var input = el('input');
+      input.name = c[0]; input.type = c[2]; input.required = true; input.placeholder = c[3]; input.autocomplete = 'off';
+      rotulo.appendChild(input);
+      form.appendChild(rotulo);
+    });
+    if (plataforma.id === 'loja_integrada') {
+      var tema = el('label', 'O tema da loja tem o campo "Incluir codigo HTML"?');
+      var sel = el('select'); sel.name = 'tema_permite_html';
+      [['true', 'Sim, tem o campo'], ['false', 'Nao, e o tema padrao novo']].forEach(function (o) {
+        var op = el('option', o[1]); op.value = o[0]; sel.appendChild(op);
+      });
+      tema.appendChild(sel);
+      form.appendChild(tema);
+    }
+    form.appendChild(el('p', AJUDA_CONEXAO[plataforma.id], 'hora'));
+    var erro = el('p', null, 'erro'); erro.hidden = true;
+    form.appendChild(erro);
+    var acoes = el('div', null, 'acoes');
+    var enviar = el('button', 'Conectar e instalar'); enviar.type = 'submit';
+    acoes.appendChild(enviar);
+    form.appendChild(acoes);
+    form.addEventListener('submit', function (evento) {
+      evento.preventDefault();
+      erro.hidden = true;
+      enviar.disabled = true;
+      var dados = new FormData(form);
+      var credenciais = {};
+      CAMPOS_CONEXAO[plataforma.id].forEach(function (c) { credenciais[c[0]] = String(dados.get(c[0]) || '').trim(); });
+      if (plataforma.id === 'loja_integrada') credenciais.tema_permite_html = dados.get('tema_permite_html') === 'true';
+      var dominio = credenciais.url || credenciais.api_address || null;
+      if (dominio) dominio = dominio.replace(/^https?:\/\//, '').split('/')[0];
+      api('/conexoes', { method: 'POST', corpo: {
+        plataforma: plataforma.id, nomeLoja: String(dados.get('nomeLoja')).trim(), dominio: dominio, credenciais: credenciais,
+      } }).then(function (conexao) {
+        // Instalacao logo em seguida: quem conecta quer ver o chat no ar.
+        return api('/conexoes/' + conexao.id + '/instalacao', { method: 'POST' }).catch(function () { return null; });
+      }).then(function () { aoConectar(); })
+        .catch(function (e) { erro.textContent = e.message; erro.hidden = false; enviar.disabled = false; });
+    });
+    caixa.appendChild(form);
+  }
+
+  /** Lote de cupons: um codigo por linha, para a plataforma que nao cria cupom por API. */
+  function formularioLote(conexao, aoSalvar) {
+    var caixa = el('div', null, 'instrucoes');
+    caixa.appendChild(el('div', 'Repor o lote de cupons', 'rotulo'));
+    caixa.appendChild(el('p', 'Crie os cupons no painel da plataforma (uso unico cada) e cole os codigos aqui, um por linha.', 'legenda'));
+    var area = el('textarea'); area.rows = 4; area.placeholder = 'CUPOM-001\nCUPOM-002';
+    caixa.appendChild(area);
+    var acoes = el('div', null, 'acoes');
+    var salvar = el('button', 'Adicionar ao lote'); salvar.type = 'button';
+    var retorno = el('span', null, 'hora');
+    salvar.addEventListener('click', function () {
+      var codigos = area.value.split(/[\n,;\s]+/).map(function (c) { return c.trim(); }).filter(Boolean);
+      if (!codigos.length) { retorno.textContent = 'Cole ao menos um codigo.'; return; }
+      salvar.disabled = true;
+      api('/conexoes/' + conexao.id + '/lote', { method: 'POST', corpo: { codigos: codigos } })
+        .then(function (r) {
+          retorno.textContent = r.inseridos + ' adicionados. Agora sao ' + r.saldo.disponiveis + ' disponiveis.';
+          area.value = '';
+          salvar.disabled = false;
+          if (aoSalvar) setTimeout(aoSalvar, 1200);
+        })
+        .catch(function (e) { retorno.textContent = e.message; salvar.disabled = false; });
+    });
+    acoes.appendChild(salvar);
+    acoes.appendChild(retorno);
+    caixa.appendChild(acoes);
+    return caixa;
   }
 
   function mostrarInstrucoes(cartao, resultado) {
@@ -1376,7 +1595,7 @@
 
   function navegar() {
     if (!eu) return;
-    var hash = location.hash || '#/hoje';
+    var hash = (location.hash || '#/hoje').split('?')[0];
     document.querySelectorAll('nav a').forEach(function (a) {
       a.classList.toggle('ativo', a.getAttribute('href') === hash);
     });
