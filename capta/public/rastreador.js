@@ -9,6 +9,11 @@
 (function () {
   'use strict';
   try {
+    // O widget carrega este arquivo sozinho. Se a loja tambem colocou a tag
+    // a mao, a segunda copia para aqui, senao cada pagina viraria dois eventos.
+    if (window.__captaRastreando) return;
+    window.__captaRastreando = true;
+
     var script = document.currentScript;
     if (!script) return;
     var origem = new URL(script.src, location.href);

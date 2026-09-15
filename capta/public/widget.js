@@ -41,10 +41,6 @@
       try { localStorage.setItem(nome, valor); } catch (e) { /* modo anonimo */ }
     }
 
-    // Quem ja pegou o beneficio nao ve o convite de novo. Ele e unico por
-    // pessoa, entao insistir so gasta a paciencia de quem ja converteu.
-    if (guardado(CHAVE_FEITO)) return;
-
     function anonimo() {
       var id = guardado(CHAVE_ANON);
       if (!id) {
@@ -61,9 +57,30 @@
       return fetch(api + caminho, config);
     }
 
+    // O rastreador e carregado daqui, e nao por uma segunda tag na loja, para
+    // a instalacao ser uma linha so em qualquer plataforma. Quem decide se
+    // ele entra e o servidor, pelo plano da conta, entao o script nem e
+    // baixado onde o rastreamento esta desligado.
+    function carregarRastreador() {
+      if (window.__captaRastreando) return;
+      var tag = document.createElement('script');
+      tag.async = true;
+      tag.src = api + '/rastreador.js?k=' + encodeURIComponent(chave);
+      (document.head || document.body).appendChild(tag);
+    }
+
     buscar('/w/fluxo/' + chave)
       .then(function (r) { return r.ok && r.status !== 204 ? r.json() : null; })
-      .then(function (fluxo) { if (fluxo) montar(fluxo); })
+      .then(function (fluxo) {
+        if (!fluxo) return;
+        if (fluxo.rastrear) carregarRastreador();
+        // Quem ja pegou o beneficio nao ve o convite de novo. Ele e unico por
+        // pessoa, entao insistir so gasta a paciencia de quem ja converteu.
+        // A navegacao dessa pessoa continua valendo, por isso o rastreador
+        // sobe antes desta trava.
+        if (guardado(CHAVE_FEITO)) return;
+        montar(fluxo);
+      })
       .catch(function () { /* API fora do ar: a loja segue como se nada existisse */ });
 
     // O que muda por beneficio: a pergunta de contato, o botao e a tela final.

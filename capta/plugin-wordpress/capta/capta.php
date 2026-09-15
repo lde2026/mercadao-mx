@@ -40,7 +40,8 @@ function capta_injetar_scripts()
     $api = untrailingslashit((string) get_option(CAPTA_OPCAO_API, CAPTA_API_PADRAO));
     $sufixo = '?k=' . rawurlencode($chave);
 
-    wp_enqueue_script('capta-rastreador', $api . '/rastreador.js' . $sufixo, array(), null, true);
+    // So o widget entra aqui. Ele carrega o rastreador sozinho quando o plano
+    // da conta permite, entao a loja nao precisa de uma segunda tag.
     wp_enqueue_script('capta-widget', $api . '/widget.js' . $sufixo, array(), null, true);
 }
 add_action('wp_enqueue_scripts', 'capta_injetar_scripts');
@@ -49,7 +50,7 @@ add_action('wp_enqueue_scripts', 'capta_injetar_scripts');
 // renderizacao do tema do cliente.
 function capta_marcar_async($tag, $handle)
 {
-    if ($handle === 'capta-widget' || $handle === 'capta-rastreador') {
+    if ($handle === 'capta-widget') {
         return str_replace(' src=', ' async src=', $tag);
     }
     return $tag;

@@ -52,7 +52,6 @@ Painel em http://localhost:3000
 Pegue a `chave` que o `semear` imprimiu e ponha numa pagina HTML local:
 
 ```html
-<script async src="http://localhost:3000/rastreador.js?k=SUA_CHAVE"></script>
 <script async src="http://localhost:3000/widget.js?k=SUA_CHAVE"></script>
 ```
 

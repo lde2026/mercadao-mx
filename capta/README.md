@@ -19,6 +19,7 @@ navegador do visitante          nosso servidor              loja do cliente
 widget.js      -> POST /w/lead/:chave -> fluxo-lead -> grava lead
                                                     -> cria cupom  -> API da loja
 rastreador.js  -> POST /e             -> eventos    -> costura pelo anonimo_id
+  (o widget carrega o rastreador sozinho quando o plano da conta permite)
                                          pedido pago <- webhook ou varredura
 ```
 
