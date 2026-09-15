@@ -248,16 +248,23 @@
             ? textos[2]
             : 'Recebemos seus dados' + (primeiro ? ', ' + primeiro : '') + '. Seu cupom chega em instantes no WhatsApp e no e-mail que você deixou.'));
         }
-        // Beneficio de contato humano com WhatsApp da loja: quem quer falar
-        // agora nao precisa esperar a loja ligar.
-        if (!comCupom && /^\d{10,15}$/.test(String(fluxo.whatsapp || ''))) {
-          var zap = el('a', 'zap', 'Falar agora no WhatsApp');
-          zap.href = 'https://wa.me/' + (fluxo.whatsapp.length <= 11 ? '55' : '') + fluxo.whatsapp
-            + '?text=' + encodeURIComponent('Oi! Acabei de responder o chat no site e quero ' + textos[1].toLowerCase().replace(/^quero /, '') + '.');
-          zap.target = '_blank'; zap.rel = 'noopener';
-          caixa.appendChild(zap);
-        }
+        var zap = botaoZap();
+        if (zap) caixa.appendChild(zap);
         area.appendChild(caixa);
+      }
+
+      /**
+       * Beneficio de contato humano com WhatsApp da loja: quem quer falar
+       * agora nao precisa esperar a loja ligar. Com cupom nao existe, porque
+       * o botao tiraria a atencao do codigo.
+       */
+      function botaoZap() {
+        if (comCupom || !/^\d{10,15}$/.test(String(fluxo.whatsapp || ''))) return null;
+        var zap = el('a', 'zap', 'Falar agora no WhatsApp');
+        zap.href = 'https://wa.me/' + (fluxo.whatsapp.length <= 11 ? '55' : '') + fluxo.whatsapp
+          + '?text=' + encodeURIComponent('Oi! Acabei de responder o chat no site e quero ' + textos[1].toLowerCase().replace(/^quero /, '') + '.');
+        zap.target = '_blank'; zap.rel = 'noopener';
+        return zap;
       }
 
       // ------------------------------------------------------------ painel ---
@@ -504,6 +511,8 @@
               ? textos[2]
               : 'Recebemos seus dados, ' + primeiro + '. Seu cupom chega em instantes no WhatsApp' + (dados.email ? ' e no e-mail' : '') + '.');
           }
+          var zapChat = botaoZap();
+          if (zapChat) { ms.appendChild(zapChat); rolar(); }
           var ps = el('div', 'ps');
           var fecharB = el('button', null, 'Fechar'); fecharB.type = 'button';
           fecharB.addEventListener('click', fechar);

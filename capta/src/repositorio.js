@@ -236,7 +236,7 @@ export async function salvarCredenciais(contaId, conexaoId, credenciais) {
 }
 
 export async function atualizarConexao(contaId, conexaoId, campos) {
-  const permitidos = ['modo_instalacao', 'status', 'detalhe_status', 'varrido_em', 'dominio'];
+  const permitidos = ['modo_instalacao', 'status', 'detalhe_status', 'varrido_em', 'dominio', 'nome_loja'];
   const partes = [];
   const valores = [conexaoId, contaId];
   for (const [chave, valor] of Object.entries(campos)) {

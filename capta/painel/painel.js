@@ -1225,6 +1225,9 @@
         cartao.appendChild(topo);
         cartao.appendChild(el('p', TEXTO_MODO[conexao.modo_instalacao] || '', 'legenda'));
 
+        if (conexao.status === 'pausada') {
+          cartao.appendChild(el('p', 'Chat pausado por você. O widget não aparece na loja até reativar. Os leads continuam aqui.', 'erro'));
+        }
         if (conexao.status === 'inadimplente_plataforma') {
           cartao.appendChild(el('p', 'Esta loja esta inadimplente com a propria plataforma. Enquanto isso durar, script e webhook ficam fora do ar por decisao dela, não nossa.', 'erro'));
         }
@@ -1250,6 +1253,18 @@
         verChave.type = 'button';
         verChave.addEventListener('click', function () { mostrarChave(cartao, conexao); });
         acoes.appendChild(verChave);
+        if (conexao.status === 'ativa' || conexao.status === 'pausada') {
+          var pausada = conexao.status === 'pausada';
+          var pausar = el('button', pausada ? 'Reativar o chat nesta loja' : 'Pausar o chat nesta loja', 'secundario');
+          pausar.type = 'button';
+          pausar.addEventListener('click', function () {
+            pausar.disabled = true;
+            api('/conexoes/' + conexao.id, { method: 'PUT', corpo: { status: pausada ? 'ativa' : 'pausada' } })
+              .then(function () { listarConexoes(alvo); })
+              .catch(function (e) { cartao.appendChild(el('p', e.message, 'erro')); pausar.disabled = false; });
+          });
+          acoes.appendChild(pausar);
+        }
         cartao.appendChild(acoes);
         if (conexao.lote) cartao.appendChild(formularioLote(conexao, function () { listarConexoes(alvo); }));
         area.appendChild(cartao);

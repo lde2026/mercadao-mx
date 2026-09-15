@@ -216,6 +216,8 @@ app.options('/e', liberarOrigem, (_req, res) => res.status(204).end());
 app.get('/w/fluxo/:chave', liberarOrigem, limitar({ porChave: 600, porIp: 60 }), async (req, res) => {
   const fluxo = await repo.fluxoPorChave(req.params.chave);
   if (!fluxo) return res.status(404).json({ erro: 'nao encontrado' });
+  // Loja pausada pelo lojista: o widget some da vitrine sem mexer na instalacao.
+  if (fluxo.status_conexao === 'pausada') return res.status(204).end();
 
   const acesso = await acessoDaConta(fluxo.conta_id);
   if (!acesso.widget) return res.status(204).end();
@@ -243,6 +245,7 @@ app.get('/w/fluxo/:chave', liberarOrigem, limitar({ porChave: 600, porIp: 60 }),
 app.post('/w/lead/:chave', liberarOrigem, limitar({ porChave: 120, porIp: 10 }), async (req, res) => {
   const fluxo = await repo.fluxoPorChave(req.params.chave);
   if (!fluxo) return res.status(404).json({ erro: 'nao encontrado' });
+  if (fluxo.status_conexao === 'pausada') return res.status(204).end();
 
   const acesso = await acessoDaConta(fluxo.conta_id);
   if (!acesso.widget) return res.status(204).end();
@@ -339,10 +342,13 @@ async function limitarEntrada(req, res, proximo) {
 app.post('/api/cadastro', limitarEntrada, async (req, res) => {
   const { nome, email, senha } = req.body || {};
   if (!nome || !email || !senha) return res.status(400).json({ erro: 'campos obrigatorios' });
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim())) return res.status(400).json({ erro: 'e-mail invalido' });
   if (String(senha).length < 8) return res.status(400).json({ erro: 'senha de no minimo 8 caracteres' });
 
   try {
-    const conta = await repo.criarConta({ nome, email, senha });
+    const conta = await repo.criarConta({
+      nome: String(nome).trim().slice(0, 120), email: String(email).trim(), senha: String(senha),
+    });
     const sessaoId = await repo.criarSessao(conta.id);
     log.info('conta.criada', { conta_id: conta.id });
     res.set('Set-Cookie', montarCookie(sessaoId))
@@ -531,6 +537,25 @@ app.post('/api/conexoes/:id/instalacao', async (req, res) => {
     });
     res.status(502).json({ erro: erro.message });
   }
+});
+
+/** Pausar e reativar o chat numa loja, sem tocar na instalacao nem nos leads. */
+app.put('/api/conexoes/:id', async (req, res) => {
+  const conexao = await repo.buscarConexao(req.conta.id, req.params.id);
+  if (!conexao) return res.status(404).json({ erro: 'nao encontrada' });
+  const { status, nomeLoja } = req.body || {};
+  const campos = {};
+  if (status != null) {
+    if (!['ativa', 'pausada'].includes(status)) return res.status(400).json({ erro: 'status invalido' });
+    campos.status = status;
+  }
+  if (nomeLoja != null) {
+    if (!String(nomeLoja).trim()) return res.status(400).json({ erro: 'nome obrigatorio' });
+    campos.nome_loja = String(nomeLoja).trim().slice(0, 120);
+  }
+  await repo.atualizarConexao(req.conta.id, conexao.id, campos);
+  log.info('conexao.atualizada', { conta_id: req.conta.id, conexao_id: conexao.id, campos: Object.keys(campos) });
+  res.json(await repo.buscarConexao(req.conta.id, conexao.id));
 });
 
 app.post('/api/conexoes/:id/lote', async (req, res) => {
