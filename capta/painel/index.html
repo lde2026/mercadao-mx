@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Captapp</title>
 <link rel="stylesheet" href="/painel.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%278%27 fill=%27%2315803d%27/%3E%3Ctext x=%2716%27 y=%2722%27 font-size=%2718%27 font-family=%27Arial%27 font-weight=%27700%27 fill=%27%23fff%27 text-anchor=%27middle%27%3Ec%3C/text%3E%3C/svg%3E">
 </head>
 <body>
   <div id="entrada" hidden>
@@ -16,7 +17,7 @@
       <label id="campo-nome" hidden>Nome da loja<input type="text" name="nome" autocomplete="organization"></label>
       <p class="erro" id="erro-entrada" hidden></p>
       <button type="submit" id="botao-entrada">Entrar</button>
-      <p class="troca"><a href="#" id="alternar">Nao tenho conta ainda</a> <span class="sep">|</span> <a href="#" id="esqueci">Esqueci minha senha</a></p>
+      <p class="troca"><a href="#" id="alternar">Não tenho conta ainda</a> <span class="sep">|</span> <a href="#" id="esqueci">Esqueci minha senha</a></p>
     </form>
     <form id="form-esqueci" hidden>
       <div class="marca-grande">captapp</div>
@@ -30,7 +31,7 @@
     <form id="form-nova-senha" hidden>
       <div class="marca-grande">captapp</div>
       <p class="sub">Escolha a senha nova</p>
-      <label>Senha nova, no minimo 8 caracteres<input type="password" name="senha" required minlength="8" autocomplete="new-password"></label>
+      <label>Senha nova, no mínimo 8 caracteres<input type="password" name="senha" required minlength="8" autocomplete="new-password"></label>
       <label>Repita a senha<input type="password" name="confirma" required minlength="8" autocomplete="new-password"></label>
       <p class="erro" id="erro-nova-senha" hidden></p>
       <button type="submit">Salvar e entrar</button>
@@ -74,7 +75,7 @@
           </a>
           <a href="#/integracoes">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 2v6"/><path d="M15 2v6"/><path d="M6 8h12v4a6 6 0 0 1-12 0z"/><path d="M12 18v4"/></svg>
-            <span>Integracoes</span>
+            <span>Integrações</span>
           </a>
           <a href="#/admin" id="menu-admin" hidden>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20h18"/><path d="M5 20V9l7-5 7 5v11"/><path d="M10 20v-6h4v6"/></svg>
@@ -86,7 +87,7 @@
           </a>
           <a href="#/configuracoes">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
-            <span>Configuracoes</span>
+            <span>Configurações</span>
           </a>
         </nav>
         <div class="rodape-lateral">

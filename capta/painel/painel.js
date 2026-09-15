@@ -115,7 +115,7 @@
     if (!digitos) return null;
     if (digitos.length <= 11) digitos = '55' + digitos;
     var texto = 'Oi ' + String(nome).split(' ')[0] + ', aqui e da ' + loja
-      + '. Vi que voce pegou um cupom no nosso site e vim ver se posso ajudar.';
+      + '. Vi que você pegou um cupom no nosso site e vim ver se posso ajudar.';
     return 'https://wa.me/' + digitos + '?text=' + encodeURIComponent(texto);
   }
 
@@ -166,7 +166,7 @@
     if (!produtos && !paginas) return null;
     var partes = [];
     if (produtos) partes.push('viu ' + produtos + (produtos === 1 ? ' produto' : ' produtos'));
-    if (paginas > produtos) partes.push((paginas - produtos) + (paginas - produtos === 1 ? ' pagina' : ' paginas'));
+    if (paginas > produtos) partes.push((paginas - produtos) + (paginas - produtos === 1 ? ' página' : ' páginas'));
     if (lead.foi_ao_carrinho) partes.push('foi ao carrinho');
     return partes.join(', ');
   }
@@ -183,18 +183,22 @@
   // ---------------------------------------------------------------- entrada ---
 
   function mostrarEntrada() {
-    document.getElementById('app').hidden = true;
-    document.getElementById('entrada').hidden = false;
+    // Quem sai depois de criar conta volta para o login, nao para o cadastro.
+    modoEntrada(false);
+    mostrarFormularioDeEntrada('form-entrada');
   }
 
   var criando = false;
-  document.getElementById('alternar').addEventListener('click', function (evento) {
-    evento.preventDefault();
-    criando = !criando;
+  function modoEntrada(criar) {
+    criando = criar;
     document.getElementById('campo-nome').hidden = !criando;
     document.querySelector('#campo-nome input').required = criando;
     document.getElementById('botao-entrada').textContent = criando ? 'Criar conta' : 'Entrar';
-    this.textContent = criando ? 'Ja tenho conta' : 'Nao tenho conta ainda';
+    document.getElementById('alternar').textContent = criando ? 'Já tenho conta' : 'Não tenho conta ainda';
+  }
+  document.getElementById('alternar').addEventListener('click', function (evento) {
+    evento.preventDefault();
+    modoEntrada(!criando);
   });
 
   document.getElementById('form-entrada').addEventListener('submit', function (evento) {
@@ -207,7 +211,7 @@
     api(criando ? '/cadastro' : '/login', { method: 'POST', corpo: corpo })
       .then(function () { iniciar(); })
       .catch(function (e) {
-        erro.textContent = e.message === 'sem sessao' ? 'E-mail ou senha invalidos' : e.message;
+        erro.textContent = e.message === 'sem sessao' ? 'E-mail ou senha inválidos' : e.message;
         erro.hidden = false;
       });
   });
@@ -263,7 +267,7 @@
     erro.hidden = true;
     var dados = new FormData(this);
     if (dados.get('senha') !== dados.get('confirma')) {
-      erro.textContent = 'As duas senhas nao batem.'; erro.hidden = false; return;
+      erro.textContent = 'As duas senhas não batem.'; erro.hidden = false; return;
     }
     var form = this;
     api('/senha/nova', { method: 'POST', corpo: { token: form.dataset.token, senha: dados.get('senha') } })
@@ -289,7 +293,7 @@
   // ------------------------------------------------------------------ hoje ---
 
   function verHoje() {
-    var alvo = pintar('Hoje', 'O que entrou, o que saiu e o que precisa de voce.');
+    var alvo = pintar('Hoje', 'O que entrou, o que saiu e o que precisa de você.');
     Promise.all([api('/hoje'), api('/alertas'), api('/leads?situacao=a_contatar&limite=1')])
       .then(function (r) {
         var lojas = r[0].lojas || [];
@@ -300,14 +304,14 @@
         var grade = el('div', null, 'grade-num');
         grade.appendChild(cartaoNumero({
           rotulo: 'Leads hoje', valor: String(soma('leads')), nomeIcone: 'leads', tom: 'acento',
-          detalhe: contagem.novos + ' nas ultimas 24h',
+          detalhe: contagem.novos + ' nas últimas 24h',
           rodape: { texto: contagem.a_contatar + ' esperando contato', acao: 'Ver a fila' },
           aoClicarRodape: function () { abaLeads = 'a_contatar'; location.hash = '#/leads'; },
         }));
         grade.appendChild(cartaoNumero({
           rotulo: 'Cupons entregues', valor: String(soma('cupons_ok')), nomeIcone: 'cupom', tom: 'bom',
           detalhe: 'de ' + (soma('cupons_ok') + soma('cupons_falhos')) + ' tentativas hoje',
-          rodape: { texto: 'Um cupom unico por pessoa' },
+          rodape: { texto: 'Um cupom único por pessoa' },
         }));
         grade.appendChild(cartaoNumero({
           rotulo: 'Cupons que falharam', valor: String(soma('cupons_falhos')),
@@ -318,7 +322,7 @@
         grade.appendChild(cartaoNumero({
           rotulo: 'Lojas conectadas', valor: String(lojas.length), nomeIcone: 'loja',
           detalhe: 'com o widget publicado',
-          rodape: { texto: 'Modos de instalacao', acao: 'Ver integracoes' },
+          rodape: { texto: 'Modos de instalação', acao: 'Ver integrações' },
           aoClicarRodape: function () { location.hash = '#/integracoes'; },
         }));
         alvo.appendChild(grade);
@@ -356,7 +360,7 @@
   // ----------------------------------------------------------------- leads ---
 
   function verLeads() {
-    pintar('Leads', 'Lead capturado nao e lead trabalhado. Comece pela fila de quem ainda espera.');
+    pintar('Leads', 'Lead capturado não é lead trabalhado. Comece pela fila de quem ainda espera.');
     api('/leads?limite=200').then(function (dados) {
       // count() do Postgres chega como texto, e "5" - 1 vira "5-1" na aba.
       Object.keys(dados.contagem).forEach(function (chave) {
@@ -377,7 +381,7 @@
     var abas = el('div', null, 'abas');
     [
       ['a_contatar', 'A contatar', cacheLeads.contagem.a_contatar],
-      ['contatados', 'Ja contatados', cacheLeads.contagem.contatados],
+      ['contatados', 'Já contatados', cacheLeads.contagem.contatados],
     ].forEach(function (par) {
       var aba = el('button', null, 'aba' + (abaLeads === par[0] ? ' ativa' : ''));
       aba.type = 'button';
@@ -405,7 +409,7 @@
       area.appendChild(el('p', filtro
         ? 'Nenhum lead bate com "' + filtro + '".'
         : abaLeads === 'a_contatar'
-          ? 'Fila zerada. Todo mundo que chegou ja foi contatado.'
+          ? 'Fila zerada. Todo mundo que chegou já foi contatado.'
           : 'Ninguem foi marcado como contatado ainda.', 'vazio'));
       alvo.appendChild(area);
       return;
@@ -443,7 +447,7 @@
     if (navegou) {
       var trilha = el('button', null, 'lead-navegacao');
       trilha.type = 'button';
-      trilha.appendChild(el('b', 'Navegacao'));
+      trilha.appendChild(el('b', 'Navegação'));
       trilha.appendChild(document.createTextNode(navegou + '. Ver o que acessou'));
       trilha.addEventListener('click', function () { location.hash = '#/lead/' + lead.id; });
       cartao.appendChild(trilha);
@@ -481,7 +485,7 @@
         desenharLeads();
       }).catch(function (e) {
         alternar.disabled = false;
-        alternar.textContent = e.dados && e.dados.motivo ? 'Painel em leitura' : 'Nao deu, tente de novo';
+        alternar.textContent = e.dados && e.dados.motivo ? 'Painel em leitura' : 'Não deu, tente de novo';
       });
     });
     acoes.appendChild(alternar);
@@ -506,7 +510,7 @@
     itens.forEach(function (item) {
       var li = el('li');
       li.appendChild(linkExterno(item.url, item.titulo || item.url));
-      li.appendChild(el('div', (item.vezes > 1 ? item.vezes + ' vezes, ultima ' : '') + tempoRelativo(item.ultimaVez), 'hora'));
+      li.appendChild(el('div', (item.vezes > 1 ? item.vezes + ' vezes, última ' : '') + tempoRelativo(item.ultimaVez), 'hora'));
       lista.appendChild(li);
     });
     return lista;
@@ -534,7 +538,7 @@
         if (perfil.cupom.status === 'criado') {
           respostas.appendChild(el('div', perfil.cupom.codigo, 'cupom-grande'));
         } else {
-          respostas.appendChild(el('p', 'Falhou: ' + (perfil.cupom.erro || 'motivo nao registrado')));
+          respostas.appendChild(el('p', 'Falhou: ' + (perfil.cupom.erro || 'motivo não registrado')));
         }
       }
       respostas.appendChild(el('div', 'Consentimento em ' + quando(lead.consentido_em), 'hora'));
@@ -547,16 +551,16 @@
         // Primeiro o que interessa a quem vai ligar: os produtos, do mais
         // recente para o mais antigo, cada um com o link da loja.
         navegacao.appendChild(el('div', 'Produtos que acessou (' + produtos.length + ')', 'rotulo'));
-        navegacao.appendChild(listaDeAcessos(produtos, 'Nenhum produto aberto, so paginas.'));
-        navegacao.appendChild(el('div', 'Paginas que acessou (' + paginas.length + ')', 'rotulo'));
-        navegacao.appendChild(listaDeAcessos(paginas, 'Nenhuma pagina alem dos produtos.'));
+        navegacao.appendChild(listaDeAcessos(produtos, 'Nenhum produto aberto, só páginas.'));
+        navegacao.appendChild(el('div', 'Páginas que acessou (' + paginas.length + ')', 'rotulo'));
+        navegacao.appendChild(listaDeAcessos(paginas, 'Nenhuma página alem dos produtos.'));
       }
       // A saida de pagina e ruido para quem le. O momento do contato entra
       // como passo proprio, vindo do lead, para a historia ter comeco e fim.
       var passos = perfil.linhaDoTempo.filter(function (evento) { return evento.tipo !== 'saida'; });
       passos.push({ tipo: 'identificado', criado_em: lead.criado_em });
       passos.sort(function (a, b) { return new Date(a.criado_em) - new Date(b.criado_em); });
-      navegacao.appendChild(el('div', 'Linha do tempo de navegacao', 'rotulo'));
+      navegacao.appendChild(el('div', 'Linha do tempo de navegação', 'rotulo'));
       if (passos.length) {
         var tempo = el('ul', null, 'linha-tempo');
         passos.forEach(function (evento) {
@@ -572,7 +576,7 @@
         navegacao.appendChild(tempo);
       } else {
         navegacao.appendChild(el('p',
-          'Sem navegacao registrada. O rastreamento e do plano Crescimento para cima e depende do consentimento no chat.',
+          'Sem navegação registrada. O rastreamento é do plano Crescimento para cima e depende do consentimento no chat.',
           'vazio'));
       }
       alvo.appendChild(navegacao);
@@ -598,7 +602,7 @@
       voltar.addEventListener('click', function () { location.hash = '#/leads'; });
       var apagar = el('button', 'Apagar por pedido do titular (LGPD)', 'secundario');
       apagar.addEventListener('click', function () {
-        if (!confirm('Apagar este lead e toda a navegacao dele? Nao tem volta.')) return;
+        if (!confirm('Apagar este lead e toda a navegação dele? Não tem volta.')) return;
         api('/leads/' + id, { method: 'DELETE' }).then(function () {
           cacheLeads = null;
           location.hash = '#/leads';
@@ -608,7 +612,7 @@
       acoes.appendChild(apagar);
       alvo.appendChild(acoes);
     }).catch(function () {
-      alvo.appendChild(el('p', 'Lead nao encontrado nesta conta.', 'vazio'));
+      alvo.appendChild(el('p', 'Lead não encontrado nesta conta.', 'vazio'));
     });
   }
 
@@ -656,7 +660,7 @@
         var conexoes = r[0];
         modelos = r[1];
         if (!conexoes.length) {
-          alvo.appendChild(el('p', 'Conecte uma loja em Integracoes antes de montar o chat.', 'vazio'));
+          alvo.appendChild(el('p', 'Conecte uma loja em Integrações antes de montar o chat.', 'vazio'));
           return;
         }
         var atual = construtor && conexoes.some(function (c) { return c.id === construtor.conexaoId; })
@@ -707,7 +711,7 @@
         escolha.appendChild(op);
       });
       escolha.addEventListener('change', function () {
-        if (construtor.sujo && !confirm('Ha mudancas nao publicadas. Trocar de loja e perder?')) {
+        if (construtor.sujo && !confirm('Ha mudanças não publicadas. Trocar de loja e perder?')) {
           escolha.value = construtor.conexaoId; return;
         }
         carregarConstrutor(alvo, conexoes, escolha.value);
@@ -726,7 +730,7 @@
     publicar.type = 'button';
     publicar.addEventListener('click', function () {
       var f = construtor.fluxo;
-      if (!f.consentimento.trim()) { estado.textContent = 'A linha de consentimento e obrigatoria.'; return; }
+      if (!f.consentimento.trim()) { estado.textContent = 'A linha de consentimento é obrigatória.'; return; }
       var semTexto = f.perguntas.some(function (p) { return !p.texto.trim(); });
       if (semTexto) { estado.textContent = 'Tem pergunta sem texto.'; return; }
       publicar.disabled = true;
@@ -735,7 +739,7 @@
         .then(function () {
           construtor.sujo = false;
           publicar.disabled = false;
-          estado.textContent = 'Publicado as ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) + '. O widget ja mostra assim.';
+          estado.textContent = 'Publicado às ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) + '. O widget já mostra assim.';
         })
         .catch(function (e) {
           publicar.disabled = false;
@@ -759,7 +763,7 @@
   function marcarSujo() {
     construtor.sujo = true;
     var estado = document.querySelector('.estado-publicacao');
-    if (estado) estado.textContent = 'Mudancas nao publicadas';
+    if (estado) estado.textContent = 'Mudanças não publicadas';
   }
 
   function no(tipo, titulo, chave) {
@@ -1077,7 +1081,7 @@
     fechar.addEventListener('click', function () { fundo.remove(); });
     cab.appendChild(fechar);
     modal.appendChild(cab);
-    modal.appendChild(el('p', 'Comece por um padrao do seu nicho e ajuste o texto do seu jeito.', 'legenda'));
+    modal.appendChild(el('p', 'Comece por um padrão do seu nicho e ajuste o texto do seu jeito.', 'legenda'));
 
     var nichos = {};
     modelos.forEach(function (m) { (nichos[m.nicho] = nichos[m.nicho] || []).push(m); });
@@ -1126,19 +1130,19 @@
   // ----------------------------------------------------------- integracoes ---
 
   var TEXTO_MODO = {
-    auto: 'Instalacao automatica. Nada a fazer na loja.',
-    manual: 'Precisa colar o codigo no painel da loja.',
-    bloqueado: 'Nao instala nesta loja.',
-    pendente: 'Ainda nao resolvido.',
+    auto: 'Instalação automática. Nada a fazer na loja.',
+    manual: 'Precisa colar o código no painel da loja.',
+    bloqueado: 'Não instala nesta loja.',
+    pendente: 'Ainda não resolvido.',
   };
 
   var NOME_PLATAFORMA = { nuvemshop: 'Nuvemshop', tray: 'Tray', woocommerce: 'WooCommerce', loja_integrada: 'Loja Integrada' };
 
   var PLATAFORMAS = [
-    { id: 'nuvemshop', nome: 'Nuvemshop', resumo: 'Instalacao automatica e cupom por API.' },
-    { id: 'tray', nome: 'Tray', resumo: 'Instalacao automatica e cupom por API.' },
+    { id: 'nuvemshop', nome: 'Nuvemshop', resumo: 'Instalação automática e cupom por API.' },
+    { id: 'tray', nome: 'Tray', resumo: 'Instalação automática e cupom por API.' },
     { id: 'woocommerce', nome: 'WooCommerce', resumo: 'Cupom por API. O widget entra pelo nosso plugin.' },
-    { id: 'loja_integrada', nome: 'Loja Integrada', resumo: 'Codigo colado no tema e cupons em lote.' },
+    { id: 'loja_integrada', nome: 'Loja Integrada', resumo: 'Código colado no tema e cupons em lote.' },
   ];
 
   /** Campos que cada plataforma pede na conexao manual. */
@@ -1148,13 +1152,13 @@
       ['access_token', 'Access token', 'password', ''],
     ],
     tray: [
-      ['api_address', 'Endereco da API (api_address)', 'url', 'https://sualoja.commercesuite.com.br/web_api'],
+      ['api_address', 'Endereço da API (api_address)', 'url', 'https://sualoja.commercesuite.com.br/web_api'],
       ['access_token', 'Access token', 'password', ''],
       ['refresh_token', 'Refresh token', 'password', ''],
-      ['store_id', 'Codigo da loja (store_id)', 'text', 'Ex.: 391250'],
+      ['store_id', 'Código da loja (store_id)', 'text', 'Ex.: 391250'],
     ],
     woocommerce: [
-      ['url', 'Endereco da loja', 'url', 'https://sualoja.com.br'],
+      ['url', 'Endereço da loja', 'url', 'https://sualoja.com.br'],
       ['consumer_key', 'Consumer key', 'text', 'ck_...'],
       ['consumer_secret', 'Consumer secret', 'password', 'cs_...'],
     ],
@@ -1166,9 +1170,9 @@
 
   var AJUDA_CONEXAO = {
     nuvemshop: 'Sem o app na loja de aplicativos, o token sai do painel de parceiros da Nuvemshop.',
-    tray: 'Os tokens vem da autorizacao do aplicativo. Sem o botao acima, gere o code em Meus aplicativos e troque pelos tokens conforme docs/tray-api.md.',
-    woocommerce: 'Em WooCommerce, Configuracoes, Avancado e REST API, crie uma chave com permissao de leitura e escrita.',
-    loja_integrada: 'A chave de API sai do painel da Loja Integrada (so em plano pago). A chave de aplicacao a equipe deles emite em 3 a 5 dias uteis.',
+    tray: 'Os tokens vem da autorizacao do aplicativo. Sem o botão acima, gere o code em Meus aplicativos e troque pelos tokens conforme docs/tray-api.md.',
+    woocommerce: 'Em WooCommerce, Configurações, Avancado e REST API, crie uma chave com permissao de leitura e escrita.',
+    loja_integrada: 'A chave de API sai do painel da Loja Integrada (só em plano pago). A chave de aplicacao a equipe deles emite em 3 a 5 dias úteis.',
   };
 
   /**
@@ -1186,10 +1190,10 @@
   }
 
   function verIntegracoes() {
-    var alvo = pintar('Integracoes', 'Conecte a loja, resolva a instalacao e o chat entra no ar.');
+    var alvo = pintar('Integrações', 'Conecte a loja, resolva a instalação e o chat entra no ar.');
     var bilhete = bilheteNoEndereco();
     if (bilhete) {
-      var aviso = el('p', 'Fechando a conexao com a loja autorizada...', 'legenda');
+      var aviso = el('p', 'Fechando a conexão com a loja autorizada...', 'legenda');
       alvo.appendChild(aviso);
       api('/conexoes/oauth', { method: 'POST', corpo: { bilhete: bilhete } })
         .then(function (r) {
@@ -1197,7 +1201,7 @@
           aviso.className = 'ok';
           listarConexoes(alvo);
         })
-        .catch(function (e) { aviso.textContent = 'Nao deu para fechar a conexao: ' + e.message; aviso.className = 'erro'; listarConexoes(alvo); });
+        .catch(function (e) { aviso.textContent = 'Não deu para fechar a conexão: ' + e.message; aviso.className = 'erro'; listarConexoes(alvo); });
       return;
     }
     listarConexoes(alvo);
@@ -1222,16 +1226,16 @@
         cartao.appendChild(el('p', TEXTO_MODO[conexao.modo_instalacao] || '', 'legenda'));
 
         if (conexao.status === 'inadimplente_plataforma') {
-          cartao.appendChild(el('p', 'Esta loja esta inadimplente com a propria plataforma. Enquanto isso durar, script e webhook ficam fora do ar por decisao dela, nao nossa.', 'erro'));
+          cartao.appendChild(el('p', 'Esta loja esta inadimplente com a propria plataforma. Enquanto isso durar, script e webhook ficam fora do ar por decisao dela, não nossa.', 'erro'));
         }
         if (conexao.detalhe_status) cartao.appendChild(el('p', conexao.detalhe_status, 'hora detalhe'));
         if (conexao.lote) {
-          cartao.appendChild(el('p', 'Lote de cupons: ' + conexao.lote.disponiveis + ' disponiveis de '
-            + conexao.lote.total + '. Esta plataforma nao cria cupom por API, entao o codigo sai deste lote.', 'legenda'));
+          cartao.appendChild(el('p', 'Lote de cupons: ' + conexao.lote.disponiveis + ' disponíveis de '
+            + conexao.lote.total + '. Esta plataforma não cria cupom por API, entao o código sai deste lote.', 'legenda'));
         }
 
         var acoes = el('div', null, 'acoes');
-        var instalar = el('button', 'Resolver instalacao');
+        var instalar = el('button', 'Resolver instalação');
         instalar.addEventListener('click', function () {
           instalar.disabled = true;
           api('/conexoes/' + conexao.id + '/instalacao', { method: 'POST' })
@@ -1242,7 +1246,7 @@
             });
         });
         acoes.appendChild(instalar);
-        var verChave = el('button', 'Chave e codigo da loja', 'secundario');
+        var verChave = el('button', 'Chave e código da loja', 'secundario');
         verChave.type = 'button';
         verChave.addEventListener('click', function () { mostrarChave(cartao, conexao); });
         acoes.appendChild(verChave);
@@ -1260,7 +1264,7 @@
     var caixa = el('div', null, 'chave-loja instrucoes');
     caixa.appendChild(el('div', 'Chave da loja (para o plugin do WordPress)', 'rotulo'));
     caixa.appendChild(el('pre', conexao.chave_publica));
-    caixa.appendChild(el('div', 'Tag para colar no tema, quando a instalacao for manual', 'rotulo'));
+    caixa.appendChild(el('div', 'Tag para colar no tema, quando a instalação for manual', 'rotulo'));
     caixa.appendChild(el('pre', '<script async src="' + location.origin + '/widget.js?k=' + conexao.chave_publica + '"></script>'));
     cartao.appendChild(caixa);
   }
@@ -1300,7 +1304,7 @@
     if (plataforma.id === 'tray' && oauth.tray) {
       var passoTray = el('div', null, 'oauth-passo');
       passoTray.appendChild(el('strong', 'Pelo painel da Tray, sem copiar token'));
-      passoTray.appendChild(el('p', 'Na sua loja Tray, entre em Meus aplicativos, procure Captapp e clique em Instalar. A Tray pede sua autorizacao e devolve voce para esta tela com a loja conectada.', 'legenda'));
+      passoTray.appendChild(el('p', 'Na sua loja Tray, entre em Meus aplicativos, procure Captapp e clique em Instalar. A Tray pede sua autorizacao e devolve você para esta tela com a loja conectada.', 'legenda'));
       caixa.appendChild(passoTray);
     }
     if (plataforma.id === 'nuvemshop' && oauth.nuvemshop) {
@@ -1313,9 +1317,9 @@
     }
 
     var form = el('form');
-    form.appendChild(el('div', 'Conexao manual', 'rotulo'));
+    form.appendChild(el('div', 'Conexão manual', 'rotulo'));
     var nome = el('label', 'Nome da loja');
-    var inputNome = el('input'); inputNome.name = 'nomeLoja'; inputNome.required = true; inputNome.placeholder = 'Como aparece para voce no painel';
+    var inputNome = el('input'); inputNome.name = 'nomeLoja'; inputNome.required = true; inputNome.placeholder = 'Como aparece para você no painel';
     nome.appendChild(inputNome);
     form.appendChild(nome);
     CAMPOS_CONEXAO[plataforma.id].forEach(function (c) {
@@ -1326,9 +1330,9 @@
       form.appendChild(rotulo);
     });
     if (plataforma.id === 'loja_integrada') {
-      var tema = el('label', 'O tema da loja tem o campo "Incluir codigo HTML"?');
+      var tema = el('label', 'O tema da loja tem o campo "Incluir código HTML"?');
       var sel = el('select'); sel.name = 'tema_permite_html';
-      [['true', 'Sim, tem o campo'], ['false', 'Nao, e o tema padrao novo']].forEach(function (o) {
+      [['true', 'Sim, tem o campo'], ['false', 'Não, e o tema padrão novo']].forEach(function (o) {
         var op = el('option', o[1]); op.value = o[0]; sel.appendChild(op);
       });
       tema.appendChild(sel);
@@ -1366,7 +1370,7 @@
   function formularioLote(conexao, aoSalvar) {
     var caixa = el('div', null, 'instrucoes');
     caixa.appendChild(el('div', 'Repor o lote de cupons', 'rotulo'));
-    caixa.appendChild(el('p', 'Crie os cupons no painel da plataforma (uso unico cada) e cole os codigos aqui, um por linha.', 'legenda'));
+    caixa.appendChild(el('p', 'Crie os cupons no painel da plataforma (uso único cada) e cole os códigos aqui, um por linha.', 'legenda'));
     var area = el('textarea'); area.rows = 4; area.placeholder = 'CUPOM-001\nCUPOM-002';
     caixa.appendChild(area);
     var acoes = el('div', null, 'acoes');
@@ -1374,11 +1378,11 @@
     var retorno = el('span', null, 'hora');
     salvar.addEventListener('click', function () {
       var codigos = area.value.split(/[\n,;\s]+/).map(function (c) { return c.trim(); }).filter(Boolean);
-      if (!codigos.length) { retorno.textContent = 'Cole ao menos um codigo.'; return; }
+      if (!codigos.length) { retorno.textContent = 'Cole ao menos um código.'; return; }
       salvar.disabled = true;
       api('/conexoes/' + conexao.id + '/lote', { method: 'POST', corpo: { codigos: codigos } })
         .then(function (r) {
-          retorno.textContent = r.inseridos + ' adicionados. Agora sao ' + r.saldo.disponiveis + ' disponiveis.';
+          retorno.textContent = r.inseridos + ' adicionados. Agora sao ' + r.saldo.disponiveis + ' disponíveis.';
           area.value = '';
           salvar.disabled = false;
           if (aoSalvar) setTimeout(aoSalvar, 1200);
@@ -1404,7 +1408,7 @@
       caixa.appendChild(el('p', resultado.motivo, 'erro'));
       caixa.appendChild(el('p', 'Saida: ' + resultado.saida, 'legenda'));
     } else if (resultado.modo === 'auto') {
-      caixa.appendChild(el('p', 'Instalado. O widget ja esta no ar.'));
+      caixa.appendChild(el('p', 'Instalado. O widget já esta no ar.'));
       if (resultado.ressalva) caixa.appendChild(el('p', resultado.ressalva, 'legenda'));
     } else {
       var passos = el('ol', null, 'passos');
@@ -1641,7 +1645,7 @@
   // ---------------------------------------------------------- configuracoes ---
 
   function verConfiguracoes() {
-    var alvo = pintar('Configuracoes', 'Quem recebe os avisos, o WhatsApp da loja e a sua senha.');
+    var alvo = pintar('Configurações', 'Quem recebe os avisos, o WhatsApp da loja e a sua senha.');
     api('/conta').then(function (conta) {
       var cartao = el('div', null, 'cartao');
       cartao.appendChild(el('div', 'Conta e avisos', 'rotulo'));
@@ -1653,11 +1657,11 @@
         l.appendChild(i); form.appendChild(l); return i;
       }
       campo('Nome da conta ou da loja', 'nome', conta.nome).required = true;
-      campo('CPF ou CNPJ (para a cobranca)', 'documento', conta.documento, 'text', 'Somente numeros');
-      campo('E-mail de login (nao muda por aqui)', 'email', conta.email, 'email').disabled = true;
-      campo('E-mail que recebe os avisos de lead e cobranca', 'emailAviso', conta.email_aviso, 'email', 'Vazio = o e-mail de login');
+      campo('CPF ou CNPJ (para a cobrança)', 'documento', conta.documento, 'text', 'Somente números');
+      campo('E-mail de login (não muda por aqui)', 'email', conta.email, 'email').disabled = true;
+      campo('E-mail que recebe os avisos de lead e cobrança', 'emailAviso', conta.email_aviso, 'email', 'Vazio = o e-mail de login');
       campo('WhatsApp da loja, com DDD', 'whatsapp', conta.whatsapp, 'tel', 'Ex.: 41999990000');
-      form.appendChild(el('p', 'O WhatsApp aparece como botao na tela final do chat quando o beneficio e diagnostico, especialista ou consultoria.', 'hora'));
+      form.appendChild(el('p', 'O WhatsApp aparece como botão na tela final do chat quando o benefício e diagnóstico, especialista ou consultoria.', 'hora'));
       var linha = el('label', null, 'linha-check');
       var check = el('input'); check.type = 'checkbox'; check.name = 'avisarLead'; check.checked = conta.avisar_lead !== false;
       linha.appendChild(check);
@@ -1688,7 +1692,7 @@
       senha.appendChild(el('div', 'Trocar a senha', 'rotulo'));
       var formSenha = el('form', null, 'form-config');
       var atual = el('label', 'Senha atual'); var iAtual = el('input'); iAtual.type = 'password'; iAtual.name = 'atual'; iAtual.required = true; iAtual.autocomplete = 'current-password'; atual.appendChild(iAtual);
-      var nova = el('label', 'Senha nova, no minimo 8 caracteres'); var iNova = el('input'); iNova.type = 'password'; iNova.name = 'nova'; iNova.required = true; iNova.minLength = 8; iNova.autocomplete = 'new-password'; nova.appendChild(iNova);
+      var nova = el('label', 'Senha nova, no mínimo 8 caracteres'); var iNova = el('input'); iNova.type = 'password'; iNova.name = 'nova'; iNova.required = true; iNova.minLength = 8; iNova.autocomplete = 'new-password'; nova.appendChild(iNova);
       formSenha.appendChild(atual); formSenha.appendChild(nova);
       var erroSenha = el('p', null, 'erro'); erroSenha.hidden = true; formSenha.appendChild(erroSenha);
       var okSenha = el('p', null, 'ok'); okSenha.hidden = true; formSenha.appendChild(okSenha);
@@ -1699,8 +1703,8 @@
         evento.preventDefault();
         erroSenha.hidden = true; okSenha.hidden = true;
         api('/conta/senha', { method: 'POST', corpo: { atual: iAtual.value, nova: iNova.value } })
-          .then(function () { okSenha.textContent = 'Senha trocada. As outras sessoes desta conta foram encerradas.'; okSenha.hidden = false; formSenha.reset(); })
-          .catch(function (e) { erroSenha.textContent = e.message === 'sem sessao' ? 'Senha atual nao confere' : e.message; erroSenha.hidden = false; });
+          .then(function () { okSenha.textContent = 'Senha trocada. As outras sessões desta conta foram encerradas.'; okSenha.hidden = false; formSenha.reset(); })
+          .catch(function (e) { erroSenha.textContent = e.message === 'sem sessao' ? 'Senha atual não confere' : e.message; erroSenha.hidden = false; });
       });
       senha.appendChild(formSenha);
       alvo.appendChild(senha);
@@ -1763,7 +1767,7 @@
       if (plano) {
         document.getElementById('rotulo-plano').textContent = 'Plano ' + plano.nome;
         document.getElementById('texto-plano').textContent = plano.rastreamento
-          ? 'Rastreamento de navegacao ligado.'
+          ? 'Rastreamento de navegação ligado.'
           : 'Rastreamento e do Crescimento para cima.';
         document.getElementById('cartao-plano').hidden = false;
       }
