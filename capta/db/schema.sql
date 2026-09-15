@@ -80,6 +80,18 @@ create table if not exists fluxos (
 alter table fluxos add column if not exists recompensa text not null default 'cupom'
   check (recompensa in ('cupom','frete_gratis','diagnostico','especialista','consultoria'));
 
+-- Formato do widget. painel e a janela compacta com o contato no fim; chat e
+-- o popup em balões no formato do projeto original, com nome e WhatsApp
+-- como primeiras perguntas. abrir_apos em segundos abre sozinho uma vez por
+-- navegador; zero desliga.
+alter table fluxos add column if not exists modo text not null default 'painel'
+  check (modo in ('painel','chat'));
+alter table fluxos add column if not exists abrir_apos integer not null default 0
+  check (abrir_apos between 0 and 120);
+-- Cor do botao e do cabecalho do widget, em hex. Nula usa o preto padrao.
+alter table fluxos add column if not exists cor text
+  check (cor is null or cor ~ '^#[0-9a-fA-F]{6}$');
+
 create unique index if not exists fluxos_conexao_idx on fluxos(conexao_id);
 
 -- Teto de quatro perguntas no banco, nao so na tela: a ultima e a de contato

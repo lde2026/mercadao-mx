@@ -510,6 +510,9 @@
     consentimento: '',
     desconto: 10,
     recompensa: 'cupom',
+    modo: 'painel',
+    abrirApos: 0,
+    cor: '',
     perguntas: [],
   };
 
@@ -553,6 +556,7 @@
         fluxo: fluxo ? {
           convite: fluxo.convite, consentimento: fluxo.consentimento,
           desconto: fluxo.desconto, recompensa: fluxo.recompensa || 'cupom',
+          modo: fluxo.modo || 'painel', abrirApos: fluxo.abrir_apos || 0, cor: fluxo.cor || '',
           perguntas: (fluxo.perguntas || []).map(function (p) {
             return { texto: p.texto, opcoes: (p.opcoes || []).slice() };
           }),
@@ -608,7 +612,7 @@
       if (semTexto) { estado.textContent = 'Tem pergunta sem texto.'; return; }
       publicar.disabled = true;
       estado.textContent = 'Publicando...';
-      api('/conexoes/' + construtor.conexaoId + '/fluxo', { method: 'PUT', corpo: f })
+      api('/conexoes/' + construtor.conexaoId + '/fluxo', { method: 'PUT', corpo: Object.assign({}, f, { cor: f.cor || null }) })
         .then(function () {
           construtor.sujo = false;
           publicar.disabled = false;
@@ -669,13 +673,43 @@
     // Convite
     var convite = no('convite', 'Convite', 'convite');
     var corpoConvite = el('div', null, 'no-corpo');
-    var rotuloConvite = el('label', 'Texto do botao flutuante');
+    var rotuloConvite = el('label', 'Texto do botão flutuante');
     var campoConvite = el('input');
     campoConvite.value = f.convite;
     campoConvite.maxLength = 60;
     campoConvite.addEventListener('input', function () { f.convite = campoConvite.value; marcarSujo(); desenharPrevia(); });
     rotuloConvite.appendChild(campoConvite);
     corpoConvite.appendChild(rotuloConvite);
+
+    var linhaCor = el('label', 'Cor do botão e do cabeçalho');
+    var caixaCor = el('div', null, 'cor-linha');
+    var campoCor = el('input');
+    campoCor.type = 'color'; campoCor.value = f.cor || '#111318';
+    campoCor.addEventListener('input', function () { f.cor = campoCor.value; marcarSujo(); desenharPrevia(); });
+    var padrao = el('button', 'Padrão', 'secundario');
+    padrao.type = 'button';
+    padrao.addEventListener('click', function (e) { e.stopPropagation(); f.cor = ''; marcarSujo(); desenharQuadro(); desenharPrevia(); });
+    caixaCor.appendChild(campoCor); caixaCor.appendChild(padrao);
+    linhaCor.appendChild(caixaCor);
+    corpoConvite.appendChild(linhaCor);
+
+    var rotuloModo = el('label', 'Formato');
+    var campoModo = el('select');
+    [['painel', 'Janela compacta, contato no fim'], ['chat', 'Chat em popup, nome e WhatsApp primeiro']].forEach(function (par) {
+      var op = el('option', par[1]); op.value = par[0]; if (f.modo === par[0]) op.selected = true; campoModo.appendChild(op);
+    });
+    campoModo.addEventListener('click', function (e) { e.stopPropagation(); });
+    campoModo.addEventListener('change', function () { f.modo = campoModo.value; marcarSujo(); desenharQuadro(); desenharPrevia(); });
+    rotuloModo.appendChild(campoModo);
+    corpoConvite.appendChild(rotuloModo);
+
+    var rotuloAbrir = el('label', 'Abrir sozinho após (segundos, 0 desliga)');
+    var campoAbrir = el('input');
+    campoAbrir.type = 'number'; campoAbrir.min = 0; campoAbrir.max = 120; campoAbrir.value = f.abrirApos;
+    campoAbrir.addEventListener('input', function () { f.abrirApos = Math.max(0, Math.min(120, Number(campoAbrir.value) || 0)); marcarSujo(); });
+    rotuloAbrir.appendChild(campoAbrir);
+    corpoConvite.appendChild(rotuloAbrir);
+    corpoConvite.appendChild(el('p', 'O botão treme como um telefone tocando até o primeiro clique.', 'hora'));
     convite.appendChild(corpoConvite);
     quadro.appendChild(convite);
 
@@ -759,7 +793,7 @@
     // Contato, fixo
     quadro.appendChild(ligacao());
     var contato = no('contato', 'Contato', 'contato');
-    contato.querySelector('header').appendChild(el('span', 'fixo, sempre a ultima', 'no-fixo'));
+    contato.querySelector('header').appendChild(el('span', f.modo === 'chat' ? 'fixo, vem primeiro' : 'fixo, sempre o último', 'no-fixo'));
     var corpoContato = el('div', null, 'no-corpo');
     corpoContato.appendChild(el('div', 'O visitante deixa', 'rotulo'));
     var fixos = el('div', null, 'chips');
@@ -844,6 +878,7 @@
     previa.appendChild(el('div', 'Como o visitante ve', 'rotulo'));
 
     var tela = el('div', null, 'previa-tela');
+    if (f.cor) tela.style.setProperty('--cor-widget', f.cor);
     if (sel === 'convite') {
       var botao = el('div', f.convite || 'Ganhe cupom', 'previa-botao');
       tela.appendChild(el('div', null, 'previa-loja'));

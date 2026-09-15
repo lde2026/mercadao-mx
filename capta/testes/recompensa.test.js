@@ -84,6 +84,30 @@ test('cupom continua sendo o padrao quando nada e informado', async () => {
   assert.equal(rows[0].desconto, 10);
 });
 
+test('formato, abrir sozinho e cor do botao chegam ao widget', async () => {
+  await publicar('cupom', { modo: 'chat', abrirApos: 12, cor: '#ff5a1f' });
+  const r = await (await fetch(`${base}/w/fluxo/${loja.chave_publica}`)).json();
+  assert.equal(r.modo, 'chat');
+  assert.equal(r.abrirApos, 12);
+  assert.equal(r.cor, '#ff5a1f');
+  assert.equal(r.loja, 'Loja do E-commerce');
+});
+
+test('o painel recusa formato e cor invalidos', async () => {
+  const entrada = await fetch(`${base}/api/login`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: 'pierre+r@lojadoecommerce.com.br', senha: 'senha-de-teste-123' }),
+  });
+  const cookie = entrada.headers.get('set-cookie').split(';')[0];
+  for (const corpo of [{ modo: 'balao' }, { cor: 'vermelho' }]) {
+    const r = await fetch(`${base}/api/conexoes/${loja.id}/fluxo`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json', Cookie: cookie },
+      body: JSON.stringify({ consentimento: 'x', perguntas: [], ...corpo }),
+    });
+    assert.equal(r.status, 400, JSON.stringify(corpo));
+  }
+});
+
 test('o painel recusa beneficio que nao existe', async () => {
   const entrada = await fetch(`${base}/api/login`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },

@@ -213,6 +213,10 @@ app.get('/w/fluxo/:chave', liberarOrigem, limitar({ porChave: 600, porIp: 60 }),
     consentimento: fluxo.consentimento,
     perguntas: (fluxo.perguntas || []).slice(0, 3),
     recompensa: fluxo.recompensa || 'cupom',
+    modo: fluxo.modo || 'painel',
+    abrirApos: fluxo.abrir_apos || 0,
+    cor: fluxo.cor || null,
+    loja: fluxo.nome_loja,
     rastrear: acesso.rastreamento,
   });
 });
@@ -451,9 +455,14 @@ app.put('/api/conexoes/:id/fluxo', async (req, res) => {
   const conexao = await repo.buscarConexao(req.conta.id, req.params.id);
   if (!conexao) return res.status(404).json({ erro: 'nao encontrada' });
 
-  const { convite, consentimento, desconto, perguntas, recompensa = 'cupom' } = req.body || {};
+  const {
+    convite, consentimento, desconto, perguntas, recompensa = 'cupom', modo = 'painel', abrirApos = 0, cor = null,
+  } = req.body || {};
+  if (cor && !/^#[0-9a-f]{6}$/i.test(String(cor))) return res.status(400).json({ erro: 'cor invalida' });
   if (!consentimento) return res.status(400).json({ erro: 'a linha de consentimento e obrigatoria' });
   if (!RECOMPENSAS.has(recompensa)) return res.status(400).json({ erro: 'beneficio invalido' });
+  if (!['painel', 'chat'].includes(modo)) return res.status(400).json({ erro: 'formato invalido' });
+  const segundos = Math.min(Math.max(Number(abrirApos) || 0, 0), 120);
   if ((perguntas || []).length > 3) {
     return res.status(400).json({
       erro: 'maximo de tres perguntas antes da de contato',
@@ -474,6 +483,9 @@ app.put('/api/conexoes/:id/fluxo', async (req, res) => {
     desconto: pct,
     perguntas: limpas,
     recompensa,
+    modo,
+    abrirApos: segundos,
+    cor: cor || null,
   });
   res.json({ id, perguntas: limpas.length });
 });

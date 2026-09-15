@@ -341,3 +341,11 @@ pre{background:var(--escuro);color:var(--superficie);padding:13px;border-radius:
 .plano-lista li::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--acento);margin-right:8px;vertical-align:middle}
 .plano button{width:100%}
 .plano-implantacao{font-size:13px;color:var(--fraco);padding:8px 10px;background:var(--fundo);border-radius:8px;margin-top:2px}
+
+.cor-linha{display:flex;gap:8px;align-items:center;margin-top:5px}
+.cor-linha input[type=color]{width:52px;height:36px;padding:2px;margin:0;border-radius:8px;cursor:pointer}
+.cor-linha button{padding:7px 12px;font-size:12.5px}
+.previa-tela{--cor-widget:#111}
+.previa-botao,.previa-cab,.previa-enviar{background:var(--cor-widget)}
+.previa-cupom{border-color:var(--cor-widget)}
+.previa-barra i{background:var(--cor-widget)}

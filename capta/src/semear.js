@@ -26,7 +26,7 @@ const conexao = jaTem || await repo.criarConexao({
 });
 
 await repo.salvarFluxo(conta.id, conexao.id, {
-  convite: 'Ganhe 10% na primeira compra',
+  convite: 'Ganhe benefícios',
   consentimento: 'Ao continuar, você concorda que a Bella Moda use seus dados para entrar em contato sobre esta compra.',
   desconto: 10,
   perguntas: [
@@ -73,7 +73,7 @@ for (const nova of outras) {
     detalhe_status: resolvida.motivo || null,
   });
   await repo.salvarFluxo(conta.id, criada.id, {
-    convite: 'Ganhe 10% na primeira compra',
+    convite: 'Ganhe benefícios',
     consentimento: `Ao continuar, voce concorda que a ${nova.nomeLoja} use seus dados para entrar em contato sobre esta compra.`,
     desconto: 10,
     perguntas: [{ texto: 'O que você procura hoje?', opcoes: ['Sala', 'Quarto', 'Cozinha', 'Presente'] }],
