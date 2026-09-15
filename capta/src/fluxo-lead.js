@@ -4,6 +4,7 @@ import { log } from './log.js';
 import { costurarEventos } from './eventos.js';
 import * as repo from './repositorio.js';
 import { credenciaisProntas } from './credenciais.js';
+import { avisarLeadNovo, avisarOperador } from './avisos.js';
 
 /**
  * O que acontece quando o lead termina o chat.
@@ -42,6 +43,10 @@ export async function concluirLead({
   const cupom = CRIAM_CUPOM.has(recompensa)
     ? await entregarCupom({ conexao, fluxo, lead })
     : { status: 'sem_cupom' };
+
+  // O aviso ao lojista nao segura a resposta ao visitante: o chat mostra o
+  // cupom agora e o e-mail chega em seguida.
+  avisarLeadNovo({ conexao, lead: { ...lead, nome, email, telefone, respostas } });
 
   return { lead, cupom, recompensa };
 }
@@ -143,5 +148,11 @@ async function falhou({ conexao, lead, desconto, motivo }) {
     gravidade: 'erro',
     mensagem: `Cupom nao criado na loja ${conexao.nome_loja}: ${motivo}`,
     dados: { conexao_id: conexao.id, lead_id: lead.id, plataforma: conexao.plataforma, desconto },
+  });
+  avisarOperador({
+    contaId: conexao.conta_id,
+    tipo: 'cupom_falhou',
+    mensagem: `Cupom nao criado na loja ${conexao.nome_loja}: ${motivo}`,
+    dados: { plataforma: conexao.plataforma, conexao_id: conexao.id },
   });
 }

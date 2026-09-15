@@ -6,6 +6,7 @@ import { gerarCodigo } from './cupom.js';
 import { enviar, cupomAtrasado } from './email.js';
 import * as repo from './repositorio.js';
 import { credenciaisProntas } from './credenciais.js';
+import { avisarCobranca } from './avisos.js';
 
 /**
  * Trabalho de fundo. Duas tarefas, as duas por falta de alternativa:
@@ -163,6 +164,25 @@ export async function reenviarCuponsFalhos() {
   }
 }
 
+/**
+ * Aviso de cobranca por e-mail, um por degrau da regua. A regua em si nao
+ * depende disto: o corte acontece pelo calculo de acesso em cada requisicao.
+ * Isto e so o lojista ficar sabendo antes de descobrir pelo widget sumido.
+ */
+export async function avisarInadimplentes() {
+  const contas = await repo.contasComAtraso();
+  let enviados = 0;
+  for (const conta of contas) {
+    try {
+      const acesso = await acessoDaConta(conta.id);
+      if (await avisarCobranca({ conta, acesso })) enviados += 1;
+    } catch (erro) {
+      log.aviso('aviso.cobranca_falhou', { conta_id: conta.id, motivo: erro.message });
+    }
+  }
+  if (contas.length) log.info('avisos.cobranca', { contas: contas.length, enviados });
+}
+
 async function acessoDaConta(contaId) {
   const [assinatura, abertas] = await Promise.all([
     repo.assinaturaDaConta(contaId),
@@ -176,6 +196,7 @@ export function agendar() {
   setInterval(() => { varrerPedidos().catch(() => {}); }, meiaHora).unref();
   setInterval(() => { reenviarCuponsFalhos().catch(() => {}); }, 15 * 60 * 1000).unref();
   setInterval(() => { removerScriptsVencidos().catch(() => {}); }, 6 * 3600 * 1000).unref();
+  setInterval(() => { avisarInadimplentes().catch(() => {}); }, 6 * 3600 * 1000).unref();
   setInterval(() => { repo.limparLimites().catch(() => {}); }, 3600 * 1000).unref();
   log.info('tarefas.agendadas', { varredura_minutos: MINUTOS_VARREDURA });
 }

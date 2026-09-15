@@ -62,6 +62,13 @@ export async function enviar({ para, assunto, texto, html, contaId }) {
   }
 }
 
+/** Nome de lead e resposta de chat sao texto digitado por visitante, entao entram no HTML escapados. */
+function escapar(texto) {
+  return String(texto ?? '').replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]));
+}
+
 function moldura(titulo, corpo) {
   return `<div style="font:15px/1.6 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#111318;max-width:520px;margin:0 auto;padding:24px">
 <h1 style="font-size:20px;margin:0 0 16px">${titulo}</h1>${corpo}</div>`;
@@ -78,8 +85,8 @@ export function cupomAtrasado({ nomeLead, nomeLoja, codigo, desconto }) {
     assunto: `Seu cupom de ${desconto}% na ${nomeLoja}`,
     texto,
     html: moldura(`Seu cupom de ${desconto}% na ${nomeLoja}`,
-      `<p>Ola, ${nomeLead}.</p>
-       <p style="font:700 24px/1 ui-monospace,Menlo,monospace;letter-spacing:2px;padding:16px;border:2px dashed #111318;border-radius:10px;text-align:center">${codigo}</p>
+      `<p>Ola, ${escapar(nomeLead)}.</p>
+       <p style="font:700 24px/1 ui-monospace,Menlo,monospace;letter-spacing:2px;padding:16px;border:2px dashed #111318;border-radius:10px;text-align:center">${escapar(codigo)}</p>
        <p>Use no carrinho. Ele e so seu e vale uma vez.</p>`),
   };
 }
@@ -93,7 +100,7 @@ export function avisoDeCobranca({ nomeConta, aviso, diasAtraso }) {
       : 'Fatura em aberto no Captapp',
     texto,
     html: moldura('Pendencia financeira',
-      `<p>Ola, ${nomeConta}.</p><p>${aviso}</p>
+      `<p>Ola, ${escapar(nomeConta)}.</p><p>${escapar(aviso)}</p>
        <p>Seus leads continuam guardados. Assim que o pagamento entrar, tudo volta no mesmo minuto, sem reimplantacao.</p>`),
   };
 }
@@ -105,9 +112,38 @@ export function leadQuente({ nomeConta, nomeLead, nomeLoja, telefone, respostas,
     assunto: `Lead novo na ${nomeLoja}: ${nomeLead}`,
     texto: `Ola, ${nomeConta}.\n\n${nomeLead} acabou de responder o chat na ${nomeLoja}.\n\n${linhas}\n\nWhatsApp: ${telefone}\n\nAbra no painel: ${urlPainel}`,
     html: moldura(`Lead novo na ${nomeLoja}`,
-      `<p><strong>${nomeLead}</strong> acabou de responder o chat.</p>
-       <ul>${respostas.map((r) => `<li>${r.pergunta} <strong>${r.resposta}</strong></li>`).join('')}</ul>
-       <p>WhatsApp: <strong>${telefone}</strong></p>
+      `<p><strong>${escapar(nomeLead)}</strong> acabou de responder o chat.</p>
+       <ul>${respostas.map((r) => `<li>${escapar(r.pergunta)} <strong>${escapar(r.resposta)}</strong></li>`).join('')}</ul>
+       <p>WhatsApp: <strong>${escapar(telefone)}</strong></p>
        <p><a href="${urlPainel}">Abrir no painel</a></p>`),
+  };
+}
+
+/** Para o operador do Captapp: algo que vira chamado se ninguem olhar. */
+export function alertaOperador({ tipo, mensagem, nomeConta, dados, urlPainel }) {
+  const detalhes = Object.entries(dados || {})
+    .filter(([, v]) => v != null && typeof v !== 'object')
+    .map(([k, v]) => `${k}: ${v}`);
+  return {
+    assunto: `[Captapp] ${tipo}${nomeConta ? ` em ${nomeConta}` : ''}`,
+    texto: `${mensagem}\n\n${detalhes.join('\n')}\n\nPainel do operador: ${urlPainel}`,
+    html: moldura(`Alerta: ${tipo}`,
+      `<p>${escapar(mensagem)}</p>
+       ${nomeConta ? `<p>Conta: <strong>${escapar(nomeConta)}</strong></p>` : ''}
+       ${detalhes.length ? `<ul>${detalhes.map((d) => `<li>${escapar(d)}</li>`).join('')}</ul>` : ''}
+       <p><a href="${urlPainel}">Abrir o painel do operador</a></p>`),
+  };
+}
+
+/** Recuperacao de senha. O link vale uma hora e uma vez so. */
+export function recuperacaoSenha({ nomeConta, url }) {
+  return {
+    assunto: 'Redefinir sua senha do Captapp',
+    texto: `Ola, ${nomeConta}.\n\nPara escolher uma senha nova, abra este link em ate uma hora:\n${url}\n\nSe voce nao pediu isso, ignore este e-mail. Sua senha continua a mesma.`,
+    html: moldura('Redefinir sua senha',
+      `<p>Ola, ${escapar(nomeConta)}.</p>
+       <p>Para escolher uma senha nova, abra o link abaixo em ate uma hora.</p>
+       <p><a href="${url}" style="display:inline-block;background:#15803d;color:#fff;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:10px">Escolher senha nova</a></p>
+       <p>Se voce nao pediu isso, ignore este e-mail. Sua senha continua a mesma.</p>`),
   };
 }

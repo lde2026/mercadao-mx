@@ -216,14 +216,64 @@
     api('/sair', { method: 'POST' }).then(mostrarEntrada).catch(mostrarEntrada);
   });
 
-  document.getElementById('trocar-senha').addEventListener('click', function () {
-    var atual = prompt('Senha atual:');
-    if (!atual) return;
-    var nova = prompt('Senha nova, no mínimo 8 caracteres:');
-    if (!nova) return;
-    api('/conta/senha', { method: 'POST', corpo: { atual: atual, nova: nova } })
-      .then(function () { alert('Senha trocada. As outras sessões desta conta foram encerradas.'); })
-      .catch(function (e) { alert(e.message); });
+  // ------------------------------------------------- esqueci e senha nova ---
+
+  function mostrarFormularioDeEntrada(id) {
+    ['form-entrada', 'form-esqueci', 'form-nova-senha'].forEach(function (nome) {
+      document.getElementById(nome).hidden = nome !== id;
+    });
+    document.getElementById('app').hidden = true;
+    document.getElementById('entrada').hidden = false;
+  }
+
+  document.getElementById('esqueci').addEventListener('click', function (evento) {
+    evento.preventDefault();
+    mostrarFormularioDeEntrada('form-esqueci');
+  });
+  document.getElementById('voltar-entrada').addEventListener('click', function (evento) {
+    evento.preventDefault();
+    mostrarFormularioDeEntrada('form-entrada');
+  });
+
+  document.getElementById('form-esqueci').addEventListener('submit', function (evento) {
+    evento.preventDefault();
+    var erro = document.getElementById('erro-esqueci');
+    var ok = document.getElementById('ok-esqueci');
+    erro.hidden = true; ok.hidden = true;
+    var botao = this.querySelector('button[type=submit]');
+    botao.disabled = true;
+    api('/senha/esqueci', { method: 'POST', corpo: { email: new FormData(this).get('email') } })
+      .then(function (r) { ok.textContent = r.mensagem; ok.hidden = false; })
+      .catch(function (e) { erro.textContent = e.message; erro.hidden = false; })
+      .then(function () { botao.disabled = false; });
+  });
+
+  /** O token vem do link do e-mail, em #/nova-senha?token=... Sai do endereco assim que lido. */
+  function tokenDeNovaSenha() {
+    var partes = location.hash.split('?');
+    if (partes[0] !== '#/nova-senha') return null;
+    var token = partes[1] ? new URLSearchParams(partes[1]).get('token') : null;
+    history.replaceState(null, '', location.pathname);
+    return token;
+  }
+
+  document.getElementById('form-nova-senha').addEventListener('submit', function (evento) {
+    evento.preventDefault();
+    var erro = document.getElementById('erro-nova-senha');
+    erro.hidden = true;
+    var dados = new FormData(this);
+    if (dados.get('senha') !== dados.get('confirma')) {
+      erro.textContent = 'As duas senhas nao batem.'; erro.hidden = false; return;
+    }
+    var form = this;
+    api('/senha/nova', { method: 'POST', corpo: { token: form.dataset.token, senha: dados.get('senha') } })
+      .then(function () {
+        mostrarFormularioDeEntrada('form-entrada');
+        var aviso = document.getElementById('erro-entrada');
+        aviso.textContent = 'Senha trocada. Entre com a senha nova.';
+        aviso.className = 'ok'; aviso.hidden = false;
+      })
+      .catch(function (e) { erro.textContent = e.message; erro.hidden = false; });
   });
 
   document.getElementById('sino').addEventListener('click', function () {
@@ -1588,13 +1638,83 @@
 
   // ------------------------------------------------------------- navegacao ---
 
+  // ---------------------------------------------------------- configuracoes ---
+
+  function verConfiguracoes() {
+    var alvo = pintar('Configuracoes', 'Quem recebe os avisos, o WhatsApp da loja e a sua senha.');
+    api('/conta').then(function (conta) {
+      var cartao = el('div', null, 'cartao');
+      cartao.appendChild(el('div', 'Conta e avisos', 'rotulo'));
+      var form = el('form', null, 'form-config');
+      function campo(rotulo, nome, valor, tipo, placeholder) {
+        var l = el('label', rotulo);
+        var i = el('input'); i.name = nome; i.type = tipo || 'text'; i.value = valor || ''; i.placeholder = placeholder || '';
+        i.autocomplete = 'off';
+        l.appendChild(i); form.appendChild(l); return i;
+      }
+      campo('Nome da conta ou da loja', 'nome', conta.nome).required = true;
+      campo('CPF ou CNPJ (para a cobranca)', 'documento', conta.documento, 'text', 'Somente numeros');
+      campo('E-mail de login (nao muda por aqui)', 'email', conta.email, 'email').disabled = true;
+      campo('E-mail que recebe os avisos de lead e cobranca', 'emailAviso', conta.email_aviso, 'email', 'Vazio = o e-mail de login');
+      campo('WhatsApp da loja, com DDD', 'whatsapp', conta.whatsapp, 'tel', 'Ex.: 41999990000');
+      form.appendChild(el('p', 'O WhatsApp aparece como botao na tela final do chat quando o beneficio e diagnostico, especialista ou consultoria.', 'hora'));
+      var linha = el('label', null, 'linha-check');
+      var check = el('input'); check.type = 'checkbox'; check.name = 'avisarLead'; check.checked = conta.avisar_lead !== false;
+      linha.appendChild(check);
+      linha.appendChild(document.createTextNode('Receber um e-mail a cada lead novo'));
+      form.appendChild(linha);
+      var erro = el('p', null, 'erro'); erro.hidden = true; form.appendChild(erro);
+      var ok = el('p', null, 'ok'); ok.hidden = true; form.appendChild(ok);
+      var acoes = el('div', null, 'acoes');
+      var salvar = el('button', 'Salvar'); salvar.type = 'submit';
+      acoes.appendChild(salvar); form.appendChild(acoes);
+      form.addEventListener('submit', function (evento) {
+        evento.preventDefault();
+        erro.hidden = true; ok.hidden = true; salvar.disabled = true;
+        var d = new FormData(form);
+        api('/conta', { method: 'PUT', corpo: {
+          nome: d.get('nome'), documento: d.get('documento'), emailAviso: d.get('emailAviso'),
+          whatsapp: d.get('whatsapp'), avisarLead: check.checked,
+        } }).then(function (atualizada) {
+          ok.textContent = 'Salvo.'; ok.hidden = false; salvar.disabled = false;
+          document.getElementById('nome-conta').textContent = atualizada.nome;
+          document.getElementById('avatar').textContent = iniciais(atualizada.nome);
+        }).catch(function (e) { erro.textContent = e.message; erro.hidden = false; salvar.disabled = false; });
+      });
+      cartao.appendChild(form);
+      alvo.appendChild(cartao);
+
+      var senha = el('div', null, 'cartao');
+      senha.appendChild(el('div', 'Trocar a senha', 'rotulo'));
+      var formSenha = el('form', null, 'form-config');
+      var atual = el('label', 'Senha atual'); var iAtual = el('input'); iAtual.type = 'password'; iAtual.name = 'atual'; iAtual.required = true; iAtual.autocomplete = 'current-password'; atual.appendChild(iAtual);
+      var nova = el('label', 'Senha nova, no minimo 8 caracteres'); var iNova = el('input'); iNova.type = 'password'; iNova.name = 'nova'; iNova.required = true; iNova.minLength = 8; iNova.autocomplete = 'new-password'; nova.appendChild(iNova);
+      formSenha.appendChild(atual); formSenha.appendChild(nova);
+      var erroSenha = el('p', null, 'erro'); erroSenha.hidden = true; formSenha.appendChild(erroSenha);
+      var okSenha = el('p', null, 'ok'); okSenha.hidden = true; formSenha.appendChild(okSenha);
+      var acoesSenha = el('div', null, 'acoes');
+      var trocar = el('button', 'Trocar senha', 'secundario'); trocar.type = 'submit';
+      acoesSenha.appendChild(trocar); formSenha.appendChild(acoesSenha);
+      formSenha.addEventListener('submit', function (evento) {
+        evento.preventDefault();
+        erroSenha.hidden = true; okSenha.hidden = true;
+        api('/conta/senha', { method: 'POST', corpo: { atual: iAtual.value, nova: iNova.value } })
+          .then(function () { okSenha.textContent = 'Senha trocada. As outras sessoes desta conta foram encerradas.'; okSenha.hidden = false; formSenha.reset(); })
+          .catch(function (e) { erroSenha.textContent = e.message === 'sem sessao' ? 'Senha atual nao confere' : e.message; erroSenha.hidden = false; });
+      });
+      senha.appendChild(formSenha);
+      alvo.appendChild(senha);
+    });
+  }
+
   var ROTAS = {
     '#/hoje': verHoje, '#/leads': verLeads, '#/chat': verChat,
     '#/integracoes': verIntegracoes, '#/financeiro': verFinanceiro, '#/admin': verAdmin,
+    '#/configuracoes': verConfiguracoes,
   };
 
   function navegar() {
-    if (!eu) return;
+    if (!eu) { abrirNovaSenhaSePedido(); return; }
     var hash = (location.hash || '#/hoje').split('?')[0];
     document.querySelectorAll('nav a').forEach(function (a) {
       a.classList.toggle('ativo', a.getAttribute('href') === hash);
@@ -1611,7 +1731,17 @@
       .map(function (p) { return p[0]; }).join('').toUpperCase();
   }
 
+  /** Link do e-mail de recuperacao: mostra o formulario de senha nova em vez do login. */
+  function abrirNovaSenhaSePedido() {
+    var token = tokenDeNovaSenha();
+    if (!token) return false;
+    document.getElementById('form-nova-senha').dataset.token = token;
+    mostrarFormularioDeEntrada('form-nova-senha');
+    return true;
+  }
+
   function iniciar() {
+    if (abrirNovaSenhaSePedido()) return;
     api('/eu').then(function (dados) {
       eu = dados;
       document.getElementById('entrada').hidden = true;

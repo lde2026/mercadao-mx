@@ -154,6 +154,7 @@
       '.ps button.leve{border-color:#dcdcdc;color:#666}',
       '.cp{display:flex;gap:8px}.cp input{border-radius:999px;padding:11px 14px}',
       '.cp button{border:0;border-radius:999px;background:var(--cor,#15803d);color:#fff;font-weight:700;padding:0 18px;cursor:pointer;font-size:14px}',
+      '.zap{display:block;margin-top:12px;text-align:center;background:#25d366;color:#fff;text-decoration:none;font-weight:700;padding:11px 16px;border-radius:999px}',
       '.er{font-size:12px;color:#c0392b;min-height:16px;margin-top:6px}',
       '@media(max-width:480px){.ov{padding:0}.cx{max-width:none;height:100%;border-radius:0}',
       '.p{right:8px;left:8px;bottom:8px;width:auto;max-width:none}',
@@ -246,6 +247,15 @@
           caixa.appendChild(el('p', 'msg', !comCupom
             ? textos[2]
             : 'Recebemos seus dados' + (primeiro ? ', ' + primeiro : '') + '. Seu cupom chega em instantes no WhatsApp e no e-mail que você deixou.'));
+        }
+        // Beneficio de contato humano com WhatsApp da loja: quem quer falar
+        // agora nao precisa esperar a loja ligar.
+        if (!comCupom && /^\d{10,15}$/.test(String(fluxo.whatsapp || ''))) {
+          var zap = el('a', 'zap', 'Falar agora no WhatsApp');
+          zap.href = 'https://wa.me/' + (fluxo.whatsapp.length <= 11 ? '55' : '') + fluxo.whatsapp
+            + '?text=' + encodeURIComponent('Oi! Acabei de responder o chat no site e quero ' + textos[1].toLowerCase().replace(/^quero /, '') + '.');
+          zap.target = '_blank'; zap.rel = 'noopener';
+          caixa.appendChild(zap);
         }
         area.appendChild(caixa);
       }

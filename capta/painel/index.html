@@ -16,7 +16,24 @@
       <label id="campo-nome" hidden>Nome da loja<input type="text" name="nome" autocomplete="organization"></label>
       <p class="erro" id="erro-entrada" hidden></p>
       <button type="submit" id="botao-entrada">Entrar</button>
-      <p class="troca"><a href="#" id="alternar">Nao tenho conta ainda</a></p>
+      <p class="troca"><a href="#" id="alternar">Nao tenho conta ainda</a> <span class="sep">|</span> <a href="#" id="esqueci">Esqueci minha senha</a></p>
+    </form>
+    <form id="form-esqueci" hidden>
+      <div class="marca-grande">captapp</div>
+      <p class="sub">Recuperar a senha</p>
+      <label>E-mail da conta<input type="email" name="email" required autocomplete="email"></label>
+      <p class="erro" id="erro-esqueci" hidden></p>
+      <p class="ok" id="ok-esqueci" hidden></p>
+      <button type="submit">Mandar o link</button>
+      <p class="troca"><a href="#" id="voltar-entrada">Voltar para o login</a></p>
+    </form>
+    <form id="form-nova-senha" hidden>
+      <div class="marca-grande">captapp</div>
+      <p class="sub">Escolha a senha nova</p>
+      <label>Senha nova, no minimo 8 caracteres<input type="password" name="senha" required minlength="8" autocomplete="new-password"></label>
+      <label>Repita a senha<input type="password" name="confirma" required minlength="8" autocomplete="new-password"></label>
+      <p class="erro" id="erro-nova-senha" hidden></p>
+      <button type="submit">Salvar e entrar</button>
     </form>
   </div>
 
@@ -35,7 +52,6 @@
         <div class="chip-conta">
           <span class="avatar" id="avatar">LD</span>
           <span class="nome-conta" id="nome-conta"></span>
-          <button type="button" id="trocar-senha">Senha</button>
           <button type="button" id="sair">Sair</button>
         </div>
       </div>
@@ -67,6 +83,10 @@
           <a href="#/financeiro">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v10"/><path d="M14.5 9.5h-4a1.5 1.5 0 0 0 0 3h3a1.5 1.5 0 0 1 0 3h-4"/></svg>
             <span>Financeiro</span>
+          </a>
+          <a href="#/configuracoes">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+            <span>Configuracoes</span>
           </a>
         </nav>
         <div class="rodape-lateral">

@@ -53,10 +53,72 @@ export async function trocarSenha(contaId, sessaoAtual, { atual, nova }) {
 
 export async function buscarConta(contaId) {
   const { rows } = await consultar(
-    `select id, nome, email, documento, cliente_externo, criado_em from contas where id = $1`,
+    `select id, nome, email, documento, cliente_externo, email_aviso, whatsapp, avisar_lead, criado_em
+       from contas where id = $1`,
     [contaId],
   );
   return rows[0] || null;
+}
+
+/** Dados que o lojista edita na tela de configuracoes. Nada de senha ou e-mail de login aqui. */
+export async function atualizarConta(contaId, campos) {
+  const permitidos = ['nome', 'documento', 'email_aviso', 'whatsapp', 'avisar_lead'];
+  const partes = [];
+  const valores = [contaId];
+  for (const [chave, valor] of Object.entries(campos)) {
+    if (!permitidos.includes(chave)) continue;
+    valores.push(valor);
+    partes.push(`${chave} = $${valores.length}`);
+  }
+  if (!partes.length) return buscarConta(contaId);
+  await consultar(
+    `update contas set ${partes.join(', ')}, atualizado_em = now() where id = $1`,
+    valores,
+  );
+  return buscarConta(contaId);
+}
+
+// ------------------------------------------------- recuperacao de senha ---
+
+function hashToken(token) {
+  return crypto.createHash('sha256').update(String(token)).digest('hex');
+}
+
+/**
+ * Cria o token de recuperacao para o e-mail, se ele existir. Devolve null
+ * quando nao existe, e quem chama responde igual nos dois casos, para a rota
+ * nao servir de lista de e-mails cadastrados.
+ */
+export async function criarRecuperacaoSenha(email, validadeMinutos = 60) {
+  const conta = await buscarContaPorEmail(email);
+  if (!conta) return null;
+  const token = crypto.randomBytes(32).toString('hex');
+  await consultar(
+    `insert into recuperacoes_senha (conta_id, token_hash, expira_em)
+     values ($1, $2, now() + ($3 || ' minutes')::interval)`,
+    [conta.id, hashToken(token), String(validadeMinutos)],
+  );
+  return { token, conta: { id: conta.id, nome: conta.nome, email: conta.email } };
+}
+
+/** Usa o token uma vez: troca a senha e derruba todas as sessoes da conta. */
+export async function usarRecuperacaoSenha(token, novaSenha) {
+  return emTransacao(async (cliente) => {
+    const { rows } = await cliente.query(
+      `update recuperacoes_senha set usado_em = now()
+        where token_hash = $1 and usado_em is null and expira_em > now()
+        returning conta_id`,
+      [hashToken(token)],
+    );
+    if (!rows[0]) return null;
+    const contaId = rows[0].conta_id;
+    await cliente.query(
+      `update contas set senha_hash = $2, atualizado_em = now() where id = $1`,
+      [contaId, hashSenha(novaSenha)],
+    );
+    await cliente.query(`delete from sessoes where conta_id = $1`, [contaId]);
+    return contaId;
+  });
 }
 
 // --------------------------------------------------------------- sessoes ---
@@ -243,6 +305,7 @@ export async function fluxoPorChave(chave) {
   const { rows } = await consultar(
     `select f.id, f.conta_id, f.conexao_id, f.convite, f.consentimento,
             f.desconto, f.recompensa, f.modo, f.abrir_apos, f.cor, f.ativo, c.plataforma, c.nome_loja, c.status as status_conexao,
+            ct.whatsapp,
             coalesce(
               (select json_agg(json_build_object('texto', p.texto, 'opcoes', p.opcoes)
                                order by p.ordem)
@@ -251,6 +314,7 @@ export async function fluxoPorChave(chave) {
             ) as perguntas
        from fluxos f
        join conexoes c on c.id = f.conexao_id
+       join contas ct on ct.id = f.conta_id
       where c.chave_publica = $1 and f.ativo = true`,
     [chave],
   );
@@ -519,6 +583,17 @@ export async function jaPagouImplantacao(contaId) {
     [contaId],
   );
   return rows.length > 0;
+}
+
+/** Contas com fatura vencida, para a tarefa de aviso de cobranca. */
+export async function contasComAtraso() {
+  const { rows } = await consultar(
+    `select distinct c.id, c.nome, c.email, c.email_aviso
+       from contas c
+       join cobrancas cb on cb.conta_id = c.id
+      where cb.status = 'aberta' and cb.vence_em < current_date`,
+  );
+  return rows;
 }
 
 export async function cobrancasEmAberto(contaId) {

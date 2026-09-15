@@ -227,7 +227,8 @@ test('trocar a senha exige a atual, derruba as outras sessoes e vale no login', 
   const cookieOutra = outra.cookie.split(';')[0];
 
   const errada = await pedir('/api/conta/senha', { metodo: 'POST', cookie: contaA.cookie, corpo: { atual: 'nao-e-essa', nova: 'nova-senha-forte' } });
-  assert.equal(errada.status, 401);
+  // 400 e nao 401: senha atual errada nao pode parecer sessao caida para o painel.
+  assert.equal(errada.status, 400);
 
   const certa = await pedir('/api/conta/senha', { metodo: 'POST', cookie: contaA.cookie, corpo: { atual: 'senha-de-teste-123', nova: 'nova-senha-forte' } });
   assert.equal(certa.status, 200);

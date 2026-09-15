@@ -15,6 +15,7 @@ import * as kiwify from './billing/kiwify.js';
 import { agendar } from './tarefas.js';
 import { credenciaisProntas } from './credenciais.js';
 import { registrarRotasOauth, concluirOauth, configuracaoOauth } from './oauth.js';
+import { enviarRecuperacaoSenha } from './avisos.js';
 import {
   carregarConta, exigirConta, exigirOperador, ehOperador, aplicarRegua, entrar,
   montarCookie, limparCookie,
@@ -230,6 +231,11 @@ app.get('/w/fluxo/:chave', liberarOrigem, limitar({ porChave: 600, porIp: 60 }),
     cor: fluxo.cor || null,
     loja: fluxo.nome_loja,
     rastrear: acesso.rastreamento,
+    // So quando o beneficio e o contato humano: o WhatsApp da loja vira o
+    // botao da tela final. Com cupom, o botao seria distracao.
+    whatsapp: ['diagnostico', 'especialista', 'consultoria'].includes(fluxo.recompensa)
+      ? (fluxo.whatsapp || '').replace(/\D/g, '') || null
+      : null,
   });
 });
 
@@ -355,6 +361,32 @@ app.post('/api/login', limitarEntrada, async (req, res) => {
     .json({ conta: { id: entrada.conta.id, nome: entrada.conta.nome, email: entrada.conta.email } });
 });
 
+/**
+ * Esqueci a senha. A resposta e a mesma exista o e-mail ou nao, para a rota
+ * nao servir de lista de clientes. O token so viaja no e-mail.
+ */
+app.post('/api/senha/esqueci', limitarEntrada, async (req, res) => {
+  const email = String(req.body?.email || '').trim();
+  if (email) {
+    const recuperacao = await repo.criarRecuperacaoSenha(email);
+    if (recuperacao) {
+      const envio = await enviarRecuperacaoSenha(recuperacao);
+      log.info('senha.recuperacao_pedida', { conta_id: recuperacao.conta.id, enviado: envio.enviado });
+    }
+  }
+  res.json({ ok: true, mensagem: 'Se o e-mail estiver cadastrado, o link para a senha nova chega em instantes.' });
+});
+
+app.post('/api/senha/nova', limitarEntrada, async (req, res) => {
+  const { token, senha } = req.body || {};
+  if (!token || !senha) return res.status(400).json({ erro: 'token e senha sao obrigatorios' });
+  if (String(senha).length < 8) return res.status(400).json({ erro: 'senha de no minimo 8 caracteres' });
+  const contaId = await repo.usarRecuperacaoSenha(String(token), String(senha));
+  if (!contaId) return res.status(400).json({ erro: 'link invalido ou vencido, peca um novo' });
+  log.info('senha.recuperada', { conta_id: contaId });
+  res.json({ ok: true });
+});
+
 app.post('/api/sair', async (req, res) => {
   if (req.sessaoId) await repo.apagarSessao(req.sessaoId);
   res.set('Set-Cookie', limparCookie()).json({ ok: true });
@@ -373,12 +405,36 @@ app.get('/api/eu', async (req, res) => {
   });
 });
 
+app.get('/api/conta', async (req, res) => {
+  res.json(await repo.buscarConta(req.conta.id));
+});
+
+app.put('/api/conta', async (req, res) => {
+  const { nome, documento, emailAviso, whatsapp, avisarLead } = req.body || {};
+  const campos = {};
+  if (nome != null) {
+    if (!String(nome).trim()) return res.status(400).json({ erro: 'nome obrigatorio' });
+    campos.nome = String(nome).trim().slice(0, 120);
+  }
+  if (documento != null) campos.documento = String(documento).replace(/\D/g, '').slice(0, 14) || null;
+  if (emailAviso != null) {
+    const limpo = String(emailAviso).trim().toLowerCase();
+    if (limpo && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(limpo)) return res.status(400).json({ erro: 'e-mail de aviso invalido' });
+    campos.email_aviso = limpo || null;
+  }
+  if (whatsapp != null) campos.whatsapp = String(whatsapp).replace(/\D/g, '').slice(0, 15) || null;
+  if (avisarLead != null) campos.avisar_lead = Boolean(avisarLead);
+  const conta = await repo.atualizarConta(req.conta.id, campos);
+  log.info('conta.atualizada', { conta_id: req.conta.id, campos: Object.keys(campos) });
+  res.json(conta);
+});
+
 app.post('/api/conta/senha', async (req, res) => {
   const { atual, nova } = req.body || {};
   if (!atual || !nova) return res.status(400).json({ erro: 'informe a senha atual e a nova' });
   if (String(nova).length < 8) return res.status(400).json({ erro: 'senha nova de no minimo 8 caracteres' });
   const ok = await repo.trocarSenha(req.conta.id, req.sessaoId, { atual: String(atual), nova: String(nova) });
-  if (!ok) return res.status(401).json({ erro: 'senha atual nao confere' });
+  if (!ok) return res.status(400).json({ erro: 'senha atual nao confere' });
   log.info('senha.trocada', { conta_id: req.conta.id });
   res.json({ ok: true });
 });

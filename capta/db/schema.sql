@@ -20,6 +20,24 @@ create table if not exists contas (
 alter table contas add column if not exists documento text;
 alter table contas add column if not exists cliente_externo text;
 
+-- Preferencias de aviso. O e-mail de aviso pode ser diferente do login (o
+-- dono entra, a equipe atende). O WhatsApp da loja e o que o visitante ve na
+-- tela final quando o beneficio e o contato humano.
+alter table contas add column if not exists email_aviso text;
+alter table contas add column if not exists whatsapp text;
+alter table contas add column if not exists avisar_lead boolean not null default true;
+
+-- Recuperacao de senha. Guarda o hash do token, nunca o token: quem le o
+-- banco nao consegue usar a linha para entrar.
+create table if not exists recuperacoes_senha (
+  id         uuid primary key default gen_random_uuid(),
+  conta_id   uuid not null references contas(id) on delete cascade,
+  token_hash text not null unique,
+  expira_em  timestamptz not null,
+  usado_em   timestamptz,
+  criado_em  timestamptz not null default now()
+);
+
 create table if not exists sessoes (
   id        text primary key,
   conta_id  uuid not null references contas(id) on delete cascade,
