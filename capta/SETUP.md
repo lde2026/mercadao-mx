@@ -56,6 +56,20 @@ Pegue a `chave` que o `semear` imprimiu e ponha numa pagina HTML local:
 <script async src="http://localhost:3000/widget.js?k=SUA_CHAVE"></script>
 ```
 
+## Cobranca pelo Asaas
+
+1. No painel do Asaas, em Integracoes, gere uma chave e cole em `ASAAS_API_KEY`.
+   Comece pelo sandbox (sandbox.asaas.com), que tem chave propria e nao cobra
+   ninguem. Em producao troque `ASAAS_BASE` para `https://api.asaas.com/v3`.
+2. Em Integracoes e Webhooks, cadastre `https://SEU-DOMINIO/webhook/asaas`
+   com os eventos de cobranca e um token de acesso. O token vai em
+   `ASAAS_WEBHOOK_TOKEN`. Sem ele o servidor recusa todo webhook.
+3. Confira: `npm run asaas:teste`. No sandbox ele cria e cancela uma
+   assinatura de teste; em producao so le a conta.
+
+Chave de producao nunca vai para chat, e-mail ou repositorio. Se passou por
+um desses, gere outra e revogue a antiga.
+
 ## Comandos
 
 | Comando | O que faz |
@@ -64,6 +78,7 @@ Pegue a `chave` que o `semear` imprimiu e ponha numa pagina HTML local:
 | `npm test` | roda os testes |
 | `npm run migrar` | aplica o schema |
 | `npm run semear` | cria a conta e o fluxo da Bella Moda |
+| `npm run asaas:teste` | confere a chave e o fluxo de assinatura no Asaas |
 | `npm run hoje` | quantos leads entraram hoje, em quais lojas, quantos cupons falharam |
 
 ## Testes

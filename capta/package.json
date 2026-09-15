@@ -3,14 +3,17 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
     "migrar": "node src/migrar.js",
     "semear": "node src/semear.js",
     "hoje": "node src/hoje.js",
-    "test": "node --test --test-concurrency=1 testes/*.test.js"
+    "test": "node --test --test-concurrency=1 testes/*.test.js",
+    "asaas:teste": "node --env-file=.env src/asaas-teste.js"
   },
   "dependencies": {
     "express": "^4.21.2",
