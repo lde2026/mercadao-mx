@@ -148,6 +148,28 @@
   }
 
   function selo(texto, tipo) { return el('span', texto, 'selo ' + tipo); }
+
+  /**
+   * A url vem do navegador do visitante, entao so vira link se for http ou
+   * https. Qualquer outra coisa aparece como texto, sem virar clique.
+   */
+  function linkExterno(url, texto) {
+    if (!/^https?:\/\//i.test(url || '')) return el('span', texto || url || '');
+    var a = el('a', texto || url, 'link-loja');
+    a.href = url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+    return a;
+  }
+
+  function resumoNavegacao(lead) {
+    var produtos = Number(lead.produtos_vistos) || 0;
+    var paginas = Number(lead.paginas_vistas) || 0;
+    if (!produtos && !paginas) return null;
+    var partes = [];
+    if (produtos) partes.push('viu ' + produtos + (produtos === 1 ? ' produto' : ' produtos'));
+    if (paginas > produtos) partes.push((paginas - produtos) + (paginas - produtos === 1 ? ' pagina' : ' paginas'));
+    if (lead.foi_ao_carrinho) partes.push('foi ao carrinho');
+    return partes.join(', ');
+  }
   function tela() { return document.getElementById('tela'); }
 
   function pintar(titulo, legenda) {
@@ -367,6 +389,16 @@
     });
     cartao.appendChild(meio);
 
+    var navegou = resumoNavegacao(lead);
+    if (navegou) {
+      var trilha = el('button', null, 'lead-navegacao');
+      trilha.type = 'button';
+      trilha.appendChild(el('b', 'Navegacao'));
+      trilha.appendChild(document.createTextNode(navegou + '. Ver o que acessou'));
+      trilha.addEventListener('click', function () { location.hash = '#/lead/' + lead.id; });
+      cartao.appendChild(trilha);
+    }
+
     var pe = el('div', null, 'lead-pe');
     var contato = el('span', null, 'hora');
     contato.textContent = [lead.telefone, lead.email].filter(Boolean).join('  |  ');
@@ -412,6 +444,24 @@
     return cartao;
   }
 
+  var NOME_EVENTO = {
+    pagina: 'pagina', produto: 'produto', carrinho: 'carrinho',
+    identificado: 'contato', saida: 'saiu',
+  };
+
+  /** Lista de enderecos acessados, com quantas vezes e quando foi a ultima. */
+  function listaDeAcessos(itens, vazio) {
+    if (!itens.length) return el('p', vazio, 'legenda');
+    var lista = el('ul', null, 'acessos');
+    itens.forEach(function (item) {
+      var li = el('li');
+      li.appendChild(linkExterno(item.url, item.titulo || item.url));
+      li.appendChild(el('div', (item.vezes > 1 ? item.vezes + ' vezes, ultima ' : '') + tempoRelativo(item.ultimaVez), 'hora'));
+      lista.appendChild(li);
+    });
+    return lista;
+  }
+
   function verLead(id) {
     var alvo = pintar('Perfil do lead');
     api('/leads/' + id).then(function (perfil) {
@@ -441,13 +491,32 @@
       alvo.appendChild(respostas);
 
       var navegacao = el('div', null, 'cartao');
+      var produtos = perfil.produtos || [];
+      var paginas = perfil.paginas || [];
+      if (produtos.length || paginas.length) {
+        // Primeiro o que interessa a quem vai ligar: os produtos, do mais
+        // recente para o mais antigo, cada um com o link da loja.
+        navegacao.appendChild(el('div', 'Produtos que acessou (' + produtos.length + ')', 'rotulo'));
+        navegacao.appendChild(listaDeAcessos(produtos, 'Nenhum produto aberto, so paginas.'));
+        navegacao.appendChild(el('div', 'Paginas que acessou (' + paginas.length + ')', 'rotulo'));
+        navegacao.appendChild(listaDeAcessos(paginas, 'Nenhuma pagina alem dos produtos.'));
+      }
+      // A saida de pagina e ruido para quem le. O momento do contato entra
+      // como passo proprio, vindo do lead, para a historia ter comeco e fim.
+      var passos = perfil.linhaDoTempo.filter(function (evento) { return evento.tipo !== 'saida'; });
+      passos.push({ tipo: 'identificado', criado_em: lead.criado_em });
+      passos.sort(function (a, b) { return new Date(a.criado_em) - new Date(b.criado_em); });
       navegacao.appendChild(el('div', 'Linha do tempo de navegacao', 'rotulo'));
-      if (perfil.linhaDoTempo.length) {
+      if (passos.length) {
         var tempo = el('ul', null, 'linha-tempo');
-        perfil.linhaDoTempo.forEach(function (evento) {
+        passos.forEach(function (evento) {
           var item = el('li');
-          item.appendChild(el('div', evento.titulo || evento.tipo));
-          item.appendChild(el('div', quando(evento.criado_em) + '  |  ' + evento.tipo, 'hora'));
+          if (evento.tipo === 'identificado') {
+            item.appendChild(el('div', 'Deixou o contato no chat'));
+          } else {
+            item.appendChild(linkExterno(evento.url, evento.titulo || evento.url || evento.tipo));
+          }
+          item.appendChild(el('div', quando(evento.criado_em) + '  |  ' + (NOME_EVENTO[evento.tipo] || evento.tipo), 'hora'));
           tempo.appendChild(item);
         });
         navegacao.appendChild(tempo);

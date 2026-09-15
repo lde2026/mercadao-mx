@@ -110,6 +110,44 @@ test('costura recusa chamada sem escopo de conta ou conexao', async () => {
   );
 });
 
+test('perfil agrupa produtos por endereco e a fila conta o que foi visto', async () => {
+  const { lojaA } = await cenario();
+  const anonimo = 'anon-visitante-3';
+  const vestido = 'https://bellamoda.com.br/vestido-midi-floral';
+
+  await registrarEvento({ conexao: lojaA, anonimoId: anonimo, tipo: 'pagina',
+    url: 'https://bellamoda.com.br/vestidos', titulo: 'Vestidos', ip: '189.45.201.77' });
+  await registrarEvento({ conexao: lojaA, anonimoId: anonimo, tipo: 'produto',
+    url: vestido, titulo: 'Vestido Midi Floral', ip: '189.45.201.77' });
+  await registrarEvento({ conexao: lojaA, anonimoId: anonimo, tipo: 'produto',
+    url: 'https://bellamoda.com.br/blusa-linho', titulo: 'Blusa de Linho', ip: '189.45.201.77' });
+  await registrarEvento({ conexao: lojaA, anonimoId: anonimo, tipo: 'produto',
+    url: vestido, titulo: 'Vestido Midi Floral', ip: '189.45.201.77' });
+  await registrarEvento({ conexao: lojaA, anonimoId: anonimo, tipo: 'carrinho',
+    url: vestido, titulo: 'Vestido Midi Floral', ip: '189.45.201.77' });
+  await registrarEvento({ conexao: lojaA, anonimoId: anonimo, tipo: 'saida',
+    url: vestido, titulo: 'Vestido Midi Floral', ip: '189.45.201.77' });
+
+  const lead = await leadDe(lojaA, 'Carla', anonimo);
+  await costurarEventos({
+    conexaoId: lojaA.id, anonimoId: anonimo, leadId: lead.id, contaId: lojaA.conta_id,
+  });
+
+  const perfil = await perfilDoLead(lojaA.conta_id, lead.id);
+  // Dois produtos distintos, o vestido visto duas vezes e por ultimo.
+  assert.equal(perfil.produtos.length, 2);
+  assert.equal(perfil.produtos[0].url, vestido);
+  assert.equal(perfil.produtos[0].vezes, 2);
+  assert.equal(perfil.paginas.length, 1);
+  assert.equal(perfil.paginas[0].titulo, 'Vestidos');
+
+  const [naFila] = await repo.listarLeads(lojaA.conta_id);
+  assert.equal(naFila.id, lead.id);
+  assert.equal(Number(naFila.produtos_vistos), 2);
+  assert.equal(Number(naFila.paginas_vistas), 3);
+  assert.equal(naFila.foi_ao_carrinho, true);
+});
+
 test('perfil do lead da conta A nao abre para a conta B', async () => {
   const { contaB, lojaA } = await cenario();
   const lead = await leadDe(lojaA, 'Renata', 'anon-y');

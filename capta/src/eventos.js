@@ -126,9 +126,35 @@ export async function perfilDoLead(contaId, leadId, { limite = 200 } = {}) {
     lead,
     cupom: cupons[0] || null,
     linhaDoTempo: linha.slice(0, limite),
+    produtos: resumirPorUrl(linha, ['produto']),
+    paginas: resumirPorUrl(linha, ['pagina']),
     pedidos,
     faturado: pedidos.reduce((soma, p) => soma + Number(p.valor), 0),
   };
+}
+
+/**
+ * Agrupa a linha do tempo por endereco, para o painel dizer "viu este produto
+ * 3 vezes" em vez de repetir a mesma linha. A ordem e da ultima visita, que e
+ * o que interessa a quem vai chamar no WhatsApp.
+ */
+function resumirPorUrl(linha, tipos) {
+  const porUrl = new Map();
+  for (const evento of linha) {
+    if (!tipos.includes(evento.tipo) || !evento.url) continue;
+    const atual = porUrl.get(evento.url);
+    if (atual) {
+      atual.vezes += 1;
+      atual.ultimaVez = evento.criado_em;
+      if (evento.titulo) atual.titulo = evento.titulo;
+    } else {
+      porUrl.set(evento.url, {
+        url: evento.url, titulo: evento.titulo || '', vezes: 1,
+        primeiraVez: evento.criado_em, ultimaVez: evento.criado_em,
+      });
+    }
+  }
+  return [...porUrl.values()].sort((a, b) => new Date(b.ultimaVez) - new Date(a.ultimaVez));
 }
 
 /** Exclusao por titular. A cascade do banco leva evento e cupom junto. */

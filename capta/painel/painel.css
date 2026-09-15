@@ -147,6 +147,15 @@ pre{background:var(--escuro);color:var(--superficie);padding:13px;border-radius:
 .linha-tempo li:last-child{padding-bottom:0}
 .linha-tempo li::before{content:"";position:absolute;left:-26px;top:5px;width:10px;height:10px;
   border-radius:50%;background:var(--acento);border:2px solid var(--superficie)}
+.linha-tempo a,.acessos a{color:var(--texto);text-decoration:none;border-bottom:1px dotted var(--linha-forte)}
+.linha-tempo a:hover,.acessos a:hover{color:var(--acento);border-bottom-color:var(--acento)}
+.acessos{list-style:none;display:grid;gap:8px;margin:10px 0 16px}
+.acessos li{padding:8px 11px;border-radius:9px;background:var(--fundo);border:1px solid var(--linha);font-size:13.5px}
+.acessos li a{display:block;font-weight:600;border:0;overflow-wrap:anywhere}
+.lead-navegacao{display:block;width:100%;text-align:left;margin:-4px 0 12px;padding:7px 11px;border-radius:9px;
+  background:var(--bom-fundo);color:var(--bom);border:1px solid transparent;font-size:12.5px;cursor:pointer}
+.lead-navegacao b{margin-right:6px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;font-size:10.5px}
+.lead-navegacao:hover{border-color:var(--bom)}
 .hora{font-size:12px;color:var(--fraco)}
 .vazio{color:var(--fraco);padding:30px;text-align:center;background:var(--superficie);
   border:1px dashed var(--linha-forte);border-radius:12px}

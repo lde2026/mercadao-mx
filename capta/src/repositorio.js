@@ -297,7 +297,13 @@ export async function listarLeads(contaId, {
             l.contatado_em, l.resultado,
             l.conexao_id, cx.nome_loja,
             cp.codigo as cupom, cp.status as cupom_status,
-            (select coalesce(sum(p.valor), 0) from pedidos p where p.lead_id = l.id) as faturado
+            (select coalesce(sum(p.valor), 0) from pedidos p where p.lead_id = l.id) as faturado,
+            (select count(distinct e.url) from eventos e
+              where e.lead_id = l.id and e.tipo = 'produto') as produtos_vistos,
+            (select count(distinct e.url) from eventos e
+              where e.lead_id = l.id and e.tipo in ('pagina', 'produto')) as paginas_vistas,
+            exists (select 1 from eventos e
+              where e.lead_id = l.id and e.tipo = 'carrinho') as foi_ao_carrinho
        from leads l
        join conexoes cx on cx.id = l.conexao_id
        left join cupons cp on cp.lead_id = l.id
