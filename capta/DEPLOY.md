@@ -53,13 +53,24 @@ todo visitante de toda loja cliente.
    `/webhook` nunca podem ser cacheados. A regra acima ja garante isso por
    nao os incluir, mas confira que nao existe "Cache Everything" no dominio.
 
-## 3. Asaas
+## 3. Landing page em capta.lojadoecommerce.com.br
+
+E um arquivo so, `landing/index.html`, sem servidor. O caminho mais simples
+e o Cloudflare Pages: novo projeto, conectar o repositorio, **Root
+directory** `capta/landing`, sem comando de build, e o dominio customizado
+`capta.lojadoecommerce.com.br`. O Pages cria o DNS sozinho.
+
+O video do topo entra pelo atributo `data-url` do bloco `#video`: cole o
+link de incorporacao do YouTube (`https://www.youtube.com/embed/ID`) ou do
+Vimeo. Vazio, o quadro fica como convite.
+
+## 4. Asaas
 
 Com o dominio no ar, cadastre o webhook em `https://captapp.lojadoecommerce.com.br/webhook/asaas`
 como descrito no `SETUP.md`, e rode `npm run asaas:teste` na sua maquina
 com a chave de producao para confirmar que ela e valida.
 
-## 4. Backup
+## 5. Backup
 
 Os leads dos clientes estao no banco. Sem backup nao ha produto.
 
@@ -73,7 +84,7 @@ Os leads dos clientes estao no banco. Sem backup nao ha produto.
   dump restaura os leads, mas as credenciais das lojas ficam ilegiveis e
   cada cliente precisa reconectar a loja na mao.
 
-## 5. Conferencia depois do primeiro deploy
+## 6. Conferencia depois do primeiro deploy
 
 ```
 curl https://captapp.lojadoecommerce.com.br/saude

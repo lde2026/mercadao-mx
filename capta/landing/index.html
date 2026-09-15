@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Chat de captação para loja virtual. O visitante responde três perguntas, ganha um cupom único, e você recebe nome, WhatsApp e o que ele quer comprar.">
+<title>Capta</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Manrope:wght@400;500;600;700&display=swap">
+<style>
+:root{
+  --fundo:#ffffff; --suave:#f5f6f8; --tinta:#0b0b0f; --cinza:#5b6068; --linha:#e6e8ec;
+  --laranja:#ff5a1f; --laranja-escuro:#e14b12; --laranja-suave:#fff1eb;
+  --verde:#15a35e; --escuro:#111122;
+  --display:"Sora",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --corpo:"Manrope",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font:16px/1.6 var(--corpo);color:var(--tinta);background:var(--fundo);-webkit-font-smoothing:antialiased}
+img{max-width:100%}
+a{color:inherit}
+.faixa{width:min(1120px,100% - 40px);margin-inline:auto}
+h1,h2,h3{font-family:var(--display);letter-spacing:-.02em;line-height:1.1;text-wrap:balance}
+h1{font-size:clamp(34px,5.4vw,60px);font-weight:800}
+h2{font-size:clamp(28px,4vw,44px);font-weight:800}
+h3{font-size:20px;font-weight:700}
+p{max-width:62ch}
+.eyebrow{display:inline-block;font-family:var(--display);font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--laranja);margin-bottom:14px}
+.botao{display:inline-flex;align-items:center;gap:8px;padding:15px 26px;border-radius:999px;background:var(--laranja);color:#fff;font-weight:700;text-decoration:none;font-size:16px;border:0;cursor:pointer;transition:background .15s,transform .15s}
+.botao:hover{background:var(--laranja-escuro);transform:translateY(-1px)}
+.botao.claro{background:#fff;color:var(--tinta);border:1.5px solid var(--linha)}
+.botao.claro:hover{background:var(--suave);transform:none}
+.botao:focus-visible,.nav a:focus-visible{outline:3px solid var(--laranja);outline-offset:3px}
+.secao{padding-block:clamp(64px,9vw,112px)}
+.secao.suave{background:var(--suave)}
+.secao.escura{background:var(--escuro);color:#fff}
+.secao.escura p{color:#c9cbd6}
+
+/* topo */
+.topo{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--linha)}
+.topo .faixa{display:flex;align-items:center;justify-content:space-between;height:68px;gap:18px}
+.marca{font-family:var(--display);font-weight:800;font-size:24px;letter-spacing:-.04em;text-decoration:none}
+.marca::after{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--laranja);margin-left:2px}
+.nav{display:flex;gap:26px;font-weight:600;font-size:15px}
+.nav a{text-decoration:none;color:var(--cinza)}
+.nav a:hover{color:var(--tinta)}
+.topo .botao{padding:11px 20px;font-size:15px}
+
+/* heroi */
+.heroi{padding-block:clamp(48px,7vw,88px) clamp(40px,6vw,72px);text-align:center}
+.heroi h1{margin:0 auto 18px;max-width:18ch}
+.heroi .sub{margin:0 auto 30px;font-size:clamp(17px,2vw,20px);color:var(--cinza);max-width:56ch}
+.acoes{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.prova{display:flex;gap:22px;justify-content:center;flex-wrap:wrap;margin-top:22px;font-size:14px;color:var(--cinza);font-weight:600}
+.prova span::before{content:"✓";color:var(--verde);margin-right:6px;font-weight:800}
+.video{position:relative;width:min(960px,100%);margin:44px auto 0;aspect-ratio:16/9;border-radius:22px;overflow:hidden;
+  background:linear-gradient(135deg,#1c1c2e,#0b0b0f);box-shadow:0 30px 80px rgba(11,11,15,.25);display:grid;place-items:center;color:#fff}
+.video iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.video .play{width:88px;height:88px;border-radius:50%;background:var(--laranja);display:grid;place-items:center;box-shadow:0 12px 30px rgba(255,90,31,.45);cursor:pointer;border:0;transition:transform .15s}
+.video .play:hover{transform:scale(1.06)}
+.video .play svg{width:34px;height:34px;fill:#fff;margin-left:6px}
+.video .legenda{position:absolute;left:0;right:0;bottom:0;padding:18px 22px;font-size:14px;color:#c9cbd6;text-align:left;background:linear-gradient(transparent,rgba(0,0,0,.55))}
+.video .legenda b{color:#fff;display:block;font-family:var(--display);font-size:16px;margin-bottom:2px}
+
+/* shopping */
+.duas{display:grid;grid-template-columns:1.05fr .95fr;gap:clamp(28px,5vw,64px);align-items:center}
+.duas p{color:var(--cinza);font-size:17px;margin-top:14px}
+.loja-vazia{background:#fff;border:1px solid var(--linha);border-radius:22px;padding:26px;box-shadow:0 20px 50px rgba(11,11,15,.08)}
+.loja-vazia .vitrine{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+.loja-vazia .prod{aspect-ratio:3/4;border-radius:12px;background:linear-gradient(160deg,#eceef2,#dfe2e8)}
+.loja-vazia .pessoa{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;background:var(--suave);font-size:14px;color:var(--cinza)}
+.loja-vazia .pessoa i{width:36px;height:36px;border-radius:50%;background:var(--laranja);flex:none}
+.loja-vazia .pessoa b{color:var(--tinta);display:block}
+.contador{margin-top:14px;display:flex;justify-content:space-between;font-family:var(--display);font-weight:700;font-size:14px}
+.contador span:last-child{color:var(--laranja)}
+
+/* como funciona */
+.passos{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:40px}
+.passo{background:#fff;border:1px solid var(--linha);border-radius:20px;padding:26px}
+.passo .num{font-family:var(--display);font-weight:800;font-size:13px;color:var(--laranja);letter-spacing:.1em}
+.passo h3{margin:10px 0 8px}
+.passo p{color:var(--cinza);font-size:15px}
+.chat-mock{margin-top:18px;background:var(--suave);border-radius:14px;padding:14px;font-size:13px}
+.chat-mock .bolha{background:#fff;border-radius:10px;padding:9px 11px;margin-bottom:6px;font-weight:600}
+.chat-mock .opcs{display:flex;flex-wrap:wrap;gap:6px}
+.chat-mock .opcs span{border:1px solid var(--linha);background:#fff;border-radius:999px;padding:5px 10px}
+.chat-mock .opcs span.on{background:var(--tinta);color:#fff;border-color:var(--tinta)}
+.cupom-mock{margin-top:18px;border:2px dashed var(--laranja);border-radius:14px;padding:14px;text-align:center;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:700;letter-spacing:2px;font-size:18px;color:var(--laranja)}
+
+/* beneficios */
+.grade{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-top:40px}
+.cartao{background:#fff;border:1px solid var(--linha);border-radius:20px;padding:24px}
+.secao.escura .cartao{background:#1a1a2e;border-color:#2a2a44}
+.cartao .icone{width:44px;height:44px;border-radius:12px;background:var(--laranja-suave);color:var(--laranja);display:grid;place-items:center;margin-bottom:14px}
+.secao.escura .cartao .icone{background:rgba(255,90,31,.15)}
+.cartao .icone svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.cartao h3{margin-bottom:6px}
+.cartao p{color:var(--cinza);font-size:15px}
+
+/* leads */
+.lead-mock{background:#fff;border:1px solid var(--linha);border-left:4px solid var(--laranja);border-radius:16px;padding:16px 18px;box-shadow:0 14px 40px rgba(11,11,15,.08)}
+.lead-mock + .lead-mock{margin-top:12px}
+.lead-mock .topo-l{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.lead-mock .topo-l b{font-family:var(--display);font-size:16px}
+.lead-mock .novo{background:var(--laranja);color:#fff;font-size:10px;font-weight:800;letter-spacing:.08em;padding:3px 8px;border-radius:999px}
+.lead-mock .hora{font-size:12px;color:var(--cinza)}
+.lead-mock .chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.lead-mock .chips span{background:var(--suave);border:1px solid var(--linha);border-radius:9px;padding:6px 10px;font-size:12.5px;font-weight:600}
+.lead-mock .chips small{display:block;font-weight:500;color:var(--cinza);font-size:10.5px}
+.lead-mock .pe{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;color:var(--cinza)}
+.lead-mock .zap{background:#e7f8ef;color:var(--verde);font-weight:700;padding:8px 14px;border-radius:9px;font-size:13px}
+.lista-check{list-style:none;display:grid;gap:12px;margin-top:22px;font-size:17px}
+.lista-check li{display:flex;gap:12px;align-items:flex-start}
+.lista-check li::before{content:"✓";flex:none;width:26px;height:26px;border-radius:50%;background:var(--laranja-suave);color:var(--laranja);display:grid;place-items:center;font-weight:800;font-size:14px}
+
+/* planos */
+.planos{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-top:36px}
+.plano{background:#fff;border:1.5px solid var(--linha);border-radius:22px;padding:28px;display:flex;flex-direction:column;gap:10px}
+.plano.destaque{border-color:var(--laranja);box-shadow:0 20px 60px rgba(255,90,31,.15);position:relative}
+.plano.destaque::before{content:"Mais escolhido";position:absolute;top:-13px;left:24px;background:var(--laranja);color:#fff;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:5px 12px;border-radius:999px}
+.plano h3{font-size:22px}
+.plano .preco{font-family:var(--display);font-size:40px;font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.plano .preco small{font-size:15px;font-weight:600;color:var(--cinza);letter-spacing:0}
+.plano .anual{font-size:13px;color:var(--cinza)}
+.plano ul{list-style:none;display:grid;gap:8px;margin:8px 0 14px;font-size:15px;flex:1}
+.plano li::before{content:"•";color:var(--laranja);font-weight:800;margin-right:8px}
+.plano .botao{justify-content:center}
+.implantacao{margin-top:22px;padding:20px 24px;border-radius:16px;background:var(--laranja-suave);display:flex;gap:16px;align-items:center;flex-wrap:wrap;justify-content:space-between}
+.implantacao b{font-family:var(--display);font-size:18px}
+.implantacao p{color:var(--cinza);font-size:15px}
+
+/* plataformas */
+.logos{display:flex;gap:12px;flex-wrap:wrap;margin-top:26px}
+.logos span{font-family:var(--display);font-weight:700;padding:12px 20px;border-radius:999px;background:#fff;border:1px solid var(--linha)}
+.logos span.breve{color:var(--cinza);font-weight:600}
+
+/* final */
+.final{text-align:center}
+.final h2{font-size:clamp(34px,5.6vw,64px);margin-bottom:16px;color:#fff}
+.final p{margin:0 auto 28px}
+.rodape{padding-block:34px;border-top:1px solid var(--linha);font-size:14px;color:var(--cinza)}
+.rodape .faixa{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.rodape a{text-decoration:none}
+
+@media(max-width:860px){
+  .duas{grid-template-columns:1fr}
+  .passos{grid-template-columns:1fr}
+  .nav{display:none}
+}
+@media(prefers-reduced-motion:reduce){.botao,.video .play{transition:none}}
+</style>
+</head>
+<body>
+<header class="topo">
+  <div class="faixa">
+    <a class="marca" href="#">capta</a>
+    <nav class="nav">
+      <a href="#como-funciona">Como funciona</a>
+      <a href="#leads">Leads</a>
+      <a href="#planos">Planos</a>
+      <a href="#plataformas">Plataformas</a>
+    </nav>
+    <a class="botao" href="https://captapp.lojadoecommerce.com.br/">Entrar no app</a>
+  </div>
+</header>
+
+<section class="heroi">
+  <div class="faixa">
+    <span class="eyebrow">Chat de captação para loja virtual</span>
+    <h1>Todo dia, milhares de clientes entram na sua loja e não compram.</h1>
+    <p class="sub">O Capta conversa com quem está na vitrine, entrega um cupom único e te manda o nome, o WhatsApp e o que a pessoa quer comprar. Antes do carrinho, não depois.</p>
+    <div class="acoes">
+      <a class="botao" href="https://captapp.lojadoecommerce.com.br/">Quero testar na minha loja</a>
+      <a class="botao claro" href="#planos">Ver planos</a>
+    </div>
+    <div class="prova"><span>Instala em minutos</span><span>Cupom único por pessoa</span><span>Leads direto no WhatsApp</span></div>
+
+    <div class="video" id="video" data-url="">
+      <button class="play" type="button" aria-label="Assistir ao vídeo"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>
+      <div class="legenda"><b>Veja o Capta funcionando na prática</b>Pierre mostra o chat na loja e o lead chegando no painel, em 3 minutos.</div>
+    </div>
+  </div>
+</section>
+
+<section class="secao suave">
+  <div class="faixa duas">
+    <div>
+      <span class="eyebrow">A dor</span>
+      <h2>Pense como uma loja no shopping em que você entra e ninguém atende.</h2>
+      <p>É isso que acontece na sua loja virtual hoje. A pessoa chega, olha, tem dúvida, e vai embora sem que ninguém saiba que ela existiu. Você paga pelo tráfego e conversa com zero visitantes.</p>
+      <p>O Capta é o vendedor que se aproxima na hora certa: pergunta o que ela procura, oferece um motivo para ficar, e te entrega o contato para fechar a venda.</p>
+    </div>
+    <div class="loja-vazia" aria-hidden="true">
+      <div class="vitrine"><div class="prod"></div><div class="prod"></div><div class="prod"></div></div>
+      <div class="pessoa"><i></i><div><b>Visitante nº 1.284 de hoje</b>olhou 4 produtos, ficou 3 minutos, saiu.</div></div>
+      <div class="contador"><span>Visitas hoje: 1.284</span><span>Conversas: 0</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="secao" id="como-funciona">
+  <div class="faixa">
+    <span class="eyebrow">Como funciona</span>
+    <h2>Sua loja virtual precisa fazer parte do futuro.</h2>
+    <p style="color:var(--cinza);font-size:17px;margin-top:12px">Um botão flutuante na sua loja abre uma conversa curta. Três perguntas, contato, cupom. Sem formulário chato, sem aplicativo para o cliente baixar.</p>
+    <div class="passos">
+      <div class="passo">
+        <div class="num">01</div>
+        <h3>O visitante conversa</h3>
+        <p>Até três perguntas que você escolhe, ou um dos nossos modelos por nicho. Moda, decoração, esporte, o que a sua loja vende.</p>
+        <div class="chat-mock">
+          <div class="bolha">Qual o seu tamanho?</div>
+          <div class="opcs"><span>PP</span><span>P</span><span class="on">M</span><span>G</span><span>GG</span><span>Plus Size</span></div>
+        </div>
+      </div>
+      <div class="passo">
+        <div class="num">02</div>
+        <h3>Ganha um benefício na hora</h3>
+        <p>Cupom de desconto ou frete grátis, único por pessoa, criado direto na sua plataforma. Não vaza em grupo de WhatsApp.</p>
+        <div class="cupom-mock">BELLAM-7K2QXR</div>
+      </div>
+      <div class="passo">
+        <div class="num">03</div>
+        <h3>Você recebe o lead</h3>
+        <p>Nome, WhatsApp, e-mail e as respostas, na sua fila. Um clique abre a conversa no WhatsApp com a mensagem pronta.</p>
+        <div class="chat-mock">
+          <div class="bolha">Renata Alvarenga <span style="float:right;color:var(--laranja)">novo</span></div>
+          <div class="opcs"><span>M</span><span>Vestido midi</span><span>R$ 100 a 200</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="secao escura">
+  <div class="faixa">
+    <span class="eyebrow">Descontos com inteligência</span>
+    <h2>Ofereça descontos de uma forma dinâmica.</h2>
+    <p style="font-size:17px;margin-top:12px">Cupom fixo na home é desconto para quem já ia comprar. O Capta oferece o benefício em troca de uma conversa, e só para quem respondeu.</p>
+    <div class="grade">
+      <div class="cartao"><div class="icone"><svg viewBox="0 0 24 24"><path d="M4 8V6h16v2a2 2 0 0 0 0 4v2H4v-2a2 2 0 0 0 0-4Z"/><path d="M12 6v12" stroke-dasharray="2 3"/></svg></div><h3>Cupom único por pessoa</h3><p>Cada visitante recebe um código só dele, que vale uma vez. Você escolhe o percentual.</p></div>
+      <div class="cartao"><div class="icone"><svg viewBox="0 0 24 24"><path d="M3 7h11v8H3z"/><path d="M14 10h4l3 3v2h-7z"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg></div><h3>Frete grátis na primeira compra</h3><p>Para loja que prefere não mexer no preço. Também único, também na hora.</p></div>
+      <div class="cartao"><div class="icone"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8"/><path d="M8 12h5"/></svg></div><h3>Ou uma conversa com você</h3><p>Diagnóstico, especialista, consultoria. Para operação que vende serviço e quer o contato, não o cupom.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="secao" id="leads">
+  <div class="faixa duas">
+    <div>
+      <div class="lead-mock">
+        <div class="topo-l"><b>Renata Alvarenga</b><span class="novo">NOVO</span><span class="hora">há 20 min</span></div>
+        <div class="chips"><span><small>Qual o seu tamanho?</small>M</span><span><small>Produto de interesse</small>Vestido midi floral</span><span><small>Faixa de preço</small>R$ 100 a R$ 200</span></div>
+        <div class="pe"><span>(41) 99887-7665 · renata@email.com.br</span><span class="zap">Chamar no WhatsApp</span></div>
+      </div>
+      <div class="lead-mock">
+        <div class="topo-l"><b>Marcos Tessaro</b><span class="novo">NOVO</span><span class="hora">há 2h</span></div>
+        <div class="chips"><span><small>Qual o seu tamanho?</small>G</span><span><small>Produto de interesse</small>Jaqueta jeans</span><span><small>Faixa de preço</small>R$ 200 a R$ 400</span></div>
+        <div class="pe"><span>41988776655 · marcos.t@email.com.br</span><span class="zap">Chamar no WhatsApp</span></div>
+      </div>
+    </div>
+    <div>
+      <span class="eyebrow">A fila</span>
+      <h2>Leads qualificados e filtrados para sua equipe fechar a venda.</h2>
+      <p style="color:var(--cinza);font-size:17px;margin-top:12px">Conheça seus clientes antes de eles comprarem.</p>
+      <ul class="lista-check">
+        <li>Nome, WhatsApp e e-mail</li>
+        <li>O que a pessoa pretende comprar</li>
+        <li>Quanto quer investir</li>
+        <li>Entre em contato e ofereça produtos similares</li>
+        <li>Marque quem já foi atendido e exporte em planilha</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="secao suave">
+  <div class="faixa">
+    <span class="eyebrow">Resultado</span>
+    <h2>Descubra um novo nível de vendas na sua loja virtual.</h2>
+    <div class="grade">
+      <div class="cartao"><div class="icone"><svg viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg></div><h3>Venda para quem já estava lá</h3><p>O tráfego que você paga vira conversa, e conversa vira pedido. Sem mídia nova.</p></div>
+      <div class="cartao"><div class="icone"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div><h3>No mesmo dia</h3><p>O lead chega na hora, com o cupom. Quem liga no mesmo dia fecha mais.</p></div>
+      <div class="cartao"><div class="icone"><svg viewBox="0 0 24 24"><path d="M12 3l8 4v6c0 5-3.5 7.5-8 8-4.5-.5-8-3-8-8V7z"/><path d="M9 12l2 2 4-4"/></svg></div><h3>Dentro da lei</h3><p>Consentimento antes do contato, cupom que não vaza, e o dado é seu. LGPD do começo ao fim.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="secao" id="planos">
+  <div class="faixa">
+    <span class="eyebrow">Planos</span>
+    <h2>Simples: a diferença é quantos leads você capta por mês.</h2>
+    <div class="planos">
+      <div class="plano">
+        <h3>Essencial</h3>
+        <div class="preco">R$ 99<small>/mês</small></div>
+        <div class="anual">ou R$ 950,40 por ano, 20% de desconto</div>
+        <ul><li>Até 100 leads por mês</li><li>Chat com cupom único</li><li>Fila de leads e WhatsApp</li><li>Modelos por nicho</li></ul>
+        <a class="botao claro" href="https://captapp.lojadoecommerce.com.br/">Começar</a>
+      </div>
+      <div class="plano destaque">
+        <h3>Crescimento</h3>
+        <div class="preco">R$ 199<small>/mês</small></div>
+        <div class="anual">ou R$ 1.910,40 por ano, 20% de desconto</div>
+        <ul><li>Até 300 leads por mês</li><li>Tudo do Essencial</li><li>Rastreamento de navegação</li><li>Veja o que cada lead olhou antes de responder</li></ul>
+        <a class="botao" href="https://captapp.lojadoecommerce.com.br/">Começar</a>
+      </div>
+      <div class="plano">
+        <h3>Escala</h3>
+        <div class="preco">R$ 299<small>/mês</small></div>
+        <div class="anual">ou R$ 2.870,40 por ano, 20% de desconto</div>
+        <ul><li>Leads ilimitados</li><li>Tudo do Crescimento</li><li>Para loja com muito tráfego</li></ul>
+        <a class="botao claro" href="https://captapp.lojadoecommerce.com.br/">Começar</a>
+      </div>
+    </div>
+    <div class="implantacao">
+      <div><b>Implantação por R$ 990, uma vez</b><p>A nossa equipe conecta a loja, monta as perguntas e deixa o chat no ar. Você só recebe os leads.</p></div>
+      <a class="botao" href="https://captapp.lojadoecommerce.com.br/">Quero a implantação</a>
+    </div>
+  </div>
+</section>
+
+<section class="secao suave" id="plataformas">
+  <div class="faixa">
+    <span class="eyebrow">Plataformas</span>
+    <h2>Funciona na plataforma que a sua loja já usa.</h2>
+    <div class="logos"><span>Nuvemshop</span><span>Tray</span><span>WooCommerce</span><span>Loja Integrada</span></div>
+    <p style="color:var(--cinza);margin-top:16px;font-size:15px">Na Loja Integrada, o chat depende do tema aceitar código HTML. A gente confere antes de vender.</p>
+  </div>
+</section>
+
+<section class="secao escura final">
+  <div class="faixa">
+    <h2>Vender de verdade começa agora.</h2>
+    <p style="font-size:18px">Instale o Capta hoje e amanhã você já sabe quem passou pela sua loja.</p>
+    <a class="botao" href="https://captapp.lojadoecommerce.com.br/">Quero testar na minha loja</a>
+  </div>
+</section>
+
+<footer class="rodape">
+  <div class="faixa">
+    <span>Capta é um produto da <a href="https://lojadoecommerce.com.br">Loja do E-commerce</a>, Curitiba.</span>
+    <span><a href="https://captapp.lojadoecommerce.com.br/">Entrar no app</a> · <a href="mailto:contato@lojadoecommerce.com.br">contato@lojadoecommerce.com.br</a></span>
+  </div>
+</footer>
+
+<script>
+(function () {
+  // O video entra por link em data-url. Vazio, o quadro fica como convite ate o link existir.
+  var caixa = document.getElementById('video');
+  var url = caixa.getAttribute('data-url');
+  caixa.querySelector('.play').addEventListener('click', function () {
+    if (!url) { alert('O vídeo entra aqui assim que o link for colado no atributo data-url.'); return; }
+    var iframe = document.createElement('iframe');
+    iframe.src = url + (url.indexOf('?') > -1 ? '&' : '?') + 'autoplay=1';
+    iframe.allow = 'autoplay; fullscreen; picture-in-picture';
+    iframe.title = 'Capta na prática';
+    caixa.textContent = '';
+    caixa.appendChild(iframe);
+  });
+}());
+</script>
+</body>
+</html>
