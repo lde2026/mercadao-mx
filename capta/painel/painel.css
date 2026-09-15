@@ -230,59 +230,59 @@ pre{background:var(--escuro);color:var(--superficie);padding:13px;border-radius:
 .construtor-topo select{width:auto;margin:0;padding:8px 32px 8px 12px;font-size:14px;font-weight:600}
 .construtor-topo strong{font-size:15px}
 .estado-publicacao{margin-left:auto}
-.construtor-corpo{display:grid;grid-template-columns:1fr 300px;gap:18px;align-items:start}
+.construtor-corpo{display:block}
 
-.quadro{display:flex;align-items:flex-start;gap:0;overflow-x:auto;padding:26px 22px 30px;
-  border:1px solid var(--linha);border-radius:14px;min-height:420px;
+/* O quadro ocupa a largura toda e os cartoes fluem para a direita e quebram
+   para baixo, em vez de rolar na horizontal: o lojista precisa ver as
+   perguntas inteiras para organiza-las. */
+.quadro{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:28px 36px;align-items:start;
+  padding:28px 24px 32px 46px;border:1px solid var(--linha);border-radius:14px;min-height:380px;
   background-color:var(--superficie);
   background-image:radial-gradient(var(--linha-forte) 1px,transparent 1px);background-size:18px 18px}
-.no{flex:none;width:258px;background:var(--superficie);border:1px solid var(--linha);border-radius:12px;
-  box-shadow:0 2px 10px rgba(44,44,70,.08);cursor:pointer;transition:box-shadow .15s,transform .15s;text-align:left}
+.ligacao{display:none}
+.no{position:relative;width:auto;background:var(--superficie);border:1px solid var(--linha);border-radius:12px;
+  box-shadow:0 2px 10px rgba(44,44,70,.08);cursor:pointer;transition:box-shadow .15s;text-align:left}
+/* a ligacao tracejada vira um traco a esquerda de cada cartao, menos o primeiro */
+.no:not(:first-child)::before{content:"";position:absolute;left:-36px;top:22px;width:36px;height:2px;
+  background:repeating-linear-gradient(90deg,#8b7de0 0 5px,transparent 5px 9px)}
+.no:not(:first-child)::after{content:"";position:absolute;left:-5px;top:19px;width:8px;height:8px;border-radius:50%;background:#8b7de0}
 .no:hover{box-shadow:0 6px 18px rgba(44,44,70,.12)}
 .no.selecionado{outline:2px solid var(--acento);outline-offset:1px}
-.no > header{display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:12px 12px 0 0;
+.no > header{display:flex;align-items:center;gap:8px;padding:11px 15px;border-radius:12px 12px 0 0;
   font-size:12.5px;font-weight:700;border-bottom:1px solid var(--linha)}
-.no > header::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor;opacity:.75}
-.no.convite > header{background:#eaf1fb;color:#2c5fa8}
-.no.pergunta > header{background:#e8f6ee;color:#1f7a4d}
-.no.contato > header{background:#fdf3e2;color:#9a6207}
+.no > header > span:first-child::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:currentColor;opacity:.75;margin-right:8px}
+.no.convite > header{background:var(--no-convite-fundo);color:var(--no-convite-tinta)}
+.no.pergunta > header{background:var(--no-pergunta-fundo);color:var(--no-pergunta-tinta)}
+.no.contato > header{background:var(--no-contato-fundo);color:var(--no-contato-tinta)}
 .no.cupom > header{background:var(--acento-suave);color:var(--acento-texto)}
-@media (prefers-color-scheme: dark){
-  .no.convite > header{background:#172a45;color:#8ab4f0}
-  .no.pergunta > header{background:#12301f;color:#63d39a}
-  .no.contato > header{background:#33280f;color:#f0b95a}
-}
 .no-fixo{margin-left:auto;font-size:10.5px;font-weight:600;opacity:.8;text-transform:uppercase;letter-spacing:.4px}
 .no-acoes{margin-left:auto;display:flex;gap:2px}
-.no-botao{background:transparent;color:inherit;padding:2px 6px;font-size:13px;border-radius:5px;opacity:.7}
+.no-botao{background:transparent;color:inherit;padding:2px 7px;font-size:14px;border-radius:5px;opacity:.7}
 .no-botao:hover{opacity:1;background:rgba(0,0,0,.06);filter:none}
-.no-corpo{padding:12px 14px 14px}
-.no-corpo label{margin-bottom:8px}
-.no-corpo textarea{resize:vertical;min-height:52px;font-size:14px}
-.no-corpo input,.no-corpo textarea{padding:8px 10px}
-.no-corpo .rotulo{display:block;margin:6px 0 6px}
-.no-corpo .nova-opcao{margin-top:6px;font-size:13px}
-.chips{display:flex;flex-wrap:wrap;gap:6px}
-.chip{display:inline-flex;align-items:center;gap:4px;padding:5px 6px 5px 10px;border-radius:999px;
-  background:var(--fundo);border:1px solid var(--linha-forte);font-size:12.5px;font-weight:600}
-.chip.fixo{padding-right:10px;background:var(--atencao-fundo);border-color:transparent;color:var(--atencao)}
+.no-corpo{padding:14px 16px 16px}
+.no-corpo label{margin-bottom:10px}
+.no-corpo textarea{resize:vertical;min-height:64px;font-size:14px}
+.no-corpo input,.no-corpo textarea{padding:9px 11px}
+.no-corpo .rotulo{display:block;margin:8px 0 8px}
+.no-corpo .nova-opcao{margin-top:8px;font-size:13px}
+.chips{display:flex;flex-wrap:wrap;gap:7px}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:6px 7px 6px 11px;border-radius:999px;
+  background:var(--fundo);border:1px solid var(--linha-forte);font-size:13px;font-weight:600}
+.chip.fixo{padding-right:11px;background:var(--atencao-fundo);border-color:transparent;color:var(--atencao)}
 .chip-x{background:transparent;color:var(--fraco);padding:0 4px;font-size:14px;line-height:1;border-radius:50%}
 .chip-x:hover{color:var(--ruim);filter:none}
 .no.adicionar{background:transparent;border:2px dashed var(--linha-forte);box-shadow:none;
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
-  min-height:120px;color:var(--acento-texto);font:inherit;padding:16px;align-self:center;margin-top:14px}
+  min-height:170px;color:var(--acento-texto);font:inherit;padding:16px}
 .no.adicionar:hover{border-color:var(--acento);background:var(--acento-suave)}
 .no.adicionar strong{font-size:14px}
-.ligacao{flex:none;width:34px;height:2px;margin-top:22px;position:relative;
-  background:repeating-linear-gradient(90deg,#8b7de0 0 5px,transparent 5px 9px)}
-.ligacao::before,.ligacao::after{content:"";position:absolute;top:-3px;width:8px;height:8px;border-radius:50%;background:#8b7de0}
-.ligacao::before{left:-4px}.ligacao::after{right:-4px}
 
-.previa{background:var(--superficie);border:1px solid var(--linha);border-radius:14px;padding:16px;
-  position:sticky;top:76px}
-.previa-tela{margin:12px 0;background:#eef0f4;border-radius:12px;padding:14px;min-height:300px;
+.previa{background:var(--superficie);border:1px solid var(--linha);border-radius:14px;padding:16px 18px;
+  margin-top:18px;display:flex;flex-wrap:wrap;gap:12px 28px;align-items:flex-start}
+.previa > .rotulo{width:100%}
+.previa-tela{width:360px;max-width:100%;margin:0;background:var(--previa-fundo);border-radius:12px;padding:14px;min-height:300px;
   display:flex;flex-direction:column;justify-content:flex-end;align-items:flex-end;position:relative}
-@media (prefers-color-scheme: dark){.previa-tela{background:#0f1115}}
+.previa > p.hora{flex:1;min-width:220px;align-self:center;font-size:13px;line-height:1.5}
 .previa-loja{flex:1;width:100%}
 .previa-botao{background:#111;color:#fff;font-weight:600;font-size:13px;padding:11px 16px;border-radius:999px;
   box-shadow:0 6px 20px rgba(0,0,0,.25)}
@@ -324,7 +324,7 @@ pre{background:var(--escuro);color:var(--superficie);padding:13px;border-radius:
 .modelo strong{font-size:14px}
 .modelo .hora{white-space:normal;line-height:1.4}
 
-@media(max-width:1000px){.construtor-corpo{grid-template-columns:1fr}.previa{position:static}}
+@media(max-width:700px){.quadro{grid-template-columns:1fr;padding-left:24px}.no:not(:first-child)::before,.no:not(:first-child)::after{display:none}}
 
 /* ------------------------------------------------------------ financeiro */
 .planos-topo{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
