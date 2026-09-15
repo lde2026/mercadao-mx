@@ -1049,6 +1049,7 @@
     var plano = a ? dados.planos[a.plano] : null;
     var uso = dados.uso;
     var pct = uso.cota ? Math.min(100, Math.round((uso.leadsMes / uso.cota) * 100)) : 0;
+    var estourou = uso.cota != null && uso.leadsMes >= uso.cota;
     var abertas = dados.cobrancas.filter(function (c) { return c.status === 'aberta'; });
     var proxima = abertas.slice().sort(function (x, y) { return x.vence_em < y.vence_em ? -1 : 1; })[0];
 
@@ -1060,9 +1061,9 @@
     }));
     grade.appendChild(cartaoNumero({
       rotulo: 'Leads no mês', valor: uso.cota ? uso.leadsMes + ' de ' + uso.cota : String(uso.leadsMes),
-      nomeIcone: 'leads', tom: pct >= 100 ? 'ruim' : pct >= 80 ? '' : 'bom',
-      detalhe: uso.cota ? pct + '% da cota' : 'sem cota definida',
-      rodape: { texto: pct >= 100 ? 'Cota do mês atingida. Os leads continuam entrando.' : 'A cota zera todo dia 1' },
+      nomeIcone: 'leads', tom: estourou ? 'ruim' : pct >= 80 ? '' : 'bom',
+      detalhe: uso.cota ? pct + '% da cota' : 'sem limite no seu plano',
+      rodape: { texto: estourou ? 'Cota atingida: o chat saiu do ar na loja.' : (uso.cota ? 'A cota zera todo dia 1' : 'Plano sem teto de leads') },
     }));
     grade.appendChild(cartaoNumero({
       rotulo: 'Próxima cobrança', valor: proxima ? dinheiro(proxima.valor) : 'Nada em aberto',
@@ -1104,7 +1105,7 @@
       col.appendChild(preco);
       if (cicloEscolhido === 'anual') col.appendChild(el('div', dinheiro(dados.precos[id].anual) + ' por ano', 'hora'));
       var lista = el('ul', null, 'plano-lista');
-      lista.appendChild(el('li', 'Até ' + p.leadsMes.toLocaleString('pt-BR') + ' leads por mês'));
+      lista.appendChild(el('li', p.leadsMes ? 'Até ' + p.leadsMes.toLocaleString('pt-BR') + ' leads por mês' : 'Leads ilimitados'));
       lista.appendChild(el('li', 'Chat com cupom único por pessoa'));
       lista.appendChild(el('li', 'Fila de leads e WhatsApp'));
       lista.appendChild(el('li', p.rastreamento ? 'Rastreamento de navegação' : 'Sem rastreamento de navegação'));

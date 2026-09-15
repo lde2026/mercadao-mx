@@ -542,6 +542,17 @@ export async function alertar({ contaId = null, tipo, gravidade = 'aviso', mensa
   );
 }
 
+export async function alertarUmaVezNoMes(alerta) {
+  const { rows } = await consultar(
+    `select 1 from alertas
+      where conta_id = $1 and tipo = $2 and criado_em >= date_trunc('month', now()) limit 1`,
+    [alerta.contaId, alerta.tipo],
+  );
+  if (rows.length) return false;
+  await alertar(alerta);
+  return true;
+}
+
 export async function alertasAbertos(limite = 50) {
   const { rows } = await consultar(
     `select * from alertas where resolvido = false order by criado_em desc limit $1`,

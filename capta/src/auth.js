@@ -71,11 +71,12 @@ export function exigirConta(req, res, proximo) {
  */
 export async function aplicarRegua(req, res, proximo) {
   if (!req.conta) return proximo();
-  const [assinatura, abertas] = await Promise.all([
+  const [assinatura, abertas, leadsNoMes] = await Promise.all([
     repo.assinaturaDaConta(req.conta.id),
     repo.cobrancasEmAberto(req.conta.id),
+    repo.leadsNoMes(req.conta.id),
   ]);
-  req.acesso = calcularAcesso({ assinatura, cobrancasAbertas: abertas });
+  req.acesso = calcularAcesso({ assinatura, cobrancasAbertas: abertas, leadsNoMes });
 
   const escrita = !['GET', 'HEAD', 'OPTIONS'].includes(req.method);
   if (escrita && req.acesso.painel === 'leitura' && !req.path.startsWith('/api/sair')) {

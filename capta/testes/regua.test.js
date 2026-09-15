@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { calcularAcesso, diasDeAtraso, avisoDeCobranca, DEGRAUS } from '../src/billing/acesso.js';
+import { calcularAcesso, diasDeAtraso, avisoDeCobranca, avisoDeCota, DEGRAUS } from '../src/billing/acesso.js';
 import { precoDoPlano, planoTemRastreamento, PLANOS } from '../src/billing/planos.js';
 
 /**
@@ -145,10 +145,33 @@ test('o anual tem 20% de desconto sobre doze mensalidades', () => {
   assert.equal(precoDoPlano('escala', 'anual'), 2870.4);
 });
 
-test('a diferenca entre os planos e a cota de leads no mes', () => {
+test('a diferenca entre os planos e a cota de leads no mes, e o Escala nao tem teto', () => {
   assert.ok(PLANOS.essencial.leadsMes < PLANOS.crescimento.leadsMes);
-  assert.ok(PLANOS.crescimento.leadsMes < PLANOS.escala.leadsMes);
+  assert.equal(PLANOS.escala.leadsMes, null);
   assert.equal(calcularAcesso({ assinatura: { status: 'ativa', plano: 'essencial' }, hoje: HOJE }).cotaLeads, PLANOS.essencial.leadsMes);
+});
+
+test('cota atingida tira o chat do ar na loja e deixa o painel inteiro', () => {
+  const cota = PLANOS.essencial.leadsMes;
+  const ess = { status: 'ativa', plano: 'essencial' };
+  const antes = calcularAcesso({ assinatura: ess, hoje: HOJE, leadsNoMes: cota - 1 });
+  assert.equal(antes.widget, true);
+  assert.equal(antes.cotaEstourada, false);
+
+  const depois = calcularAcesso({ assinatura: ess, hoje: HOJE, leadsNoMes: cota });
+  assert.equal(depois.widget, false, 'no lead que bate a cota o chat sai do ar');
+  assert.equal(depois.cotaEstourada, true);
+  assert.equal(depois.painel, 'total', 'cota nao trava o painel');
+  assert.equal(depois.leadsPreservados, true);
+  assert.match(depois.motivo, /cota/);
+  assert.match(avisoDeCota(depois).texto, /saiu do ar/);
+});
+
+test('o Escala nunca estoura cota', () => {
+  const acesso = calcularAcesso({ assinatura: { status: 'ativa', plano: 'escala' }, hoje: HOJE, leadsNoMes: 50000 });
+  assert.equal(acesso.widget, true);
+  assert.equal(acesso.cotaEstourada, false);
+  assert.equal(avisoDeCota(acesso), null);
 });
 
 test('todo plano declara rastreamento de forma explicita', () => {

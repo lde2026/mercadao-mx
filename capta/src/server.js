@@ -7,7 +7,7 @@ import { log } from './log.js';
 import { adaptador, PLATAFORMAS } from './adapters/index.js';
 import { concluirLead } from './fluxo-lead.js';
 import { registrarEvento, perfilDoLead, esquecerLead } from './eventos.js';
-import { calcularAcesso, avisoDeCobranca } from './billing/acesso.js';
+import { calcularAcesso, avisoDeCobranca, avisoDeCota } from './billing/acesso.js';
 import { PLANOS, precoDoPlano, IMPLANTACAO, DESCONTO_ANUAL } from './billing/planos.js';
 import { MODELOS } from './modelos.js';
 import * as asaas from './billing/asaas.js';
@@ -245,11 +245,20 @@ app.post('/e', liberarOrigem, limitar({ porChave: 3000, porIp: 240 }), async (re
 });
 
 async function acessoDaConta(contaId) {
-  const [assinatura, abertas] = await Promise.all([
+  const [assinatura, abertas, leadsNoMes] = await Promise.all([
     repo.assinaturaDaConta(contaId),
     repo.cobrancasEmAberto(contaId),
+    repo.leadsNoMes(contaId),
   ]);
-  return calcularAcesso({ assinatura, cobrancasAbertas: abertas });
+  const acesso = calcularAcesso({ assinatura, cobrancasAbertas: abertas, leadsNoMes });
+  // Cota atingida e chance de upgrade, entao vira alerta, mas um por mes.
+  if (acesso.cotaEstourada) {
+    await repo.alertarUmaVezNoMes({
+      contaId, tipo: 'cota_atingida', gravidade: 'aviso',
+      mensagem: `Cota de ${acesso.cotaLeads} leads do mes atingida. O chat saiu do ar na loja.`,
+    });
+  }
+  return acesso;
 }
 
 // ------------------------------------------------------------ painel: api ---
@@ -294,7 +303,7 @@ app.get('/api/eu', async (req, res) => {
     conta: req.conta,
     assinatura,
     acesso: req.acesso,
-    aviso: avisoDeCobranca(req.acesso),
+    aviso: avisoDeCobranca(req.acesso) || avisoDeCota(req.acesso),
     planos: PLANOS,
   });
 });

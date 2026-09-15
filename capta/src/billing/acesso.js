@@ -39,9 +39,16 @@ export function diasDeAtraso(cobrancasAbertas, hoje = new Date()) {
   return pior;
 }
 
-export function calcularAcesso({ assinatura, cobrancasAbertas = [], hoje = new Date() } = {}) {
+export function calcularAcesso({
+  assinatura, cobrancasAbertas = [], hoje = new Date(), leadsNoMes = 0,
+} = {}) {
   const atraso = diasDeAtraso(cobrancasAbertas, hoje);
   const plano = assinatura?.plano || null;
+
+  // Cota do plano atingida: o chat sai do ar na loja ate o dia 1 ou ate o
+  // upgrade. So o widget cai; o painel e os leads ja captados ficam.
+  const cota = cotaDeLeads(plano);
+  const cotaEstourada = cota != null && leadsNoMes >= cota;
 
   // Conta sem assinatura nenhuma e conta em implantacao, antes da primeira
   // cobranca existir, e nao pode nascer trancada. Quem derruba servico e
@@ -50,10 +57,12 @@ export function calcularAcesso({ assinatura, cobrancasAbertas = [], hoje = new D
 
   const acesso = {
     plano,
-    cotaLeads: cotaDeLeads(plano),
+    cotaLeads: cota,
+    leadsNoMes,
+    cotaEstourada,
     diasAtraso: atraso,
     rastreamento: !parada && planoTemRastreamento(plano) && atraso < DEGRAUS.RASTREAMENTO,
-    widget: !parada && atraso < DEGRAUS.WIDGET,
+    widget: !parada && atraso < DEGRAUS.WIDGET && !cotaEstourada,
     painel: parada || atraso >= DEGRAUS.WIDGET ? 'leitura' : 'total',
     // A remocao do script depende so do atraso, nunca do status da assinatura:
     // cancelamento e outro assunto e nao esta na regua que voce definiu.
@@ -67,6 +76,7 @@ export function calcularAcesso({ assinatura, cobrancasAbertas = [], hoje = new D
   else if (atraso >= DEGRAUS.SCRIPT) acesso.motivo = `script removido da loja, ${atraso} dias de atraso`;
   else if (atraso >= DEGRAUS.WIDGET) acesso.motivo = `widget fora do ar e painel em leitura, ${atraso} dias de atraso`;
   else if (atraso >= DEGRAUS.RASTREAMENTO) acesso.motivo = `rastreamento desligado, ${atraso} dias de atraso`;
+  else if (cotaEstourada) acesso.motivo = `cota de ${cota} leads do mes atingida`;
 
   return acesso;
 }
@@ -95,5 +105,14 @@ export function avisoDeCobranca(acesso) {
   return {
     gravidade: 'erro',
     texto: 'Script removido da loja. Seus leads continuam guardados e voltam no mesmo minuto do pagamento.',
+  };
+}
+
+/** Aviso no painel quando a cota derrubou o chat. */
+export function avisoDeCota(acesso) {
+  if (!acesso.cotaEstourada) return null;
+  return {
+    gravidade: 'erro',
+    texto: `Cota de ${acesso.cotaLeads} leads do mes atingida. O chat saiu do ar na loja e volta no dia 1, ou na hora se voce mudar de plano.`,
   };
 }

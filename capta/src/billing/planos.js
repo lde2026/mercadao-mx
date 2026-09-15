@@ -1,6 +1,6 @@
 /**
- * A diferenca entre os planos e a quantidade de leads captados no mes. O
- * anual tem 20% de desconto sobre doze mensalidades.
+ * A diferenca entre os planos e a quantidade de leads captados no mes; o
+ * Escala nao tem teto. O anual tem 20% de desconto sobre doze mensalidades.
  */
 export const PLANOS = {
   essencial: {
@@ -18,7 +18,7 @@ export const PLANOS = {
   escala: {
     nome: 'Escala',
     mensal: 299,
-    leadsMes: 1000,
+    leadsMes: null,
     rastreamento: true,
   },
 };
@@ -37,6 +37,7 @@ export function planoTemRastreamento(plano) {
   return Boolean(PLANOS[plano]?.rastreamento);
 }
 
+/** null significa sem teto. */
 export function cotaDeLeads(plano) {
   return PLANOS[plano]?.leadsMes ?? null;
 }
