@@ -193,7 +193,7 @@ export async function atualizarConexao(contaId, conexaoId, campos) {
 export async function conexoesParaVarrer(minutos = 30) {
   const { rows } = await consultar(
     `select ${CAMPOS_CONEXAO} from conexoes
-      where plataforma = 'loja_integrada' and status = 'ativa'
+      where plataforma in ('loja_integrada', 'tray') and status = 'ativa'
         and (varrido_em is null or varrido_em < now() - ($1 || ' minutes')::interval)`,
     [String(minutos)],
   );

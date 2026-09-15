@@ -3,6 +3,7 @@ import { gerarCodigo } from './cupom.js';
 import { log } from './log.js';
 import { costurarEventos } from './eventos.js';
 import * as repo from './repositorio.js';
+import { credenciaisProntas } from './credenciais.js';
 
 /**
  * O que acontece quando o lead termina o chat.
@@ -81,17 +82,7 @@ async function entregarCupom({ conexao, fluxo, lead }) {
   }
 
   try {
-    let credenciais = await repo.credenciaisDaConexao(conexao.conta_id, conexao.id);
-
-    if (api.tokenExpira) {
-      const { credenciais: novas, renovou } = await api.garantirToken(credenciais);
-      if (renovou) {
-        await repo.salvarCredenciais(conexao.conta_id, conexao.id, novas);
-        log.info('token.renovado', { conta_id: conexao.conta_id, conexao_id: conexao.id });
-      }
-      credenciais = novas;
-    }
-
+    const credenciais = await credenciaisProntas(conexao);
     await api.criarCupom(credenciais, { codigo, desconto, frete });
     await repo.marcarCupom(registro.id, 'criado');
     log.info('cupom.entregue', {

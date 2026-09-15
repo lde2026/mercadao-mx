@@ -34,6 +34,42 @@ export const nuvemshop = {
   plataforma: 'nuvemshop',
   tokenExpira: false,
 
+  /**
+   * OAuth da Nuvemshop: o lojista instala o app pela loja de aplicativos e a
+   * Nuvemshop manda um code para a URL de redirecionamento cadastrada. Aqui
+   * o code vira o token permanente da loja. O client_secret fica na
+   * credencial porque e com ele que se confere a assinatura do webhook.
+   */
+  urlDeAutorizacao({ appId }) {
+    return `https://www.nuvemshop.com.br/apps/${encodeURIComponent(appId)}/authorize`;
+  },
+
+  async trocarCodigo({ code, clientId, clientSecret }) {
+    const resposta = await pedir('https://www.tiendanube.com/apps/authorize/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': AGENTE },
+      body: new URLSearchParams({
+        client_id: clientId, client_secret: clientSecret, grant_type: 'authorization_code', code,
+      }).toString(),
+    }, { plataforma: 'nuvemshop' });
+    if (!resposta?.access_token || !resposta?.user_id) {
+      throw new ErroPlataforma('resposta sem token', { plataforma: 'nuvemshop' });
+    }
+    return {
+      store_id: String(resposta.user_id),
+      access_token: resposta.access_token,
+      client_secret: clientSecret,
+    };
+  },
+
+  /** Nome e dominio da loja, para a conexao nascer com o nome certo. */
+  async dadosDaLoja(credenciais) {
+    const loja = await pedir(url(credenciais, ''), { headers: cabecalhos(credenciais) },
+      { plataforma: 'nuvemshop' });
+    const nome = typeof loja?.name === 'object' ? (loja.name.pt || Object.values(loja.name)[0]) : loja?.name;
+    return { nome: nome || null, dominio: loja?.original_domain || loja?.domains?.[0] || null };
+  },
+
   async criarCupom(credenciais, { codigo, desconto, frete = false }) {
     try {
       await pedir(url(credenciais, '/coupons'), {

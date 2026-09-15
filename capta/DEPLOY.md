@@ -30,6 +30,8 @@ todo visitante de toda loja cliente.
    | `ASAAS_WEBHOOK_TOKEN` | token cadastrado no webhook do Asaas |
    | `ASAAS_BASE` | `https://api.asaas.com/v3` |
    | `EMAIL_PROVEDOR`, `EMAIL_CHAVE`, `EMAIL_REMETENTE` | quando o e-mail estiver ligado |
+   | `TRAY_CONSUMER_KEY`, `TRAY_CONSUMER_SECRET` | quando a Tray liberar o aplicativo; callback `https://captapp.lojadoecommerce.com.br/tray/callback` |
+   | `NUVEMSHOP_CLIENT_ID`, `NUVEMSHOP_CLIENT_SECRET` | quando o app da Nuvemshop existir; redirecionamento `https://captapp.lojadoecommerce.com.br/nuvemshop/callback` |
    | `OPERADOR_EMAILS` | e-mails de quem administra o Captapp, separados por virgula. So eles veem a tela Admin |
    | `OPERADOR_EMAIL`, `OPERADOR_SENHA_INICIAL` | a conta do operador e criada na primeira subida com esses valores. Troque a senha no painel depois e apague a variavel |
 

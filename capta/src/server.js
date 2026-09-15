@@ -13,6 +13,8 @@ import { MODELOS } from './modelos.js';
 import * as asaas from './billing/asaas.js';
 import * as kiwify from './billing/kiwify.js';
 import { agendar } from './tarefas.js';
+import { credenciaisProntas } from './credenciais.js';
+import { registrarRotasOauth, concluirOauth, configuracaoOauth } from './oauth.js';
 import {
   carregarConta, exigirConta, exigirOperador, ehOperador, aplicarRegua, entrar,
   montarCookie, limparCookie,
@@ -36,7 +38,8 @@ app.use((req, res, proximo) => {
   res.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   if (PRODUCAO) res.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   const publico = req.path === '/widget.js' || req.path === '/rastreador.js'
-    || req.path.startsWith('/w/') || req.path === '/e' || req.path.startsWith('/webhook/');
+    || req.path.startsWith('/w/') || req.path === '/e' || req.path.startsWith('/webhook/')
+    || req.path.startsWith('/tray/') || req.path.startsWith('/nuvemshop/');
   if (!publico) {
     res.set('X-Frame-Options', 'DENY');
     res.set('Content-Security-Policy',
@@ -105,7 +108,7 @@ app.post('/webhook/loja/:chave', express.raw({ type: '*/*', limit: '512kb' }), a
   if (!conexao) return res.status(404).end();
 
   const api = adaptador(conexao.plataforma);
-  const credenciais = await repo.credenciaisDaConexao(conexao.conta_id, conexao.id);
+  const credenciais = await credenciaisProntas(conexao);
   const bruto = req.body.toString('utf8');
 
   if (!api.verificarWebhook?.(credenciais, bruto, req.headers)) {
@@ -116,15 +119,24 @@ app.post('/webhook/loja/:chave', express.raw({ type: '*/*', limit: '512kb' }), a
   }
 
   try {
-    const pedido = JSON.parse(bruto);
-    const normalizado = conexao.plataforma === 'nuvemshop'
-      ? await api.lerPedido(credenciais, pedido.id)
-      : {
+    // Quem sabe ler o pedido na API le de novo: o corpo do webhook so
+    // aponta o id. No WooCommerce o corpo assinado ja e o pedido inteiro.
+    let normalizado;
+    if (api.lerPedido) {
+      const idPedido = api.idDoWebhook ? api.idDoWebhook(bruto) : JSON.parse(bruto).id;
+      normalizado = await api.lerPedido(credenciais, idPedido);
+      // Pedido ainda nao pago: responde 200 para a plataforma nao reenviar e
+      // espera a proxima notificacao.
+      if (!normalizado) return res.json({ ok: true, ignorado: 'nao pago' });
+    } else {
+      const pedido = JSON.parse(bruto);
+      normalizado = {
         idExterno: String(pedido.id),
         valor: Number(pedido.total || 0),
         cupomCodigo: pedido.coupon_lines?.[0]?.code || null,
         feitoEm: pedido.date_created_gmt ? `${pedido.date_created_gmt}Z` : new Date().toISOString(),
       };
+    }
 
     const gravado = await repo.registrarPedido({
       contaId: conexao.conta_id, conexaoId: conexao.id, ...normalizado,
@@ -298,6 +310,12 @@ async function acessoDaConta(contaId) {
   return acesso;
 }
 
+// ---------------------------------------------------- conexao por oauth ---
+
+// Paginas de callback das plataformas. Publicas: quem chega aqui ainda nao
+// esta logado no Captapp, e o bilhete que sai daqui so vale com sessao.
+registrarRotasOauth(app);
+
 // ------------------------------------------------------------ painel: api ---
 
 app.use(carregarConta);
@@ -375,6 +393,30 @@ app.get('/api/conexoes', async (req, res) => {
   }))));
 });
 
+/** O que o painel precisa saber para oferecer o botao de conectar por OAuth. */
+app.get('/api/conexoes/oauth', (_req, res) => {
+  const cfg = configuracaoOauth();
+  res.json({
+    tray: cfg.tray,
+    nuvemshop: cfg.nuvemshop,
+    nuvemshopUrl: cfg.nuvemshop ? adaptador('nuvemshop').urlDeAutorizacao({ appId: cfg.nuvemshopAppId }) : null,
+  });
+});
+
+/** Fecha a conexao iniciada na callback de OAuth, agora com a conta dona. */
+app.post('/api/conexoes/oauth', async (req, res) => {
+  const { bilhete, nomeLoja } = req.body || {};
+  if (!bilhete) return res.status(400).json({ erro: 'bilhete obrigatorio' });
+  try {
+    const resultado = await concluirOauth({ contaId: req.conta.id, bilheteTexto: bilhete, nomeLoja });
+    res.status(201).json(resultado);
+  } catch (erro) {
+    if (/bilhete/.test(erro.message)) return res.status(400).json({ erro: erro.message });
+    log.erro('oauth.conclusao_falhou', { conta_id: req.conta.id, motivo: erro.message });
+    res.status(502).json({ erro: erro.message });
+  }
+});
+
 app.post('/api/conexoes', async (req, res) => {
   const { plataforma, nomeLoja, dominio, credenciais } = req.body || {};
   if (!PLATAFORMAS.includes(plataforma)) return res.status(400).json({ erro: 'plataforma invalida' });
@@ -397,7 +439,7 @@ app.post('/api/conexoes/:id/instalacao', async (req, res) => {
   const conexao = await repo.buscarConexao(req.conta.id, req.params.id);
   if (!conexao) return res.status(404).json({ erro: 'nao encontrada' });
 
-  const credenciais = await repo.credenciaisDaConexao(req.conta.id, conexao.id);
+  const credenciais = await credenciaisProntas(conexao);
   const urlScript = `${URL_PUBLICA}/widget.js?k=${conexao.chave_publica}`;
 
   try {
@@ -406,6 +448,13 @@ app.post('/api/conexoes/:id/instalacao', async (req, res) => {
       modo_instalacao: resultado.modo,
       detalhe_status: resultado.motivo || resultado.ressalva || null,
     });
+    // O id do script e o que permite tirar o widget da loja no dia 45 da
+    // regua. Fica junto da credencial, cifrado, porque e dado da plataforma.
+    if (resultado.idScript) {
+      await repo.salvarCredenciais(req.conta.id, conexao.id, {
+        ...credenciais, id_script: resultado.idScript,
+      });
+    }
     log.info('instalacao.resolvida', {
       conta_id: req.conta.id, conexao_id: conexao.id,
       plataforma: conexao.plataforma, modo: resultado.modo,

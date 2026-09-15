@@ -5,6 +5,7 @@ import { calcularAcesso, DEGRAUS } from './billing/acesso.js';
 import { gerarCodigo } from './cupom.js';
 import { enviar, cupomAtrasado } from './email.js';
 import * as repo from './repositorio.js';
+import { credenciaisProntas } from './credenciais.js';
 
 /**
  * Trabalho de fundo. Duas tarefas, as duas por falta de alternativa:
@@ -28,7 +29,7 @@ export async function varrerPedidos() {
       // atribuido continua no painel.
       if (!acesso.widget) continue;
 
-      const credenciais = await repo.credenciaisDaConexao(conexao.conta_id, conexao.id);
+      const credenciais = await credenciaisProntas(conexao);
       const desde = conexao.varrido_em
         ? new Date(conexao.varrido_em)
         : new Date(Date.now() - 7 * 24 * 3600 * 1000);
@@ -78,9 +79,9 @@ export async function removerScriptsVencidos() {
 
   for (const conexao of rows) {
     try {
-      const credenciais = await repo.credenciaisDaConexao(conexao.conta_id, conexao.id);
+      const credenciais = await credenciaisProntas(conexao);
       const api = adaptador(conexao.plataforma);
-      if (api.removerScript && credenciais.id_script) {
+      if (api.removerScript && credenciais?.id_script) {
         await api.removerScript(credenciais, credenciais.id_script);
       }
       await repo.atualizarConexao(conexao.conta_id, conexao.id, {
@@ -106,7 +107,7 @@ export async function removerScriptsVencidos() {
  */
 export async function reenviarCuponsFalhos() {
   const { rows } = await consultar(
-    `select cp.id, cp.codigo, cp.desconto, cp.conta_id, cp.conexao_id,
+    `select cp.id, cp.codigo, cp.desconto, cp.tipo, cp.conta_id, cp.conexao_id,
             l.id as lead_id, l.nome, l.email,
             cx.plataforma, cx.nome_loja
        from cupons cp
@@ -130,9 +131,13 @@ export async function reenviarCuponsFalhos() {
         codigo = await repo.tirarDoLote(cupom.conexao_id, cupom.lead_id);
         if (!codigo) continue;
       } else {
-        const credenciais = await repo.credenciaisDaConexao(cupom.conta_id, cupom.conexao_id);
+        const credenciais = await credenciaisProntas({
+          conta_id: cupom.conta_id, id: cupom.conexao_id, plataforma: cupom.plataforma,
+        });
         codigo = codigo || gerarCodigo(cupom.nome_loja);
-        await api.criarCupom(credenciais, { codigo, desconto: cupom.desconto });
+        await api.criarCupom(credenciais, {
+          codigo, desconto: cupom.desconto, frete: cupom.tipo === 'frete',
+        });
       }
 
       await consultar(`update cupons set status = 'criado', erro = null, codigo = $1 where id = $2`,
