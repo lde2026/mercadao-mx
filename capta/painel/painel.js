@@ -1265,7 +1265,9 @@
     caixa.appendChild(el('div', 'Chave da loja (para o plugin do WordPress)', 'rotulo'));
     caixa.appendChild(el('pre', conexao.chave_publica));
     caixa.appendChild(el('div', 'Tag para colar no tema, quando a instalação for manual', 'rotulo'));
-    caixa.appendChild(el('pre', '<script async src="' + location.origin + '/widget.js?k=' + conexao.chave_publica + '"></script>'));
+    // A tag de fechamento e montada em pedacos para o proprio painel poder
+    // ser embutido num HTML sem fechar o script antes da hora.
+    caixa.appendChild(el('pre', '<script async src="' + location.origin + '/widget.js?k=' + conexao.chave_publica + '"><' + '/script>'));
     cartao.appendChild(caixa);
   }
 

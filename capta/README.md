@@ -34,8 +34,11 @@ rastreador.js  -> POST /e             -> eventos    -> costura pelo anonimo_id
 | `src/fluxo-lead.js` | o que acontece quando o lead termina o chat |
 | `src/eventos.js` | rastreamento, mascara de IP e costura do anonimo |
 | `src/billing/acesso.js` | regua de inadimplencia |
-| `src/tarefas.js` | varredura de pedidos e remocao de script no dia 45 |
-| `public/widget.js` | o chat, 4,3kb comprimido |
+| `src/tarefas.js` | varredura de pedidos, remocao de script no dia 45, avisos de cobranca |
+| `src/oauth.js` | conexao de loja por OAuth (Tray e Nuvemshop) |
+| `src/avisos.js` | quem recebe e-mail de que: lead novo, cobranca, operador |
+| `src/credenciais.js` | credenciais decifradas com token renovado |
+| `public/widget.js` | o chat, 7,9kb comprimido, carrega o rastreador quando o plano permite |
 | `public/rastreador.js` | rastreamento, 1,7kb comprimido |
 | `painel/` | o painel do lojista |
 
@@ -45,10 +48,14 @@ Isso define o produto. Elas nao se comportam igual.
 
 | | Nuvemshop | WooCommerce | Tray | Loja Integrada |
 |---|---|---|---|---|
-| Instala o script | automatico | plugin nosso | colar a mao | colar a mao, ou nao instala |
+| Conecta por | OAuth ou token | chave REST | OAuth ou token | duas chaves |
+| Instala o script | automatico | plugin nosso | automatico (external_scripts) | colar a mao, ou nao instala |
 | Cria cupom por API | sim | sim | sim, form-urlencoded | nao, sai de lote |
-| Webhook de pedido | sim | sim | sim | nao, varredura de 30 em 30 min |
-| Token expira | nao | nao | sim, horas | nao |
+| Webhook de pedido | sim | sim | sim, ativado por chamado; varredura ate la | nao, varredura de 30 em 30 min |
+| Token expira | nao | nao | sim, 3 horas | nao |
+
+A Tray esta descrita em detalhe em [docs/tray-api.md](docs/tray-api.md),
+conferido com a documentacao oficial.
 
 `instalarScript()` sempre devolve `auto`, `manual` ou `bloqueado`, e a tela de
 integracoes mostra o caminho certo sem ninguem da equipe entrar na loja do
