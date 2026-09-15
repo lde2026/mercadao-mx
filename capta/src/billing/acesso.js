@@ -1,4 +1,4 @@
-import { planoTemRastreamento } from './planos.js';
+import { planoTemRastreamento, cotaDeLeads } from './planos.js';
 
 /**
  * Regua de inadimplencia.
@@ -50,6 +50,7 @@ export function calcularAcesso({ assinatura, cobrancasAbertas = [], hoje = new D
 
   const acesso = {
     plano,
+    cotaLeads: cotaDeLeads(plano),
     diasAtraso: atraso,
     rastreamento: !parada && planoTemRastreamento(plano) && atraso < DEGRAUS.RASTREAMENTO,
     widget: !parada && atraso < DEGRAUS.WIDGET,

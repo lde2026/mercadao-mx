@@ -62,6 +62,14 @@ A Loja Integrada com o tema padrao novo nao tem o campo Incluir codigo HTML.
 Nessas lojas o produto nao instala, e isso e pergunta de qualificacao antes da
 venda.
 
+## Cobranca
+
+Implantacao de R$ 990, cobrada uma vez. Mensalidades de R$ 99, R$ 199 e
+R$ 299, e a diferenca entre elas e a cota de leads captados no mes. O anual
+tem 20% de desconto. O Financeiro do painel mostra so isso: o que a loja paga
+pelo Capta. Faturamento atribuido ao chat aparece na fila e no perfil do
+lead, nunca no Financeiro.
+
 ## Decisoes que nao se mexe sem conversa
 
 O cupom e sempre unico por pessoa, gerado pela API ou tirado de um lote.

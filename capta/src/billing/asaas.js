@@ -104,7 +104,7 @@ export async function processarWebhook(corpo) {
   if (ABREM.has(evento)) {
     await repo.registrarCobranca({
       contaId: conta.id,
-      tipo: pagamento.value >= IMPLANTACAO ? 'implantacao' : 'assinatura',
+      tipo: /implanta/i.test(pagamento.description || '') ? 'implantacao' : 'assinatura',
       valor: Number(pagamento.value),
       origem: 'asaas',
       idExterno: pagamento.id,
@@ -125,13 +125,15 @@ export async function processarWebhook(corpo) {
 }
 
 async function contaPorClienteExterno(clienteExterno) {
-  const { consultar } = await import('../db.js');
-  const { rows } = await consultar(
-    `select c.id from contas c
-      join assinaturas a on a.conta_id = c.id
-     where a.id_externo = $1 or a.id_externo like $2
-     limit 1`,
-    [clienteExterno, `${clienteExterno}%`],
-  );
-  return rows[0] || null;
+  return repo.contaPorClienteExterno(clienteExterno);
+}
+
+export async function cancelarAssinatura(idExterno) {
+  return pedir(`${base()}/subscriptions/${idExterno}`, {
+    method: 'DELETE', headers: cabecalhos(),
+  }, { plataforma: 'asaas' });
+}
+
+export function configurado() {
+  return Boolean(process.env.ASAAS_API_KEY);
 }

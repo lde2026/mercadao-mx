@@ -8,7 +8,7 @@ import { adaptador, PLATAFORMAS } from './adapters/index.js';
 import { concluirLead } from './fluxo-lead.js';
 import { registrarEvento, perfilDoLead, esquecerLead } from './eventos.js';
 import { calcularAcesso, avisoDeCobranca } from './billing/acesso.js';
-import { PLANOS, precoDoPlano, IMPLANTACAO } from './billing/planos.js';
+import { PLANOS, precoDoPlano, IMPLANTACAO, DESCONTO_ANUAL } from './billing/planos.js';
 import { MODELOS } from './modelos.js';
 import * as asaas from './billing/asaas.js';
 import * as kiwify from './billing/kiwify.js';
@@ -498,27 +498,98 @@ app.delete('/api/leads/:id', async (req, res) => {
   res.json({ ok: true });
 });
 
+/**
+ * O Financeiro e da ferramenta, nao da loja: plano, mensalidade, cota de
+ * leads e as cobrancas do Capta. Faturamento atribuido ao chat fica na fila
+ * e no perfil do lead, nao aqui.
+ */
 app.get('/api/financeiro', async (req, res) => {
-  const { consultar } = await import('./db.js');
-  const { rows } = await consultar(
-    `select date_trunc('month', p.feito_em) as mes,
-            count(*) as pedidos,
-            sum(p.valor) as faturado
-       from pedidos p
-      where p.conta_id = $1 and p.lead_id is not null
-      group by 1 order by 1 desc limit 12`,
-    [req.conta.id],
-  );
-  const cobrancas = await repo.cobrancasEmAberto(req.conta.id);
-  const assinatura = await repo.assinaturaDaConta(req.conta.id);
+  const [assinatura, cobrancas, usados, implantacaoPaga] = await Promise.all([
+    repo.assinaturaDaConta(req.conta.id),
+    repo.cobrancasDaConta(req.conta.id),
+    repo.leadsNoMes(req.conta.id),
+    repo.jaPagouImplantacao(req.conta.id),
+  ]);
+  const precos = {};
+  for (const id of Object.keys(PLANOS)) {
+    precos[id] = { mensal: precoDoPlano(id, 'mensal'), anual: precoDoPlano(id, 'anual') };
+  }
   res.json({
-    porMes: rows,
-    cobrancasEmAberto: cobrancas,
     assinatura,
-    mensalidade: assinatura ? precoDoPlano(assinatura.plano, assinatura.ciclo) : null,
-    implantacao: IMPLANTACAO,
+    planos: PLANOS,
+    precos,
+    descontoAnual: DESCONTO_ANUAL,
+    implantacao: { valor: IMPLANTACAO, cobrada: implantacaoPaga },
+    uso: { leadsMes: usados, cota: req.acesso.cotaLeads },
+    cobrancas,
     acesso: req.acesso,
+    cobrancaAutomatica: asaas.configurado(),
   });
+});
+
+/**
+ * Escolha ou troca de plano. Com o Asaas configurado, cria o cliente, a
+ * assinatura e a cobranca de implantacao na primeira vez; o webhook faz o
+ * resto. Sem o Asaas, a assinatura entra como manual e a cobranca acontece
+ * fora, entao nao ha cobranca em aberto e a regua nao corta ninguem por
+ * fatura que nunca existiu.
+ */
+app.post('/api/assinatura', async (req, res) => {
+  const { plano, ciclo = 'mensal', documento } = req.body || {};
+  if (!PLANOS[plano]) return res.status(400).json({ erro: 'plano invalido' });
+  if (!['mensal', 'anual'].includes(ciclo)) return res.status(400).json({ erro: 'ciclo invalido' });
+
+  const atual = await repo.assinaturaDaConta(req.conta.id);
+  if (atual && atual.plano === plano && atual.ciclo === ciclo) {
+    return res.json({ assinatura: atual, mudou: false });
+  }
+
+  if (!asaas.configurado()) {
+    const assinatura = await repo.trocarAssinatura({
+      contaId: req.conta.id, plano, ciclo, origem: 'manual',
+    });
+    log.info('assinatura.manual', { conta_id: req.conta.id, plano, ciclo });
+    return res.json({ assinatura, mudou: true, cobrancaAutomatica: false });
+  }
+
+  try {
+    const conta = await repo.buscarConta(req.conta.id);
+    let clienteExterno = conta.cliente_externo;
+    if (!clienteExterno) {
+      const doc = String(documento || conta.documento || '').replace(/\D/g, '');
+      if (!doc) return res.status(400).json({ erro: 'informe o CPF ou CNPJ para a cobranca' });
+      const cliente = await asaas.criarCliente({ nome: conta.nome, email: conta.email, cpfCnpj: doc });
+      clienteExterno = cliente.id;
+      await repo.salvarClienteExterno(req.conta.id, { clienteExterno, documento: doc });
+    }
+
+    if (atual?.id_externo && atual.origem === 'asaas') {
+      await asaas.cancelarAssinatura(atual.id_externo);
+    }
+    const criada = await asaas.criarAssinatura({ clienteExterno, plano, ciclo });
+    const assinatura = await repo.trocarAssinatura({
+      contaId: req.conta.id, plano, ciclo, origem: 'asaas', idExterno: criada.id,
+    });
+
+    if (!(await repo.jaPagouImplantacao(req.conta.id))) {
+      const venceEm = new Date(Date.now() + 3 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+      const cobranca = await asaas.cobrarImplantacao({ clienteExterno, venceEm });
+      await repo.registrarCobranca({
+        contaId: req.conta.id, tipo: 'implantacao', valor: IMPLANTACAO,
+        origem: 'asaas', idExterno: cobranca.id, venceEm,
+      });
+    }
+
+    log.info('assinatura.criada', { conta_id: req.conta.id, plano, ciclo, origem: 'asaas' });
+    res.json({ assinatura, mudou: true, cobrancaAutomatica: true });
+  } catch (erro) {
+    log.erro('assinatura.falhou', { conta_id: req.conta.id, motivo: erro.message });
+    await repo.alertar({
+      contaId: req.conta.id, tipo: 'assinatura_falhou', gravidade: 'erro',
+      mensagem: `Nao foi possivel criar a assinatura no Asaas: ${erro.message}`,
+    });
+    res.status(502).json({ erro: 'a cobranca nao respondeu, tente de novo em instantes' });
+  }
 });
 
 /** Quantos leads entraram hoje, em quais lojas, e quantos cupons falharam. */

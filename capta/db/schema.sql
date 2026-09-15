@@ -15,6 +15,11 @@ create table if not exists contas (
   atualizado_em timestamptz not null default now()
 );
 
+-- Documento e id de cliente na cobranca. O Asaas identifica o pagador pelo
+-- id de cliente dele, e o webhook casa a cobranca com a conta por aqui.
+alter table contas add column if not exists documento text;
+alter table contas add column if not exists cliente_externo text;
+
 create table if not exists sessoes (
   id        text primary key,
   conta_id  uuid not null references contas(id) on delete cascade,

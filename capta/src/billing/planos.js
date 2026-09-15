@@ -1,38 +1,42 @@
 /**
- * O anual custa dez meses. O plano do meio e o desenhado para vender, porque
- * e onde entra o rastreamento de navegacao.
+ * A diferenca entre os planos e a quantidade de leads captados no mes. O
+ * anual tem 20% de desconto sobre doze mensalidades.
  */
 export const PLANOS = {
   essencial: {
     nome: 'Essencial',
-    mensal: 197,
-    limiteLeadsMes: 300,
+    mensal: 99,
+    leadsMes: 100,
     rastreamento: false,
   },
   crescimento: {
     nome: 'Crescimento',
-    mensal: 397,
-    limiteLeadsMes: 1500,
+    mensal: 199,
+    leadsMes: 300,
     rastreamento: true,
   },
   escala: {
     nome: 'Escala',
-    mensal: 797,
-    limiteLeadsMes: null,
+    mensal: 299,
+    leadsMes: 1000,
     rastreamento: true,
   },
 };
 
-export const IMPLANTACAO = 1500;
-
-const MESES_NO_ANUAL = 10;
+export const IMPLANTACAO = 990;
+export const DESCONTO_ANUAL = 0.2;
 
 export function precoDoPlano(plano, ciclo = 'mensal') {
   const escolhido = PLANOS[plano];
   if (!escolhido) throw new Error(`plano desconhecido: ${plano}`);
-  return ciclo === 'anual' ? escolhido.mensal * MESES_NO_ANUAL : escolhido.mensal;
+  if (ciclo !== 'anual') return escolhido.mensal;
+  return Math.round(escolhido.mensal * 12 * (1 - DESCONTO_ANUAL) * 100) / 100;
 }
 
 export function planoTemRastreamento(plano) {
   return Boolean(PLANOS[plano]?.rastreamento);
+}
+
+export function cotaDeLeads(plano) {
+  return PLANOS[plano]?.leadsMes ?? null;
 }

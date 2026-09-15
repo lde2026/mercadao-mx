@@ -136,12 +136,19 @@ test('o aviso muda antes de cada corte', () => {
   assert.match(avisoDeCobranca(acessoNoDia(12)).texto, /leads continuam guardados/);
 });
 
-test('o anual custa dez meses', () => {
-  assert.equal(precoDoPlano('essencial'), 197);
-  assert.equal(precoDoPlano('crescimento'), 397);
-  assert.equal(precoDoPlano('escala'), 797);
-  assert.equal(precoDoPlano('crescimento', 'anual'), 3970);
-  assert.equal(precoDoPlano('escala', 'anual'), 7970);
+test('o anual tem 20% de desconto sobre doze mensalidades', () => {
+  assert.equal(precoDoPlano('essencial'), 99);
+  assert.equal(precoDoPlano('crescimento'), 199);
+  assert.equal(precoDoPlano('escala'), 299);
+  assert.equal(precoDoPlano('essencial', 'anual'), 950.4);
+  assert.equal(precoDoPlano('crescimento', 'anual'), 1910.4);
+  assert.equal(precoDoPlano('escala', 'anual'), 2870.4);
+});
+
+test('a diferenca entre os planos e a cota de leads no mes', () => {
+  assert.ok(PLANOS.essencial.leadsMes < PLANOS.crescimento.leadsMes);
+  assert.ok(PLANOS.crescimento.leadsMes < PLANOS.escala.leadsMes);
+  assert.equal(calcularAcesso({ assinatura: { status: 'ativa', plano: 'essencial' }, hoje: HOJE }).cotaLeads, PLANOS.essencial.leadsMes);
 });
 
 test('todo plano declara rastreamento de forma explicita', () => {

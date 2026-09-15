@@ -1034,64 +1034,127 @@
 
   // ------------------------------------------------------------ financeiro ---
 
+  var cicloEscolhido = 'mensal';
+
   function verFinanceiro() {
-    var alvo = pintar('Financeiro', 'Quanto o chat faturou, e o que a sua conta deve.');
-    api('/financeiro').then(function (dados) {
-      var meses = dados.porMes || [];
-      var total = meses.reduce(function (t, m) { return t + Number(m.faturado || 0); }, 0);
-      var pedidos = meses.reduce(function (t, m) { return t + Number(m.pedidos || 0); }, 0);
+    var alvo = pintar('Financeiro', 'Seu plano, sua cota de leads e as cobranças do Capta.');
+    api('/financeiro').then(function (dados) { desenharFinanceiro(alvo, dados); });
+  }
 
-      var grade = el('div', null, 'grade-num');
-      grade.appendChild(cartaoNumero({
-        rotulo: 'Faturado pelo chat', valor: dinheiro(total), nomeIcone: 'dinheiro', tom: 'bom',
-        detalhe: 'atribuido por cupom', rodape: { texto: 'Nos ultimos 12 meses' },
-      }));
-      grade.appendChild(cartaoNumero({
-        rotulo: 'Pedidos atribuidos', valor: String(pedidos), nomeIcone: 'pedido',
-        detalhe: pedidos ? 'ticket medio ' + dinheiro(total / pedidos) : 'nenhum ainda',
-        rodape: { texto: 'Cupom usado no carrinho' },
-      }));
-      grade.appendChild(cartaoNumero({
-        rotulo: 'Sua mensalidade', valor: dados.mensalidade ? dinheiro(dados.mensalidade) : 'sem assinatura',
-        nomeIcone: 'plano', tom: 'acento',
-        detalhe: dados.assinatura ? 'plano ' + dados.assinatura.plano + ', ' + dados.assinatura.ciclo : 'nenhum plano ativo',
-        rodape: { texto: 'Implantacao ' + dinheiro(dados.implantacao) },
-      }));
-      grade.appendChild(cartaoNumero({
-        rotulo: 'Situacao da conta',
-        valor: dados.acesso.diasAtraso > 0 ? dados.acesso.diasAtraso + ' dias' : 'em dia',
-        nomeIcone: 'relogio', tom: dados.acesso.diasAtraso > 0 ? 'ruim' : 'bom',
-        detalhe: dados.acesso.motivo || 'nada em aberto',
-        rodape: { texto: 'Seus leads ficam guardados sempre' },
-      }));
-      alvo.appendChild(grade);
+  function desenharFinanceiro(alvo, dados) {
+    var antigo = alvo.querySelector('.area-fin');
+    if (antigo) antigo.remove();
+    var area = el('div', null, 'area-fin');
+    var a = dados.assinatura;
+    var plano = a ? dados.planos[a.plano] : null;
+    var uso = dados.uso;
+    var pct = uso.cota ? Math.min(100, Math.round((uso.leadsMes / uso.cota) * 100)) : 0;
+    var abertas = dados.cobrancas.filter(function (c) { return c.status === 'aberta'; });
+    var proxima = abertas.slice().sort(function (x, y) { return x.vence_em < y.vence_em ? -1 : 1; })[0];
 
-      var painelMeses = el('div', null, 'cartao');
-      painelMeses.appendChild(el('div', 'Faturamento por mes', 'rotulo'));
-      if (meses.length) {
-        painelMeses.appendChild(tabela(['Mes', 'Pedidos', 'Faturado'], meses.map(function (m) {
-          return {
-            celulas: [
-              new Date(m.mes).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }),
-              m.pedidos, dinheiro(m.faturado),
-            ],
-          };
-        })));
-      } else {
-        painelMeses.appendChild(el('p', 'Nenhum pedido atribuido ao chat ainda.', 'vazio'));
-      }
-      alvo.appendChild(painelMeses);
+    var grade = el('div', null, 'grade-num');
+    grade.appendChild(cartaoNumero({
+      rotulo: 'Plano atual', valor: plano ? plano.nome : 'Nenhum', nomeIcone: 'plano', tom: 'acento',
+      detalhe: a ? dinheiro(dados.precos[a.plano][a.ciclo]) + (a.ciclo === 'anual' ? ' por ano' : ' por mês') : 'escolha um plano abaixo',
+      rodape: { texto: a ? (a.ciclo === 'anual' ? 'Cobrança anual' : 'Cobrança mensal') : 'Sem cobrança ativa' },
+    }));
+    grade.appendChild(cartaoNumero({
+      rotulo: 'Leads no mês', valor: uso.cota ? uso.leadsMes + ' de ' + uso.cota : String(uso.leadsMes),
+      nomeIcone: 'leads', tom: pct >= 100 ? 'ruim' : pct >= 80 ? '' : 'bom',
+      detalhe: uso.cota ? pct + '% da cota' : 'sem cota definida',
+      rodape: { texto: pct >= 100 ? 'Cota do mês atingida. Os leads continuam entrando.' : 'A cota zera todo dia 1' },
+    }));
+    grade.appendChild(cartaoNumero({
+      rotulo: 'Próxima cobrança', valor: proxima ? dinheiro(proxima.valor) : 'Nada em aberto',
+      nomeIcone: 'relogio', tom: dados.acesso.diasAtraso > 0 ? 'ruim' : '',
+      detalhe: proxima ? 'vence em ' + new Date(proxima.vence_em).toLocaleDateString('pt-BR') : (a ? 'em dia' : ''),
+      rodape: { texto: dados.acesso.diasAtraso > 0 ? dados.acesso.diasAtraso + ' dias de atraso' : 'Seus leads ficam guardados sempre' },
+    }));
+    grade.appendChild(cartaoNumero({
+      rotulo: 'Implantação', valor: dinheiro(dados.implantacao.valor), nomeIcone: 'dinheiro',
+      tom: dados.implantacao.cobrada ? 'bom' : '',
+      detalhe: dados.implantacao.cobrada ? 'já cobrada' : 'cobrada uma vez, na adesão',
+      rodape: { texto: 'A gente configura e monta as perguntas' },
+    }));
+    area.appendChild(grade);
 
-      if ((dados.cobrancasEmAberto || []).length) {
-        var abertas = el('div', null, 'cartao');
-        abertas.appendChild(el('div', 'Cobrancas em aberto', 'rotulo'));
-        abertas.appendChild(tabela(['Tipo', 'Valor', 'Vence em', 'Origem'],
-          dados.cobrancasEmAberto.map(function (c) {
-            return { celulas: [c.tipo, dinheiro(c.valor), new Date(c.vence_em).toLocaleDateString('pt-BR'), c.origem] };
-          })));
-        alvo.appendChild(abertas);
-      }
+    // Planos
+    var planosCx = el('div', null, 'cartao');
+    var topo = el('div', null, 'planos-topo');
+    topo.appendChild(el('div', 'Planos', 'rotulo'));
+    var alternador = el('div', null, 'alternador');
+    [['mensal', 'Mensal'], ['anual', 'Anual, ' + Math.round(dados.descontoAnual * 100) + '% off']].forEach(function (par) {
+      var b = el('button', par[1], 'aba' + (cicloEscolhido === par[0] ? ' ativa' : ''));
+      b.type = 'button';
+      b.addEventListener('click', function () { cicloEscolhido = par[0]; desenharFinanceiro(alvo, dados); });
+      alternador.appendChild(b);
     });
+    topo.appendChild(alternador);
+    planosCx.appendChild(topo);
+
+    var colunas = el('div', null, 'planos');
+    Object.keys(dados.planos).forEach(function (id) {
+      var p = dados.planos[id];
+      var atual = a && a.plano === id && a.ciclo === cicloEscolhido;
+      var col = el('div', null, 'plano' + (atual ? ' atual' : ''));
+      col.appendChild(el('div', p.nome, 'plano-nome'));
+      var preco = el('div', null, 'plano-preco');
+      preco.appendChild(el('span', dinheiro(cicloEscolhido === 'anual' ? dados.precos[id].anual / 12 : dados.precos[id].mensal)));
+      preco.appendChild(el('small', '/mês'));
+      col.appendChild(preco);
+      if (cicloEscolhido === 'anual') col.appendChild(el('div', dinheiro(dados.precos[id].anual) + ' por ano', 'hora'));
+      var lista = el('ul', null, 'plano-lista');
+      lista.appendChild(el('li', 'Até ' + p.leadsMes.toLocaleString('pt-BR') + ' leads por mês'));
+      lista.appendChild(el('li', 'Chat com cupom único por pessoa'));
+      lista.appendChild(el('li', 'Fila de leads e WhatsApp'));
+      lista.appendChild(el('li', p.rastreamento ? 'Rastreamento de navegação' : 'Sem rastreamento de navegação'));
+      col.appendChild(lista);
+      var botao = el('button', atual ? 'Plano atual' : (a ? 'Mudar para este' : 'Escolher'), atual ? 'secundario' : '');
+      botao.type = 'button';
+      botao.disabled = atual;
+      botao.addEventListener('click', function () { escolherPlano(alvo, dados, id); });
+      col.appendChild(botao);
+      colunas.appendChild(col);
+    });
+    planosCx.appendChild(colunas);
+    if (!dados.cobrancaAutomatica) {
+      planosCx.appendChild(el('p', 'A cobrança automática ainda não está ligada nesta conta. A troca de plano vale na hora e a cobrança é combinada com a equipe do Capta.', 'hora'));
+    }
+    area.appendChild(planosCx);
+
+    // Cobrancas
+    var cobr = el('div', null, 'cartao');
+    cobr.appendChild(el('div', 'Cobranças', 'rotulo'));
+    if (dados.cobrancas.length) {
+      cobr.appendChild(tabela(['Tipo', 'Valor', 'Vencimento', 'Situação', 'Origem'],
+        dados.cobrancas.map(function (c) {
+          return { celulas: [
+            c.tipo === 'implantacao' ? 'Implantação' : 'Mensalidade',
+            dinheiro(c.valor),
+            new Date(c.vence_em).toLocaleDateString('pt-BR'),
+            selo(c.status === 'paga' ? 'paga' : c.status === 'aberta' ? 'em aberto' : c.status,
+              c.status === 'paga' ? 'criado' : c.status === 'aberta' ? 'manual' : 'pendente'),
+            c.origem,
+          ] };
+        })));
+    } else {
+      cobr.appendChild(el('p', 'Nenhuma cobrança ainda.', 'vazio'));
+    }
+    area.appendChild(cobr);
+    alvo.appendChild(area);
+  }
+
+  function escolherPlano(alvo, dados, plano) {
+    var corpo = { plano: plano, ciclo: cicloEscolhido };
+    if (dados.cobrancaAutomatica && !(dados.assinatura && dados.assinatura.origem === 'asaas')) {
+      var doc = prompt('CPF ou CNPJ para a cobrança:');
+      if (!doc) return;
+      corpo.documento = doc;
+    }
+    api('/assinatura', { method: 'POST', corpo: corpo })
+      .then(function () { return api('/financeiro'); })
+      .then(function (novos) { desenharFinanceiro(alvo, novos); })
+      .catch(function (e) { alert(e.message); });
   }
 
   // ------------------------------------------------------------- navegacao ---

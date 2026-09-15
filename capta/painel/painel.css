@@ -325,3 +325,18 @@ pre{background:var(--escuro);color:var(--superficie);padding:13px;border-radius:
 .modelo .hora{white-space:normal;line-height:1.4}
 
 @media(max-width:1000px){.construtor-corpo{grid-template-columns:1fr}.previa{position:static}}
+
+/* ------------------------------------------------------------ financeiro */
+.planos-topo{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.alternador{display:flex;gap:4px;background:var(--fundo);border:1px solid var(--linha);border-radius:999px;padding:3px}
+.alternador .aba{border:0;margin:0;padding:6px 14px;border-radius:999px;font-size:13px}
+.alternador .aba.ativa{background:var(--superficie);color:var(--acento-texto);box-shadow:var(--sombra)}
+.planos{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+.plano{border:1px solid var(--linha);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:8px}
+.plano.atual{border-color:var(--acento);box-shadow:0 0 0 3px var(--acento-suave)}
+.plano-nome{font-weight:700;font-size:15px}
+.plano-preco{font-size:28px;font-weight:700;letter-spacing:-1px;font-variant-numeric:tabular-nums}
+.plano-preco small{font-size:13px;font-weight:500;color:var(--fraco);margin-left:3px}
+.plano-lista{list-style:none;display:grid;gap:6px;font-size:13.5px;margin:6px 0 10px;flex:1}
+.plano-lista li::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--acento);margin-right:8px;vertical-align:middle}
+.plano button{width:100%}

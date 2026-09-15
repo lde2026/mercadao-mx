@@ -37,7 +37,7 @@ export async function buscarContaPorEmail(email) {
 
 export async function buscarConta(contaId) {
   const { rows } = await consultar(
-    `select id, nome, email, criado_em from contas where id = $1`,
+    `select id, nome, email, documento, cliente_externo, criado_em from contas where id = $1`,
     [contaId],
   );
   return rows[0] || null;
@@ -432,6 +432,68 @@ export async function assinaturaDaConta(contaId) {
     [contaId],
   );
   return rows[0] || null;
+}
+
+export async function leadsNoMes(contaId) {
+  const { rows } = await consultar(
+    `select count(*)::int as total from leads
+      where conta_id = $1 and criado_em >= date_trunc('month', now())`,
+    [contaId],
+  );
+  return rows[0].total;
+}
+
+export async function cobrancasDaConta(contaId, limite = 12) {
+  const { rows } = await consultar(
+    `select id, tipo, valor, status, origem, vence_em, pago_em
+       from cobrancas where conta_id = $1
+      order by vence_em desc limit $2`,
+    [contaId, limite],
+  );
+  return rows;
+}
+
+export async function salvarClienteExterno(contaId, { clienteExterno, documento }) {
+  await consultar(
+    `update contas set cliente_externo = coalesce($2, cliente_externo),
+                       documento = coalesce($3, documento),
+                       atualizado_em = now()
+      where id = $1`,
+    [contaId, clienteExterno || null, documento || null],
+  );
+}
+
+export async function contaPorClienteExterno(clienteExterno) {
+  const { rows } = await consultar(
+    `select id, nome from contas where cliente_externo = $1`, [clienteExterno],
+  );
+  return rows[0] || null;
+}
+
+/** Troca de plano encerra a assinatura anterior; nunca ha duas ativas. */
+export async function trocarAssinatura({ contaId, plano, ciclo, origem, idExterno = null }) {
+  return emTransacao(async (cliente) => {
+    await cliente.query(
+      `update assinaturas set status = 'cancelada', fim_em = now(), atualizado_em = now()
+        where conta_id = $1 and status = 'ativa'`,
+      [contaId],
+    );
+    const { rows } = await cliente.query(
+      `insert into assinaturas (conta_id, plano, ciclo, status, origem, id_externo)
+       values ($1, $2, $3, 'ativa', $4, $5)
+       returning *`,
+      [contaId, plano, ciclo, origem, idExterno],
+    );
+    return rows[0];
+  });
+}
+
+export async function jaPagouImplantacao(contaId) {
+  const { rows } = await consultar(
+    `select 1 from cobrancas where conta_id = $1 and tipo = 'implantacao' limit 1`,
+    [contaId],
+  );
+  return rows.length > 0;
 }
 
 export async function cobrancasEmAberto(contaId) {
