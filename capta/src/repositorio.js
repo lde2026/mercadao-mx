@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { consultar, emTransacao } from './db.js';
-import { cifrar, decifrar, gerarChavePublica, hashSenha } from './cripto.js';
+import { cifrar, decifrar, gerarChavePublica, hashSenha, conferirSenha } from './cripto.js';
 
 /**
  * Regra unica desta camada: id vindo da URL nunca e autorizacao. Toda funcao
@@ -33,6 +33,22 @@ export async function buscarContaPorEmail(email) {
     [email],
   );
   return rows[0] || null;
+}
+
+export async function atualizarSenha(contaId, senha) {
+  await consultar(
+    `update contas set senha_hash = $2, atualizado_em = now() where id = $1`,
+    [contaId, hashSenha(senha)],
+  );
+}
+
+/** Troca pelo painel: exige a senha atual e derruba as outras sessoes. */
+export async function trocarSenha(contaId, sessaoAtual, { atual, nova }) {
+  const { rows } = await consultar(`select senha_hash from contas where id = $1`, [contaId]);
+  if (!rows[0] || !conferirSenha(atual, rows[0].senha_hash)) return false;
+  await atualizarSenha(contaId, nova);
+  await consultar(`delete from sessoes where conta_id = $1 and id <> $2`, [contaId, sessaoAtual]);
+  return true;
 }
 
 export async function buscarConta(contaId) {

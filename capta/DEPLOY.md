@@ -31,6 +31,7 @@ todo visitante de toda loja cliente.
    | `ASAAS_BASE` | `https://api.asaas.com/v3` |
    | `EMAIL_PROVEDOR`, `EMAIL_CHAVE`, `EMAIL_REMETENTE` | quando o e-mail estiver ligado |
    | `OPERADOR_EMAILS` | e-mails de quem administra o Captapp, separados por virgula. So eles veem a tela Admin |
+   | `OPERADOR_EMAIL`, `OPERADOR_SENHA_INICIAL` | a conta do operador e criada na primeira subida com esses valores. Troque a senha no painel depois e apague a variavel |
 
 5. Deploy. O container roda `migrar` e depois sobe o servidor; o Railway
    considera saudavel quando `/saude` responder 200, e `/saude` so responde

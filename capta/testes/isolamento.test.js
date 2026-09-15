@@ -222,6 +222,24 @@ test('o operador ve o Captapp inteiro e entra na conta de um cliente', async () 
   assert.deepEqual(leads.json.leads.map((l) => l.nome), ['Renata']);
 });
 
+test('trocar a senha exige a atual, derruba as outras sessoes e vale no login', async () => {
+  const outra = await pedir('/api/login', { metodo: 'POST', corpo: { email: 'pierre+a@lojadoecommerce.com.br', senha: 'senha-de-teste-123' } });
+  const cookieOutra = outra.cookie.split(';')[0];
+
+  const errada = await pedir('/api/conta/senha', { metodo: 'POST', cookie: contaA.cookie, corpo: { atual: 'nao-e-essa', nova: 'nova-senha-forte' } });
+  assert.equal(errada.status, 401);
+
+  const certa = await pedir('/api/conta/senha', { metodo: 'POST', cookie: contaA.cookie, corpo: { atual: 'senha-de-teste-123', nova: 'nova-senha-forte' } });
+  assert.equal(certa.status, 200);
+  assert.equal((await pedir('/api/eu', { cookie: cookieOutra })).status, 401, 'a outra sessao tinha que cair');
+  assert.equal((await pedir('/api/eu', { cookie: contaA.cookie })).status, 200, 'a sessao que trocou continua');
+
+  const antiga = await pedir('/api/login', { metodo: 'POST', corpo: { email: 'pierre+a@lojadoecommerce.com.br', senha: 'senha-de-teste-123' } });
+  assert.equal(antiga.status, 401);
+  const nova = await pedir('/api/login', { metodo: 'POST', corpo: { email: 'pierre+a@lojadoecommerce.com.br', senha: 'nova-senha-forte' } });
+  assert.equal(nova.status, 200);
+});
+
 // Por ultimo: consome o teto do IP e derrubaria qualquer cadastro depois dele.
 test('o login corta por teto de tentativas por IP', async () => {
   let cortou = false;

@@ -194,6 +194,16 @@
     api('/sair', { method: 'POST' }).then(mostrarEntrada).catch(mostrarEntrada);
   });
 
+  document.getElementById('trocar-senha').addEventListener('click', function () {
+    var atual = prompt('Senha atual:');
+    if (!atual) return;
+    var nova = prompt('Senha nova, no mínimo 8 caracteres:');
+    if (!nova) return;
+    api('/conta/senha', { method: 'POST', corpo: { atual: atual, nova: nova } })
+      .then(function () { alert('Senha trocada. As outras sessões desta conta foram encerradas.'); })
+      .catch(function (e) { alert(e.message); });
+  });
+
   document.getElementById('sino').addEventListener('click', function () {
     location.hash = '#/hoje';
   });
@@ -1071,12 +1081,6 @@
       detalhe: proxima ? 'vence em ' + new Date(proxima.vence_em).toLocaleDateString('pt-BR') : (a ? 'em dia' : ''),
       rodape: { texto: dados.acesso.diasAtraso > 0 ? dados.acesso.diasAtraso + ' dias de atraso' : 'Seus leads ficam guardados sempre' },
     }));
-    grade.appendChild(cartaoNumero({
-      rotulo: 'Implantação', valor: dinheiro(dados.implantacao.valor), nomeIcone: 'dinheiro',
-      tom: dados.implantacao.cobrada ? 'bom' : '',
-      detalhe: dados.implantacao.cobrada ? 'já cobrada' : 'cobrada uma vez, na adesão',
-      rodape: { texto: 'A gente configura e monta as perguntas' },
-    }));
     area.appendChild(grade);
 
     // Planos
@@ -1104,6 +1108,9 @@
       preco.appendChild(el('small', '/mês'));
       col.appendChild(preco);
       if (cicloEscolhido === 'anual') col.appendChild(el('div', dinheiro(dados.precos[id].anual) + ' por ano', 'hora'));
+      col.appendChild(el('div', dados.implantacao.cobrada
+        ? 'Implantação já cobrada'
+        : '+ ' + dinheiro(dados.implantacao.valor) + ' de implantação, uma vez', 'plano-implantacao'));
       var lista = el('ul', null, 'plano-lista');
       lista.appendChild(el('li', p.leadsMes ? 'Até ' + p.leadsMes.toLocaleString('pt-BR') + ' leads por mês' : 'Leads ilimitados'));
       lista.appendChild(el('li', 'Chat com cupom único por pessoa'));

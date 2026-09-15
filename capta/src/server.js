@@ -351,6 +351,16 @@ app.get('/api/eu', async (req, res) => {
   });
 });
 
+app.post('/api/conta/senha', async (req, res) => {
+  const { atual, nova } = req.body || {};
+  if (!atual || !nova) return res.status(400).json({ erro: 'informe a senha atual e a nova' });
+  if (String(nova).length < 8) return res.status(400).json({ erro: 'senha nova de no minimo 8 caracteres' });
+  const ok = await repo.trocarSenha(req.conta.id, req.sessaoId, { atual: String(atual), nova: String(nova) });
+  if (!ok) return res.status(401).json({ erro: 'senha atual nao confere' });
+  log.info('senha.trocada', { conta_id: req.conta.id });
+  res.json({ ok: true });
+});
+
 app.get('/api/conexoes', async (req, res) => {
   const conexoes = await repo.listarConexoes(req.conta.id);
   res.json(await Promise.all(conexoes.map(async (conexao) => ({

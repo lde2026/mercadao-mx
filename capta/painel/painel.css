@@ -85,8 +85,8 @@ button:disabled{opacity:.5;cursor:default;filter:none}
   font-size:12px;font-weight:700;display:grid;place-items:center;flex:none;letter-spacing:.3px}
 .nome-conta{font-size:13px;font-weight:600;max-width:160px;overflow:hidden;text-overflow:ellipsis;
   white-space:nowrap}
-#sair{background:transparent;color:var(--fraco);font-size:13px;font-weight:500;padding:6px 10px}
-#sair:hover{color:var(--tinta);background:var(--fundo);filter:none}
+#sair,#trocar-senha{background:transparent;color:var(--fraco);font-size:13px;font-weight:500;padding:6px 10px}
+#sair:hover,#trocar-senha:hover{color:var(--tinta);background:var(--fundo);filter:none}
 
 /* ---------------------------------------------------------------- estrutura */
 .corpo{display:grid;grid-template-columns:224px 1fr;flex:1;min-height:0}
@@ -340,3 +340,4 @@ pre{background:var(--escuro);color:var(--superficie);padding:13px;border-radius:
 .plano-lista{list-style:none;display:grid;gap:6px;font-size:13.5px;margin:6px 0 10px;flex:1}
 .plano-lista li::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--acento);margin-right:8px;vertical-align:middle}
 .plano button{width:100%}
+.plano-implantacao{font-size:13px;color:var(--fraco);padding:8px 10px;background:var(--fundo);border-radius:8px;margin-top:2px}

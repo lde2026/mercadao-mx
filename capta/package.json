@@ -14,7 +14,8 @@
     "hoje": "node src/hoje.js",
     "test": "node --test --test-concurrency=1 testes/*.test.js",
     "asaas:teste": "node --env-file=.env src/asaas-teste.js",
-    "backup": "sh scripts/backup.sh"
+    "backup": "sh scripts/backup.sh",
+    "operador": "node --env-file=.env src/operador.js"
   },
   "dependencies": {
     "express": "^4.21.2",
