@@ -1233,8 +1233,16 @@
         }
         if (conexao.detalhe_status) cartao.appendChild(el('p', conexao.detalhe_status, 'hora detalhe'));
         if (conexao.lote) {
-          cartao.appendChild(el('p', 'Lote de cupons: ' + conexao.lote.disponiveis + ' disponíveis de '
-            + conexao.lote.total + '. Esta plataforma não cria cupom por API, entao o código sai deste lote.', 'legenda'));
+          // Lote baixo e o problema que so aparece quando ja doeu: o lead
+          // ouve a promessa e nao recebe codigo. Por isso vira alerta em
+          // vermelho, e nao mais uma linha de legenda.
+          var restam = Number(conexao.lote.disponiveis);
+          var baixo = restam <= 10;
+          cartao.appendChild(el('p', restam === 0
+            ? 'Lote de cupons zerado. Quem responder o chat fica sem o cupom prometido. Reponha abaixo.'
+            : 'Lote de cupons: ' + restam + ' disponíveis de ' + conexao.lote.total
+              + (baixo ? '. Está acabando, reponha abaixo.' : '. Esta plataforma não cria cupom por API, então o código sai deste lote.'),
+          baixo ? 'erro' : 'legenda'));
         }
 
         var acoes = el('div', null, 'acoes');

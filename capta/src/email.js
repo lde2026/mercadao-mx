@@ -147,3 +147,21 @@ export function recuperacaoSenha({ nomeConta, url }) {
        <p>Se voce nao pediu isso, ignore este e-mail. Sua senha continua a mesma.</p>`),
   };
 }
+
+/**
+ * Lote de cupons acabando. E o unico e-mail que pede acao do lojista antes de
+ * o problema acontecer: quando o lote zera, o proximo lead ouve a promessa e
+ * nao recebe codigo nenhum.
+ */
+export function loteAcabando({ nomeConta, nomeLoja, disponiveis, urlPainel }) {
+  const texto = `Ola, ${nomeConta}.\n\nO lote de cupons da ${nomeLoja} esta em ${disponiveis} codigo(s) disponivel(is).\n\nQuando ele zerar, quem responder o chat fica sem o cupom prometido. Cadastre novos codigos no painel da plataforma e cole em ${urlPainel}.`;
+  return {
+    assunto: `Lote de cupons acabando na ${nomeLoja}: ${disponiveis} restantes`,
+    texto,
+    html: moldura('Lote de cupons acabando',
+      `<p>Ola, ${escapar(nomeConta)}.</p>
+       <p>O lote de cupons da <strong>${escapar(nomeLoja)}</strong> esta em <strong>${escapar(disponiveis)}</strong> codigo(s) disponivel(is).</p>
+       <p>Quando ele zerar, quem responder o chat fica sem o cupom prometido.</p>
+       <p><a href="${urlPainel}">Repor o lote no painel</a></p>`),
+  };
+}

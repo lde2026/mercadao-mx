@@ -1,4 +1,4 @@
-import { enviar, leadQuente, avisoDeCobranca, alertaOperador, recuperacaoSenha } from './email.js';
+import { enviar, leadQuente, avisoDeCobranca, alertaOperador, recuperacaoSenha, loteAcabando } from './email.js';
 import { ehOperador } from './auth.js';
 import { log } from './log.js';
 import * as repo from './repositorio.js';
@@ -32,6 +32,42 @@ export async function avisarLeadNovo({ conexao, lead }) {
     await enviar({ para, contaId: conta.id, ...mensagem });
   } catch (erro) {
     log.aviso('aviso.lead_falhou', { conta_id: conexao.conta_id, motivo: erro.message });
+  }
+}
+
+/**
+ * Lote de cupons acabando, na plataforma que nao cria cupom por API. Avisa
+ * antes de zerar, porque depois de zerado o estrago ja aconteceu: o lead
+ * ouviu a promessa e nao recebeu codigo.
+ */
+const PISO_DO_LOTE = 10;
+
+export async function avisarLoteBaixo({ conexao, disponiveis }) {
+  try {
+    if (disponiveis > PISO_DO_LOTE) return false;
+    const inedito = await repo.alertarLoteBaixo({
+      contaId: conexao.conta_id,
+      conexaoId: conexao.id,
+      mensagem: disponiveis > 0
+        ? `Lote de cupons da ${conexao.nome_loja} em ${disponiveis} codigo(s). Reponha antes de zerar.`
+        : `Lote de cupons da ${conexao.nome_loja} zerado. O proximo lead fica sem o cupom prometido.`,
+      dados: { disponiveis, plataforma: conexao.plataforma },
+    });
+    if (!inedito) return false;
+
+    const conta = await repo.buscarConta(conexao.conta_id);
+    if (!conta) return false;
+    const mensagem = loteAcabando({
+      nomeConta: conta.nome,
+      nomeLoja: conexao.nome_loja,
+      disponiveis,
+      urlPainel: `${URL_PUBLICA()}/#/integracoes`,
+    });
+    await enviar({ para: conta.email_aviso || conta.email, contaId: conta.id, ...mensagem });
+    return true;
+  } catch (erro) {
+    log.aviso('aviso.lote_falhou', { conta_id: conexao.conta_id, motivo: erro.message });
+    return false;
   }
 }
 

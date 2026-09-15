@@ -57,6 +57,12 @@ Isso define o produto. Elas nao se comportam igual.
 A Tray esta descrita em detalhe em [docs/tray-api.md](docs/tray-api.md),
 conferido com a documentacao oficial.
 
+A Loja Integrada e a unica das quatro que nao tem OAuth: as duas chaves sao
+coladas a mao no painel, e a de aplicacao a equipe deles emite por formulario.
+O adaptador dela e o unico ainda nao conferido contra documentacao oficial,
+porque a rede desta maquina nao alcanca `api.awsli.com.br`. Os nomes de campo
+em `listarPedidos` valem ate a primeira chamada real.
+
 `instalarScript()` sempre devolve `auto`, `manual` ou `bloqueado`, e a tela de
 integracoes mostra o caminho certo sem ninguem da equipe entrar na loja do
 cliente.

@@ -653,6 +653,29 @@ export async function alertarUmaVezNoMes(alerta) {
   return true;
 }
 
+/**
+ * Lote de cupons acabando. Nao repete no mesmo dia para a mesma loja: o lote
+ * cai a cada lead, e um alerta por lead viraria ruido no sino e no e-mail.
+ * A deduplicacao olha a conexao porque uma conta pode ter mais de uma loja
+ * na plataforma que trabalha com lote.
+ */
+export async function alertarLoteBaixo({ contaId, conexaoId, mensagem, dados = {} }) {
+  const { rows } = await consultar(
+    `select 1 from alertas
+      where conta_id = $1 and tipo = 'lote_baixo'
+        and dados->>'conexao_id' = $2
+        and criado_em >= now() - interval '1 day'
+      limit 1`,
+    [contaId, String(conexaoId)],
+  );
+  if (rows.length) return false;
+  await alertar({
+    contaId, tipo: 'lote_baixo', gravidade: 'aviso', mensagem,
+    dados: { ...dados, conexao_id: conexaoId },
+  });
+  return true;
+}
+
 export async function alertasAbertos(limite = 50) {
   const { rows } = await consultar(
     `select * from alertas where resolvido = false order by criado_em desc limit $1`,

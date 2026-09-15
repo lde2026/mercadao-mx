@@ -4,7 +4,7 @@ import { log } from './log.js';
 import { costurarEventos } from './eventos.js';
 import * as repo from './repositorio.js';
 import { credenciaisProntas } from './credenciais.js';
-import { avisarLeadNovo, avisarOperador } from './avisos.js';
+import { avisarLeadNovo, avisarOperador, avisarLoteBaixo } from './avisos.js';
 
 /**
  * O que acontece quando o lead termina o chat.
@@ -64,6 +64,7 @@ async function entregarCupom({ conexao, fluxo, lead }) {
   if (api.criaCupomPorApi === false) {
     const codigo = await repo.tirarDoLote(conexao.id, lead.id);
     if (!codigo) {
+      await avisarLoteBaixo({ conexao, disponiveis: 0 });
       await falhou({ conexao, lead, desconto, motivo: 'lote de cupons vazio' });
       return { status: 'falhou', motivo: 'lote_vazio' };
     }
@@ -74,6 +75,10 @@ async function entregarCupom({ conexao, fluxo, lead }) {
     log.info('cupom.entregue', {
       conta_id: conexao.conta_id, conexao_id: conexao.id, lead_id: lead.id, origem: 'lote',
     });
+    // O aviso sai depois de o cupom estar entregue: avisar o lojista nunca
+    // pode atrasar a resposta ao visitante.
+    const saldo = await repo.saldoDoLote(conexao.conta_id, conexao.id);
+    avisarLoteBaixo({ conexao, disponiveis: Number(saldo.disponiveis) });
     return { status: 'criado', codigo, desconto };
   }
 
