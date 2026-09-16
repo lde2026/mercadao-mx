@@ -325,6 +325,7 @@ export async function conexoesParaVarrer(minutos = 30) {
 
 export async function salvarFluxo(contaId, conexaoId, {
   convite, consentimento, desconto, perguntas, recompensa = 'cupom', modo = 'painel', abrirApos = 0, cor = null,
+  botaoFormato = 'retangular', botaoPosicao = 'direita-inferior',
 }) {
   if (perguntas.length > 3) {
     // A quarta pergunta e a de contato, fixa. Tres configuraveis e o teto.
@@ -332,8 +333,9 @@ export async function salvarFluxo(contaId, conexaoId, {
   }
   return emTransacao(async (cliente) => {
     const { rows } = await cliente.query(
-      `insert into fluxos (conta_id, conexao_id, convite, consentimento, desconto, recompensa, modo, abrir_apos, cor)
-       select $1, $2, $3, $4, $5, $6, $7, $8, $9
+      `insert into fluxos (conta_id, conexao_id, convite, consentimento, desconto, recompensa, modo, abrir_apos, cor,
+                            botao_formato, botao_posicao)
+       select $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
         where exists (select 1 from conexoes where id = $2 and conta_id = $1)
        on conflict (conexao_id) do update
           set convite = excluded.convite,
@@ -343,9 +345,12 @@ export async function salvarFluxo(contaId, conexaoId, {
               modo = excluded.modo,
               abrir_apos = excluded.abrir_apos,
               cor = excluded.cor,
+              botao_formato = excluded.botao_formato,
+              botao_posicao = excluded.botao_posicao,
               atualizado_em = now()
        returning id`,
-      [contaId, conexaoId, convite, consentimento, desconto, recompensa, modo, abrirApos, cor],
+      [contaId, conexaoId, convite, consentimento, desconto, recompensa, modo, abrirApos, cor,
+        botaoFormato, botaoPosicao],
     );
     if (!rows[0]) return null;
     const fluxoId = rows[0].id;
@@ -363,7 +368,8 @@ export async function salvarFluxo(contaId, conexaoId, {
 export async function fluxoPorChave(chave) {
   const { rows } = await consultar(
     `select f.id, f.conta_id, f.conexao_id, f.convite, f.consentimento,
-            f.desconto, f.recompensa, f.modo, f.abrir_apos, f.cor, f.ativo, c.plataforma, c.nome_loja, c.status as status_conexao,
+            f.desconto, f.recompensa, f.modo, f.abrir_apos, f.cor, f.botao_formato, f.botao_posicao,
+            f.ativo, c.plataforma, c.nome_loja, c.status as status_conexao,
             ct.whatsapp,
             coalesce(
               (select json_agg(json_build_object('texto', p.texto, 'opcoes', p.opcoes)
@@ -382,7 +388,8 @@ export async function fluxoPorChave(chave) {
 
 export async function fluxoDaConexao(contaId, conexaoId) {
   const { rows } = await consultar(
-    `select f.id, f.convite, f.consentimento, f.desconto, f.recompensa, f.modo, f.abrir_apos, f.cor, f.ativo,
+    `select f.id, f.convite, f.consentimento, f.desconto, f.recompensa, f.modo, f.abrir_apos, f.cor,
+            f.botao_formato, f.botao_posicao, f.ativo,
             coalesce(
               (select json_agg(json_build_object('texto', p.texto, 'opcoes', p.opcoes)
                                order by p.ordem)

@@ -267,6 +267,8 @@ app.get('/w/fluxo/:chave', liberarOrigem, limitar({ porChave: 600, porIp: 60 }),
     modo: fluxo.modo || 'painel',
     abrirApos: fluxo.abrir_apos || 0,
     cor: fluxo.cor || null,
+    botaoFormato: fluxo.botao_formato || 'retangular',
+    botaoPosicao: fluxo.botao_posicao || 'direita-inferior',
     loja: fluxo.nome_loja,
     rastrear: acesso.rastreamento,
     // So quando o beneficio e o contato humano: o WhatsApp da loja vira o
@@ -695,11 +697,14 @@ app.put('/api/conexoes/:id/fluxo', async (req, res) => {
 
   const {
     convite, consentimento, desconto, perguntas, recompensa = 'cupom', modo = 'painel', abrirApos = 0, cor = null,
+    botaoFormato = 'retangular', botaoPosicao = 'direita-inferior',
   } = req.body || {};
   if (cor && !/^#[0-9a-f]{6}$/i.test(String(cor))) return res.status(400).json({ erro: 'cor invalida' });
   if (!consentimento) return res.status(400).json({ erro: 'a linha de consentimento e obrigatoria' });
   if (!RECOMPENSAS.has(recompensa)) return res.status(400).json({ erro: 'beneficio invalido' });
   if (!['painel', 'chat'].includes(modo)) return res.status(400).json({ erro: 'formato invalido' });
+  if (!FORMATOS_BOTAO.has(botaoFormato)) return res.status(400).json({ erro: 'formato de botao invalido' });
+  if (!POSICOES_BOTAO.has(botaoPosicao)) return res.status(400).json({ erro: 'posicao de botao invalida' });
   const segundos = Math.min(Math.max(Number(abrirApos) || 0, 0), 120);
   if ((perguntas || []).length > 3) {
     return res.status(400).json({
@@ -724,12 +729,22 @@ app.put('/api/conexoes/:id/fluxo', async (req, res) => {
     modo,
     abrirApos: segundos,
     cor: cor || null,
+    botaoFormato,
+    botaoPosicao,
   });
   res.json({ id, perguntas: limpas.length });
 });
 
 const SITUACOES = new Set(['a_contatar', 'contatados']);
 const RECOMPENSAS = new Set(['cupom', 'frete_gratis', 'diagnostico', 'especialista', 'consultoria']);
+
+// Os mesmos valores do check no banco. Validar aqui tambem faz a resposta
+// ser 400 com explicacao, e nao 500 de violacao de restricao.
+const FORMATOS_BOTAO = new Set(['retangular', 'redondo']);
+const POSICOES_BOTAO = new Set([
+  'direita-inferior', 'direita-central', 'direita-superior',
+  'esquerda-inferior', 'esquerda-central', 'esquerda-superior',
+]);
 
 /**
  * Planilha dos leads. Ponto e virgula e BOM porque o Excel em portugues abre

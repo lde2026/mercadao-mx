@@ -140,6 +140,21 @@ alter table fluxos add column if not exists abrir_apos integer not null default 
 alter table fluxos add column if not exists cor text
   check (cor is null or cor ~ '^#[0-9a-fA-F]{6}$');
 
+-- Aparencia e lugar do botao flutuante na loja.
+--
+-- retangular e o botao com o texto do convite, que e o que existia antes e
+-- por isso e o padrao: loja ja instalada nao pode mudar de cara sozinha num
+-- deploy. redondo e so o icone, para quem nao quer texto sobre a vitrine.
+--
+-- A posicao e lado mais altura, porque e assim que o lojista pensa ("canto
+-- inferior direito"), e porque o canto errado cobre o botao de comprar de
+-- alguns temas, que e o motivo real desta opcao existir.
+alter table fluxos add column if not exists botao_formato text not null default 'retangular'
+  check (botao_formato in ('retangular','redondo'));
+alter table fluxos add column if not exists botao_posicao text not null default 'direita-inferior'
+  check (botao_posicao in ('direita-inferior','direita-central','direita-superior',
+                           'esquerda-inferior','esquerda-central','esquerda-superior'));
+
 create unique index if not exists fluxos_conexao_idx on fluxos(conexao_id);
 
 -- Teto de quatro perguntas no banco, nao so na tela: a ultima e a de contato
