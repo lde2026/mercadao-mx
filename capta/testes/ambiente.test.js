@@ -38,7 +38,7 @@ test('ambiente completo nao para nem avisa', () => {
   assert.deepEqual(paradas, []);
   // Asaas ausente e escolha, nao defeito: a cobranca fica manual.
   assert.equal(avisos.length, 1);
-  assert.match(avisos[0], /ASAAS_CHAVE/);
+  assert.match(avisos[0], /ASAAS_API_KEY/);
 });
 
 test('sem o que cifra credencial ou assina sessao, o processo nao sobe', () => {
@@ -75,7 +75,7 @@ test('em producao a url publica tem que ser https', () => {
 });
 
 test('Asaas com chave e sem token de webhook para o boot', () => {
-  const { paradas } = conferir({ ...COMPLETO, ASAAS_CHAVE: 'x' });
+  const { paradas } = conferir({ ...COMPLETO, ASAAS_API_KEY: 'x' });
   assert.equal(paradas.length, 1);
   assert.match(paradas[0], /ASAAS_WEBHOOK_TOKEN/);
 });

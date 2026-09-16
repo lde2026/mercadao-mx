@@ -53,10 +53,10 @@ export function conferirAmbiente({ producao = process.env.NODE_ENV === 'producti
   if (!process.env.EMAIL_PROVEDOR) {
     avisos.push('EMAIL_PROVEDOR vazio: nenhum e-mail sai. Cupom atrasado, aviso de lead, cobranca e recuperacao de senha viram linha de log.');
   }
-  if (!process.env.ASAAS_CHAVE) {
-    avisos.push('ASAAS_CHAVE vazio: a cobranca fica manual, a troca de plano vale na hora mas nao gera fatura.');
+  if (!process.env.ASAAS_API_KEY) {
+    avisos.push('ASAAS_API_KEY vazio: a cobranca fica manual, a troca de plano vale na hora mas nao gera fatura.');
   } else if (!process.env.ASAAS_WEBHOOK_TOKEN) {
-    paradas.push('ASAAS_WEBHOOK_TOKEN ausente com ASAAS_CHAVE presente: o webhook de pagamento recusaria tudo, e conta paga ficaria como inadimplente.');
+    paradas.push('ASAAS_WEBHOOK_TOKEN ausente com ASAAS_API_KEY presente: o webhook de pagamento recusaria tudo, e conta paga ficaria como inadimplente.');
   }
 
   return { paradas, avisos };
