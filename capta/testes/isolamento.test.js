@@ -5,7 +5,7 @@ import { prepararBanco } from './ajuda.js';
 process.env.NODE_ENV = 'test';
 process.env.OPERADOR_EMAILS = 'contato@lojadoecommerce.com.br';
 
-const { pool } = await import('../src/db.js');
+const { pool, consultar } = await import('../src/db.js');
 await prepararBanco();
 
 const { app } = await import('../src/server.js');
@@ -235,6 +235,18 @@ test('o operador ve o Captapp inteiro e entra na conta de um cliente', async () 
   const cookieA = entrada.cookie.split(';')[0];
   const leads = await pedir('/api/leads', { cookie: cookieA });
   assert.deepEqual(leads.json.leads.map((l) => l.nome), ['Renata']);
+
+  // A sessao criada fica marcada como personificacao. Sem isso, a pergunta
+  // "quem exportou a base deste cliente" nao tem resposta no log: a acao
+  // sairia com o id da conta do lojista, como se tivesse sido ele.
+  const { rows } = await consultar(
+    'select operador_id from sessoes where conta_id = $1 and operador_id is not null', [contaA.id],
+  );
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].operador_id, operador.id);
+
+  // E o operador perde os poderes de admin enquanto esta dentro da conta.
+  assert.equal((await pedir('/api/admin/contas', { cookie: cookieA })).status, 403);
 });
 
 test('trocar a senha exige a atual, derruba as outras sessoes e vale no login', async () => {
