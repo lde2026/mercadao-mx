@@ -642,8 +642,20 @@
     modo: 'painel',
     abrirApos: 0,
     cor: '',
+    botaoFormato: 'retangular',
+    botaoPosicao: 'direita-inferior',
     perguntas: [],
   };
+
+  // Lado e altura viram as mesmas classes do widget, para a previa mostrar o
+  // lugar de verdade e nao uma aproximacao.
+  var CLASSES_POSICAO = {
+    direita: 'lr', esquerda: 'll', inferior: 'vb', central: 'vc', superior: 'vt',
+  };
+  function classesDePosicao(posicao) {
+    var partes = String(posicao || '').split('-');
+    return ' ' + (CLASSES_POSICAO[partes[0]] || 'lr') + ' ' + (CLASSES_POSICAO[partes[1]] || 'vb');
+  }
 
   var RECOMPENSAS = [
     ['Loja virtual', [
@@ -686,6 +698,8 @@
           convite: fluxo.convite, consentimento: fluxo.consentimento,
           desconto: fluxo.desconto, recompensa: fluxo.recompensa || 'cupom',
           modo: fluxo.modo || 'painel', abrirApos: fluxo.abrir_apos || 0, cor: fluxo.cor || '',
+          botaoFormato: fluxo.botao_formato || 'retangular',
+          botaoPosicao: fluxo.botao_posicao || 'direita-inferior',
           perguntas: (fluxo.perguntas || []).map(function (p) {
             return { texto: p.texto, opcoes: (p.opcoes || []).slice() };
           }),
@@ -822,7 +836,50 @@
     linhaCor.appendChild(caixaCor);
     corpoConvite.appendChild(linhaCor);
 
-    var rotuloModo = el('label', 'Formato');
+    var rotuloFormato = el('label', 'Formato do botão');
+    var campoFormato = el('select');
+    [['retangular', 'Retangular, com o texto'], ['redondo', 'Redondo, só o ícone']].forEach(function (par) {
+      var op = el('option', par[1]); op.value = par[0];
+      if (f.botaoFormato === par[0]) op.selected = true;
+      campoFormato.appendChild(op);
+    });
+    campoFormato.addEventListener('click', function (e) { e.stopPropagation(); });
+    campoFormato.addEventListener('change', function () {
+      f.botaoFormato = campoFormato.value; marcarSujo(); desenharPrevia();
+    });
+    rotuloFormato.appendChild(campoFormato);
+    corpoConvite.appendChild(rotuloFormato);
+
+    /*
+     * Posicao como seis celulas no desenho da tela, e nao lista suspensa.
+     * "direita-central" numa lista obriga a pessoa a imaginar onde fica; a
+     * grade ja e o mapa, e a escolha errada cobre o botao de comprar do tema,
+     * que e o motivo de a opcao existir.
+     */
+    var rotuloPosicao = el('label', 'Posição na tela');
+    var grade = el('div', null, 'posicao-grade');
+    if (f.cor) grade.style.setProperty('--cor-widget', f.cor);
+    [['esquerda-superior', 'Esquerda, topo'], ['direita-superior', 'Direita, topo'],
+      ['esquerda-central', 'Esquerda, meio'], ['direita-central', 'Direita, meio'],
+      ['esquerda-inferior', 'Esquerda, base'], ['direita-inferior', 'Direita, base'],
+    ].forEach(function (par) {
+      var cel = el('button', par[1]);
+      cel.type = 'button';
+      cel.setAttribute('aria-pressed', f.botaoPosicao === par[0] ? 'true' : 'false');
+      cel.addEventListener('click', function (e) {
+        e.stopPropagation();
+        f.botaoPosicao = par[0];
+        grade.querySelectorAll('button').forEach(function (b) { b.setAttribute('aria-pressed', 'false'); });
+        cel.setAttribute('aria-pressed', 'true');
+        marcarSujo(); desenharPrevia();
+      });
+      grade.appendChild(cel);
+    });
+    rotuloPosicao.appendChild(grade);
+    corpoConvite.appendChild(rotuloPosicao);
+    corpoConvite.appendChild(el('p', 'Em alguns temas o canto inferior direito cobre o botão de comprar. Se acontecer, mude o lado aqui.', 'hora'));
+
+    var rotuloModo = el('label', 'Formato da conversa');
     var campoModo = el('select');
     [['painel', 'Janela compacta, contato no fim'], ['chat', 'Chat em popup, nome e WhatsApp primeiro']].forEach(function (par) {
       var op = el('option', par[1]); op.value = par[0]; if (f.modo === par[0]) op.selected = true; campoModo.appendChild(op);
@@ -998,6 +1055,28 @@
   }
 
   /** O que o visitante ve, na etapa selecionada. */
+  // Os mesmos desenhos do public/widget.js. Duplicar dois caminhos de SVG
+  // custa menos do que fazer o painel baixar o widget so para mostrar um
+  // icone, e o widget nao pode ganhar peso por causa do painel.
+  var ICONES_BOTAO = {
+    presente: 'M20 12v10H4V12M2 7h20v5H2zM12 22V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z',
+    balao: 'M21 11.5a8.4 8.4 0 0 1-9 8.4 8.9 8.9 0 0 1-3.8-.9L3 20.5l1.5-4.9A8.4 8.4 0 0 1 3.6 11 8.4 8.4 0 0 1 12 2.6h.5A8.4 8.4 0 0 1 21 11z',
+  };
+  function iconeDoBotao(nome) {
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('fill', 'none');
+    svg.setAttribute('stroke', 'currentColor');
+    svg.setAttribute('stroke-width', '2');
+    svg.setAttribute('stroke-linecap', 'round');
+    svg.setAttribute('stroke-linejoin', 'round');
+    svg.setAttribute('aria-hidden', 'true');
+    var caminho = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    caminho.setAttribute('d', ICONES_BOTAO[nome]);
+    svg.appendChild(caminho);
+    return svg;
+  }
+
   function desenharPrevia() {
     var previa = document.querySelector('.previa');
     if (!previa) return;
@@ -1009,11 +1088,20 @@
     var tela = el('div', null, 'previa-tela');
     if (f.cor) tela.style.setProperty('--cor-widget', f.cor);
     if (sel === 'convite') {
-      var botao = el('div', f.convite || 'Ganhe cupom', 'previa-botao');
+      var redondo = f.botaoFormato === 'redondo';
+      var botao = el('div', redondo ? null : (f.convite || 'Ganhe cupom'),
+        'previa-botao' + classesDePosicao(f.botaoPosicao) + (redondo ? ' rd' : ''));
+      if (redondo) {
+        var comBeneficio = f.recompensa === 'cupom' || f.recompensa === 'frete_gratis';
+        botao.appendChild(iconeDoBotao(comBeneficio ? 'presente' : 'balao'));
+        botao.title = f.convite || 'Ganhe cupom';
+      }
       tela.appendChild(el('div', null, 'previa-loja'));
       tela.appendChild(botao);
       previa.appendChild(tela);
-      previa.appendChild(el('p', 'Botao flutuante no canto da loja. Clicar abre o chat.', 'hora'));
+      previa.appendChild(el('p', redondo
+        ? 'Botão redondo no canto escolhido. Sem texto na loja: o convite vira o nome do botão para leitor de tela.'
+        : 'Botão flutuante no canto escolhido. Clicar abre o chat.', 'hora'));
       return;
     }
 

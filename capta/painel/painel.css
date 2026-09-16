@@ -16,6 +16,13 @@
   --atencao:#9a6207; --atencao-fundo:#fdf3df;
   --escuro:#22223a;
   --sombra:0 1px 2px rgba(44,44,70,.06);
+  /*
+   * Fundo da tela de previa. Escuro nos dois temas de proposito: ele
+   * representa a loja do cliente, nao o painel, e precisa se distinguir do
+   * cartao em volta. Sem isso a previa fica transparente e o botao parece
+   * solto no meio do nada, em vez de num canto.
+   */
+  --previa-fundo:#22223a;
 }
 @media (prefers-color-scheme: dark){
   :root{
@@ -320,6 +327,30 @@ pre{background:var(--escuro);color:var(--superficie);padding:13px;border-radius:
 .previa-loja{flex:1;width:100%}
 .previa-botao{background:#111;color:#fff;font-weight:600;font-size:13px;padding:11px 16px;border-radius:999px;
   box-shadow:0 6px 20px rgba(0,0,0,.25)}
+/*
+ * Na previa o botao sai do fluxo e vai para o canto escolhido, para o lojista
+ * ver o lugar de verdade antes de publicar na loja dele. Os nomes das classes
+ * acompanham os do widget de proposito: quem for mexer nos dois procura a
+ * mesma palavra.
+ */
+.previa-botao{position:absolute;max-width:calc(100% - 28px)}
+.previa-botao.lr{right:14px}
+.previa-botao.ll{left:14px}
+.previa-botao.vb{bottom:14px}
+.previa-botao.vt{top:14px}
+.previa-botao.vc{top:50%;transform:translateY(-50%)}
+.previa-botao.rd{width:46px;height:46px;padding:0;border-radius:50%;display:grid;place-items:center}
+.previa-botao.rd svg{width:22px;height:22px}
+
+/* Escolha da posicao: seis celulas no desenho da tela, nao uma lista. */
+.posicao-grade{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:4px;
+  background:var(--previa-fundo,#1b1d24);border-radius:10px;padding:8px}
+.posicao-grade button{border:1px solid transparent;background:rgba(255,255,255,.08);color:#cfd3dc;
+  border-radius:7px;padding:9px 6px;font-size:11px;font-weight:600;cursor:pointer;line-height:1.2}
+.posicao-grade button:hover{background:rgba(255,255,255,.16)}
+.posicao-grade button[aria-pressed="true"]{background:var(--cor-widget,#15803d);color:#fff;border-color:rgba(255,255,255,.5)}
+/* Explicacao sempre grudada no controle de cima, nunca no de baixo. */
+.no-corpo > p.hora{margin:6px 0 12px}
 .previa-painel{width:100%;background:#fff;color:#111;border-radius:14px;overflow:hidden;
   box-shadow:0 10px 40px rgba(0,0,0,.25);font-size:13px}
 .previa-cab{background:#111;color:#fff;padding:11px 13px;display:flex;justify-content:space-between;
