@@ -32,7 +32,8 @@ todo visitante de toda loja cliente.
    | `EMAIL_PROVEDOR`, `EMAIL_CHAVE`, `EMAIL_REMETENTE` | quando o e-mail estiver ligado |
    | `TRAY_CONSUMER_KEY`, `TRAY_CONSUMER_SECRET` | quando a Tray liberar o aplicativo; callback `https://captapp.lojadoecommerce.com.br/tray/callback` |
    | `TRAY_DOMINIOS` | loja Tray em dominio proprio, uma por virgula |
-   | `CONFIAR_CLOUDFLARE=1` e `PROXY_SALTOS` | obrigatorio, para o limite por IP valer |
+   | `DATABASE_SSL` | vazio no Postgres do Railway (rede privada). `1` em banco gerenciado de fora, como Supabase, Neon ou RDS. Ver secao 1.1 |
+   | `CONFIAR_CLOUDFLARE` e `PROXY_SALTOS` | ver secao 9.1 antes de escolher. Errado aqui, todo limite por IP para de valer em silencio |
    | `NUVEMSHOP_CLIENT_ID`, `NUVEMSHOP_CLIENT_SECRET` | quando o app da Nuvemshop existir; redirecionamento `https://captapp.lojadoecommerce.com.br/nuvemshop/callback` |
    | `OPERADOR_EMAILS` | e-mails de quem administra o Captapp, separados por virgula. So eles veem a tela Admin |
    | `OPERADOR_EMAIL`, `OPERADOR_SENHA_INICIAL` | a conta do operador e criada na primeira subida com esses valores. Troque a senha no painel depois e apague a variavel |
@@ -41,7 +42,42 @@ todo visitante de toda loja cliente.
    considera saudavel quando `/saude` responder 200, e `/saude` so responde
    200 com o banco alcançavel.
 
+### 1.1 Supabase, Neon ou o Postgres do Railway?
+
+O app fala Postgres puro, pela `pg` e uma string de conexao. Qualquer um dos
+tres serve, e nao ha nada no codigo que prenda a um deles.
+
+O Postgres do Railway, no mesmo projeto, e o mais simples: a `DATABASE_URL`
+aparece sozinha no servico, o trafego nao sai da rede privada da plataforma,
+e nao ha um segundo painel para administrar.
+
+Supabase e Neon ficam do lado de fora. Isso traz duas consequencias:
+
+- **TLS deixa de ser opcional.** A conexao atravessa a internet publica.
+  Ponha `DATABASE_SSL=1`. Sem isso, dependendo da string, a conexao pode sair
+  em claro e ninguem percebe, porque funciona.
+- **A latencia entra em cada consulta.** Escolha a regiao mais perto do app
+  (Sao Paulo, no caso do Supabase) ou cada tela do painel paga a ida e volta.
+
+O que faria valer a pena e usar o resto do Supabase: autenticacao, storage,
+realtime. O Captapp nao usa nenhum dos tres, tem a propria sessao e o proprio
+esquema. Entao a recomendacao e o Postgres do Railway. Se voce ja tem Supabase
+e prefere manter tudo num lugar so, tambem funciona, e a unica mudanca e a
+`DATABASE_URL` mais o `DATABASE_SSL=1`.
+
+Em qualquer um dos dois, a secao 5 continua valendo: backup e a sua parte.
+
 ## 2. Dominio e Cloudflare
+
+As duas entradas de DNS, no painel do Cloudflare, na zona
+`lojadoecommerce.com.br`:
+
+| Tipo | Nome | Aponta para | Proxy |
+|---|---|---|---|
+| CNAME | `captapp` | o alvo que o Railway mostra em Custom Domain | ligado (nuvem laranja) |
+| CNAME | `capta` | criado sozinho pelo Cloudflare Pages, secao 3 | ligado |
+
+Nada de registro A: os dois alvos mudam de IP sem avisar.
 
 1. No Railway, Settings, **Custom Domain**: `captapp.lojadoecommerce.com.br`.
    Ele mostra um alvo de CNAME.
@@ -100,8 +136,23 @@ A primeira tem que responder `{"ok":true,"banco":true}`. Na segunda,
 `cf-cache-status: HIT` na segunda chamada confirma o Cloudflare segurando o
 widget.
 
-Entre no painel, crie a primeira conta, e rode `npm run hoje` apontando
-para producao para ver a tabela vazia. A partir dai, e lojista de verdade.
+Depois entre com a sua conta de operador e abra, no navegador,
+`https://captapp.lojadoecommerce.com.br/api/admin/rede`. Ele responde de onde
+o servidor acha que veio a requisicao:
+
+```json
+{"ipVisto":"200.x.x.x","ipDoExpress":"200.x.x.x","saltosConfiaveis":1,
+ "confiaCloudflare":true,"cabecalhoCloudflare":"200.x.x.x","protocoloVisto":"https"}
+```
+
+`ipVisto` tem que ser o **seu** IP de casa, e `protocoloVisto` tem que ser
+`https`. Se `ipVisto` vier como endereco interno, `127.0.0.1` ou o IP de um
+proxy, ajuste `PROXY_SALTOS` e confira a secao 9.1: enquanto isso estiver
+errado, todo limite por IP conta baldes separados, inclusive o de forca bruta
+de senha.
+
+Por fim, `npm run hoje` apontando para producao mostra a tabela vazia. A
+partir dai, e lojista de verdade.
 
 ## 7. O que ainda depende de gente, nao de codigo
 
@@ -170,7 +221,7 @@ Ainda assim, passe os dois pelo seu advogado antes de anunciar: o texto e
 seu, a responsabilidade e sua, e uma clausula de limitacao de
 responsabilidade mal redigida nao vale nada num processo.
 
-## 9. Duas coisas de seguranca que dependem do servidor, nao do codigo
+## 9. Seguranca que depende do servidor, nao do codigo
 
 ### 9.1 O Cloudflare tem que ser a unica porta de entrada
 
@@ -186,7 +237,34 @@ plataforma permitir, restringir a entrada as faixas do Cloudflare. Sem isso,
 deixe `CONFIAR_CLOUDFLARE` vazio e ajuste `PROXY_SALTOS` para o numero real
 de saltos.
 
-### 9.2 A CHAVE_CREDENCIAIS e o backup
+### 9.2 A area de Admin e so sua
+
+Quem administra o Captapp e definido por uma coisa so: o e-mail estar em
+`OPERADOR_EMAILS`. Nao existe coluna no banco nem rota capaz de promover
+alguem, de proposito. Quem esta na lista ve o resumo do negocio, a lista de
+todas as contas e consegue entrar dentro da conta de um cliente para dar
+suporte, e essa entrada fica gravada no log com o seu id.
+
+Tres coisas garantem que so voce alcance isso:
+
+1. **`OPERADOR_EMAILS` com o seu e-mail, e so ele.** Uma linha a mais nessa
+   variavel e um administrador a mais, com acesso a base de todos os clientes.
+2. **Crie a conta na primeira subida**, com `OPERADOR_EMAIL` e
+   `OPERADOR_SENHA_INICIAL`. O container roda isso antes de aceitar a primeira
+   requisicao. Troque a senha no painel depois e apague
+   `OPERADOR_SENHA_INICIAL` das variaveis.
+3. **O cadastro publico recusa e-mail de operador.** Seu e-mail aparece no
+   rodape da landing e nas paginas juridicas, entao e publico. Sem essa trava,
+   quem se cadastrasse com ele antes de voce levaria o painel de administracao
+   junto. A recusa vem com a mesma mensagem de e-mail repetido, para nao
+   confirmar a quem tentar que aquele e o endereco do dono.
+
+Enquanto voce estiver **dentro da conta de um cliente**, os poderes de admin
+ficam suspensos naquela sessao: para voltar a ver o Captapp inteiro, saia da
+conta do cliente. Isso evita agir no negocio inteiro achando que esta agindo
+so no cliente.
+
+### 9.3 A CHAVE_CREDENCIAIS e o backup
 
 O `pg_dump` sozinho nao restaura nada de util: as credenciais das lojas estao
 cifradas com `CHAVE_CREDENCIAIS`, que nao fica no banco. Guarde a chave em
