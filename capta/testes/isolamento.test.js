@@ -42,6 +42,17 @@ async function contaLogada(nome, email) {
   return { id: r.json.conta.id, cookie: r.cookie.split(';')[0] };
 }
 
+/**
+ * Operador nao nasce pelo cadastro publico, entao o teste cria a conta pelo
+ * mesmo caminho do src/operador.js e so depois faz login.
+ */
+async function operadorLogado(nome, email) {
+  const conta = await repo.criarConta({ nome, email, senha: 'senha-de-teste-123' });
+  const r = await pedir('/api/login', { metodo: 'POST', corpo: { email, senha: 'senha-de-teste-123' } });
+  assert.equal(r.status, 200, 'login do operador falhou');
+  return { id: conta.id, cookie: r.cookie.split(';')[0] };
+}
+
 async function lojaComLead(conta, nomeLoja, plataforma, nomePessoa) {
   const conexao = await repo.criarConexao({
     contaId: conta.id, plataforma, nomeLoja,
@@ -208,7 +219,7 @@ test('o endpoint publico corta por limite de requisicoes', async () => {
 
 test('lojista comum nao alcanca as rotas do operador', async () => {
   for (const [caminho, metodo] of [['/api/admin/resumo', 'GET'], ['/api/admin/contas', 'GET'],
-    [`/api/admin/contas/${contaA.id}/entrar`, 'POST']]) {
+    ['/api/admin/rede', 'GET'], [`/api/admin/contas/${contaA.id}/entrar`, 'POST']]) {
     const r = await pedir(caminho, { metodo, cookie: contaB.cookie });
     assert.equal(r.status, 403, `${metodo} ${caminho} tinha que ser 403 para lojista`);
   }
@@ -217,7 +228,7 @@ test('lojista comum nao alcanca as rotas do operador', async () => {
 });
 
 test('o operador ve o Captapp inteiro e entra na conta de um cliente', async () => {
-  const operador = await contaLogada('Loja do E-commerce', 'contato@lojadoecommerce.com.br');
+  const operador = await operadorLogado('Loja do E-commerce', 'contato@lojadoecommerce.com.br');
   const eu = await pedir('/api/eu', { cookie: operador.cookie });
   assert.equal(eu.json.conta.operador, true);
 
@@ -247,6 +258,28 @@ test('o operador ve o Captapp inteiro e entra na conta de um cliente', async () 
 
   // E o operador perde os poderes de admin enquanto esta dentro da conta.
   assert.equal((await pedir('/api/admin/contas', { cookie: cookieA })).status, 403);
+});
+
+test('cadastro publico nao cria conta de operador', async () => {
+  // O e-mail do operador e publico: esta no rodape da landing e nas paginas
+  // juridicas. Se o cadastro aceitasse, quem chegasse primeiro levava o
+  // painel de administracao, com acesso a base de todos os clientes.
+  await consultar('delete from contas where email = $1', ['dono@lojadoecommerce.com.br']);
+  process.env.OPERADOR_EMAILS = 'contato@lojadoecommerce.com.br,dono@lojadoecommerce.com.br';
+
+  const r = await pedir('/api/cadastro', {
+    metodo: 'POST',
+    corpo: { nome: 'Estranho', email: 'DONO@lojadoecommerce.com.br', senha: 'senha-de-teste-123', aceite: true },
+  });
+  assert.equal(r.status, 409, 'cadastro com e-mail de operador tinha que ser recusado');
+  // Mesma resposta de e-mail repetido: a rota nao pode confirmar quem e dono.
+  assert.equal(r.json.erro, 'email ja cadastrado');
+  assert.equal(r.cookie, null, 'nao pode sair sessao de um cadastro recusado');
+
+  const { rows } = await consultar('select id from contas where lower(email) = $1', ['dono@lojadoecommerce.com.br']);
+  assert.equal(rows.length, 0, 'a conta nao pode ter sido criada');
+
+  process.env.OPERADOR_EMAILS = 'contato@lojadoecommerce.com.br';
 });
 
 test('trocar a senha exige a atual, derruba as outras sessoes e vale no login', async () => {

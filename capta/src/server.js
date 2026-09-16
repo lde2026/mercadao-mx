@@ -413,6 +413,18 @@ app.post('/api/cadastro', limitarEntrada, limitarCadastro, async (req, res) => {
   // e o que sustenta a cobranca e a politica de dados depois.
   if (aceite !== true) return res.status(400).json({ erro: 'e preciso aceitar os termos de uso e a politica de privacidade' });
 
+  // Conta de operador nunca nasce pelo cadastro publico.
+  //
+  // Quem esta em OPERADOR_EMAILS ve o Captapp inteiro e entra na conta de
+  // qualquer cliente. O e-mail do operador e publico: esta no rodape da
+  // landing e nas paginas juridicas, porque a LGPD exige contato visivel.
+  // Sem esta trava, bastava um estranho se cadastrar com esse e-mail antes
+  // de nos para receber o painel de administracao junto com a conta.
+  //
+  // A resposta e a mesma de e-mail ja cadastrado, de proposito: dizer "esse
+  // e o e-mail do dono" transformaria o cadastro em confirmacao de alvo.
+  if (ehOperador(String(email).trim())) return res.status(409).json({ erro: 'email ja cadastrado' });
+
   try {
     const conta = await repo.criarConta({
       nome: String(nome).trim().slice(0, 120), email: String(email).trim(), senha: String(senha),
@@ -932,6 +944,30 @@ app.get('/api/admin/resumo', exigirOperador, async (_req, res) => {
     return soma + (a.ciclo === 'anual' ? preco / 12 : preco) * a.n;
   }, 0);
   res.json({ ...resumo, mrr: Math.round(mrr * 100) / 100, planos: PLANOS });
+});
+
+/**
+ * Confere, no ar, de onde o servidor acha que veio a requisicao.
+ *
+ * PROXY_SALTOS errado ou CONFIAR_CLOUDFLARE ligado sem o Cloudflare na
+ * frente nao quebram nada visivel: o servidor sobe, o painel abre, e o
+ * unico efeito e que todo limite por IP passa a contar baldes separados,
+ * inclusive o de forca bruta de senha. E um defeito que so aparece quando
+ * alguem ja esta abusando. Por isso da para olhar o valor de proposito.
+ *
+ * So operador: a cadeia de encaminhamento descreve a topologia de quem esta
+ * na frente do app, e isso nao e assunto de cliente.
+ */
+app.get('/api/admin/rede', exigirOperador, (req, res) => {
+  res.json({
+    ipVisto: ipDoCliente(req),
+    ipDoExpress: req.ip,
+    saltosConfiaveis: SALTOS_CONFIAVEIS,
+    confiaCloudflare: process.env.CONFIAR_CLOUDFLARE === '1',
+    cabecalhoCloudflare: req.headers['cf-connecting-ip'] || null,
+    cadeiaEncaminhada: req.headers['x-forwarded-for'] || null,
+    protocoloVisto: req.protocol,
+  });
 });
 
 app.get('/api/admin/contas', exigirOperador, async (_req, res) => {
