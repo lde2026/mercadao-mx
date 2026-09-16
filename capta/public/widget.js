@@ -96,18 +96,30 @@
       ':host{all:initial}',
       '*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}',
       /* botao flutuante */
-      '.b{position:fixed;right:16px;bottom:16px;z-index:2147483000;border:0;border-radius:999px;',
+      '.b{position:fixed;z-index:2147483000;border:0;border-radius:999px;',
       'padding:14px 20px;font-size:15px;font-weight:600;color:#fff;background:var(--cor,#15803d);',
       'box-shadow:0 8px 26px rgba(21,128,61,.38);cursor:pointer;line-height:1.2;max-width:calc(100vw - 32px);',
       'text-align:left;transition:transform .15s ease;transform-origin:70% 70%}',
       '.b:hover{transform:translateY(-2px)}',
+      /* botao redondo: so o icone, para quem nao quer texto sobre a vitrine */
+      '.b.rd{width:60px;height:60px;padding:0;border-radius:50%;display:flex;align-items:center;justify-content:center}',
+      '.b.rd svg{width:28px;height:28px;display:block}',
+      /*
+       * Lado e altura como classes separadas, aplicadas ao botao e a janela.
+       * O meio usa top/bottom zero com margem automatica, e nao translate,
+       * porque o tremor do botao e o hover ja ocupam o transform: as duas
+       * coisas brigariam e o botao sairia do lugar ao passar o mouse.
+       */
+      '.lr{right:16px}.ll{left:16px}',
+      '.vb{bottom:16px}.vt{top:16px}',
+      '.vc{top:0;bottom:0;height:fit-content;margin-top:auto;margin-bottom:auto}',
       /* treme como telefone tocando ate o primeiro clique */
       '@keyframes toca{0%,100%{transform:rotate(0)}8%{transform:rotate(-9deg)}16%{transform:rotate(9deg)}24%{transform:rotate(-7deg)}',
       '32%{transform:rotate(7deg)}40%{transform:rotate(-3deg)}48%{transform:rotate(3deg)}56%{transform:rotate(0)}}',
       '.b.toca{animation:toca 2.6s ease-in-out infinite}',
       '@media(prefers-reduced-motion:reduce){.b.toca{animation:none}}',
       /* formato painel */
-      '.p{position:fixed;right:16px;bottom:16px;z-index:2147483001;width:340px;max-width:calc(100vw - 32px);',
+      '.p{position:fixed;z-index:2147483001;width:340px;max-width:calc(100vw - 32px);',
       'background:#fff;border-radius:16px;box-shadow:0 12px 48px rgba(0,0,0,.3);overflow:hidden;',
       'display:flex;flex-direction:column;max-height:min(560px,calc(100vh - 32px))}',
       '.h{background:var(--cor,#15803d);color:#fff;padding:14px 16px;display:flex;align-items:center;gap:10px}',
@@ -156,9 +168,16 @@
       '.cp button{border:0;border-radius:999px;background:var(--cor,#15803d);color:#fff;font-weight:700;padding:0 18px;cursor:pointer;font-size:14px}',
       '.zap{display:block;margin-top:12px;text-align:center;background:#25d366;color:#fff;text-decoration:none;font-weight:700;padding:11px 16px;border-radius:999px}',
       '.er{font-size:12px;color:#c0392b;min-height:16px;margin-top:6px}',
+      /*
+       * No celular a tela e estreita demais para um botao com texto de lado.
+       * O retangular vira barra da largura toda, na altura que o lojista
+       * escolheu; o redondo continua redondo, so encosta mais na borda.
+       */
       '@media(max-width:480px){.ov{padding:0}.cx{max-width:none;height:100%;border-radius:0}',
-      '.p{right:8px;left:8px;bottom:8px;width:auto;max-width:none}',
-      '.b{right:8px;left:8px;bottom:8px;max-width:none;text-align:center}}',
+      '.p{left:8px;right:8px;width:auto;max-width:none}',
+      '.b:not(.rd){left:8px;right:8px;max-width:none;text-align:center}',
+      '.b.rd.lr{right:12px}.b.rd.ll{left:12px}',
+      '.vb{bottom:8px}.vt{top:8px}}',
     ].join('');
 
     function el(tag, classe, texto) {
@@ -185,6 +204,42 @@
       }).then(function (r) { return r.json(); });
     }
 
+    /**
+     * Traduz "esquerda-central" nas duas classes de posicao.
+     *
+     * Valor desconhecido cai no canto de sempre em vez de deixar o botao sem
+     * posicao nenhuma, grudado no topo da pagina: o widget pode ser mais
+     * velho que o painel que gravou a escolha.
+     */
+    var LADO = { direita: 'lr', esquerda: 'll' };
+    var ALTURA = { inferior: 'vb', central: 'vc', superior: 'vt' };
+    function classesDePosicao(posicao) {
+      var partes = String(posicao || '').split('-');
+      return ' ' + (LADO[partes[0]] || 'lr') + ' ' + (ALTURA[partes[1]] || 'vb');
+    }
+
+    // Presente para cupom e frete, balao de conversa para os beneficios em
+    // que a recompensa e falar com gente. O icone e o unico texto do botao
+    // redondo, entao ele precisa dizer sozinho o que vai acontecer.
+    var ICONES = {
+      presente: 'M20 12v10H4V12M2 7h20v5H2zM12 22V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z',
+      balao: 'M21 11.5a8.4 8.4 0 0 1-9 8.4 8.9 8.9 0 0 1-3.8-.9L3 20.5l1.5-4.9A8.4 8.4 0 0 1 3.6 11 8.4 8.4 0 0 1 12 2.6h.5A8.4 8.4 0 0 1 21 11z',
+    };
+    function icone(nome) {
+      var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('viewBox', '0 0 24 24');
+      svg.setAttribute('fill', 'none');
+      svg.setAttribute('stroke', 'currentColor');
+      svg.setAttribute('stroke-width', '2');
+      svg.setAttribute('stroke-linecap', 'round');
+      svg.setAttribute('stroke-linejoin', 'round');
+      svg.setAttribute('aria-hidden', 'true');
+      var caminho = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      caminho.setAttribute('d', ICONES[nome]);
+      svg.appendChild(caminho);
+      return svg;
+    }
+
     function montar(fluxo) {
       var textos = TEXTOS[fluxo.recompensa] || TEXTOS.cupom;
       var hospedeiro = document.createElement('div');
@@ -200,8 +255,19 @@
       var perguntas = (fluxo.perguntas || []).slice(0, 3);
       var comCupom = fluxo.recompensa === 'cupom' || fluxo.recompensa === 'frete_gratis';
 
-      var botao = el('button', 'b', fluxo.convite || 'Ganhe benefícios');
+      var convite = fluxo.convite || 'Ganhe benefícios';
+      var posicao = classesDePosicao(fluxo.botaoPosicao);
+      var redondo = fluxo.botaoFormato === 'redondo';
+
+      var botao = el('button', 'b' + posicao + (redondo ? ' rd' : ''), redondo ? null : convite);
       botao.type = 'button';
+      // Redondo nao mostra texto, entao o convite vira o nome do botao para
+      // leitor de tela e para quem passa o mouse.
+      botao.setAttribute('aria-label', convite);
+      if (redondo) {
+        botao.title = convite;
+        botao.appendChild(icone(comCupom ? 'presente' : 'balao'));
+      }
       if (fluxo.cor) botao.style.setProperty('--cor', fluxo.cor);
       // Treme ate o primeiro clique, e nunca mais nas proximas visitas.
       if (!guardado(CHAVE_CLICOU)) botao.classList.add('toca');
@@ -270,12 +336,15 @@
       // ------------------------------------------------------------ painel ---
 
       function abrirPainel() {
-        var painel = el('div', 'p');
+        // A janela abre no mesmo canto do botao. Abrir sempre embaixo a
+        // direita, com o botao no alto a esquerda, faria a pessoa procurar
+        // o que acabou de abrir.
+        var painel = el('div', 'p' + posicao);
         painel.setAttribute('role', 'dialog');
-        painel.setAttribute('aria-label', fluxo.convite || 'Ganhe benefícios');
+        painel.setAttribute('aria-label', convite);
         if (fluxo.cor) painel.style.setProperty('--cor', fluxo.cor);
         var cab = el('div', 'h');
-        cab.appendChild(el('strong', null, fluxo.convite || 'Ganhe benefícios'));
+        cab.appendChild(el('strong', null, convite));
         var x = el('button', 'x', '×');
         x.type = 'button'; x.setAttribute('aria-label', 'Fechar');
         x.addEventListener('click', fechar);
@@ -383,7 +452,7 @@
         var cab = el('div', 'ch');
         var av = el('div', 'av', (fluxo.loja || 'C').charAt(0).toUpperCase());
         var tit = document.createElement('div');
-        tit.appendChild(el('b', null, fluxo.convite || 'Ganhe benefícios'));
+        tit.appendChild(el('b', null, convite));
         tit.appendChild(el('small', null, 'Online agora'));
         var x = el('button', 'x', '×');
         x.type = 'button'; x.setAttribute('aria-label', 'Fechar');
@@ -467,7 +536,7 @@
         var emailOk = function (v) { return /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(v) ? null : 'Confere o e-mail? Precisa ter @ e um domínio.'; };
 
         (async function fluxoChat() {
-          await bot('Oi! ' + (fluxo.convite || 'Ganhe benefícios') + '. Leva menos de um minuto.');
+          await bot('Oi! ' + convite + '. Leva menos de um minuto.');
           ms.appendChild(el('div', 'bb lgpd', fluxo.consentimento)); rolar();
           await bot('Pra começar, qual é o seu nome?');
           dados.nome = await perguntar({ dica: 'Seu nome' });
