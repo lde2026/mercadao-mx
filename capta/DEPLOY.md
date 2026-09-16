@@ -17,7 +17,20 @@ todo visitante de toda loja cliente.
    `Dockerfile` ficam ai e o Railway os encontra sozinho.
 3. Adicione um **PostgreSQL** ao projeto. Ele expõe `DATABASE_URL` para o
    servico automaticamente.
-4. Variaveis do servico (Settings, Variables):
+4. Variaveis do servico (Settings, Variables). Para montar o bloco sem errar,
+   rode **na sua maquina**:
+
+   ```
+   sh scripts/variaveis-railway.sh
+   ```
+
+   Ele gera as duas chaves aleatorias, pergunta a senha inicial do operador
+   sem ecoar na tela, imprime o bloco pronto para colar e guarda uma copia em
+   `~/captapp-segredos.txt`, legivel so por voce. As chaves nao podem ser
+   digitadas na mao nem reaproveitadas de outro projeto, e a
+   `CHAVE_CREDENCIAIS` precisa sobreviver a perda do Railway.
+
+   As variaveis, uma a uma:
 
    | Variavel | Valor |
    |---|---|
