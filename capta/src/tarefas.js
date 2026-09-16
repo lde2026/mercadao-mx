@@ -198,5 +198,6 @@ export function agendar() {
   setInterval(() => { removerScriptsVencidos().catch(() => {}); }, 6 * 3600 * 1000).unref();
   setInterval(() => { avisarInadimplentes().catch(() => {}); }, 6 * 3600 * 1000).unref();
   setInterval(() => { repo.limparLimites().catch(() => {}); }, 3600 * 1000).unref();
+  setInterval(() => { repo.limparConexoesPendentes().catch(() => {}); }, 6 * 3600 * 1000).unref();
   log.info('tarefas.agendadas', { varredura_minutos: MINUTOS_VARREDURA });
 }

@@ -1,5 +1,4 @@
 import { tray, nuvemshop, adaptador } from './adapters/index.js';
-import { cifrar, decifrar } from './cripto.js';
 import { log } from './log.js';
 import * as repo from './repositorio.js';
 
@@ -9,14 +8,19 @@ import * as repo from './repositorio.js';
  *
  * O code que a plataforma manda e de uso unico e vence em minutos, entao a
  * troca por token acontece na hora, na propria callback, antes de saber qual
- * conta do Captapp vai ficar com a loja. O resultado viaja cifrado no
- * endereco do painel (o "bilhete"), e so vira conexao quando alguem logado
- * o entrega em /api/conexoes/oauth. O bilhete vence em quinze minutos e nao
- * serve para nada fora desse endpoint: e a mesma cifra das credenciais no
- * banco, com a chave que so o servidor tem.
+ * conta do Captapp vai ficar com a loja. O token resultante fica no banco,
+ * cifrado, numa linha sem dono; para o painel viaja apenas o id dessa linha,
+ * o "bilhete". Quem esta logado entrega o bilhete em /api/conexoes/oauth e
+ * a loja passa a ser da conta dele.
+ *
+ * O bilhete e id opaco de uso unico, e nao a credencial em si, por uma razao
+ * concreta: URL vaza. Vai para o historico do navegador, para a sincronizacao
+ * da conta Google, para extensao instalada, para print de tela em suporte.
+ * Um id ja queimado que vazou nao serve para nada; um token de loja que vazou
+ * entrega a loja do cliente.
  */
 
-const VALIDADE_BILHETE_MS = 15 * 60 * 1000;
+const VALIDADE_BILHETE_MINUTOS = 15;
 
 const URL_PUBLICA = () => process.env.URL_PUBLICA || 'http://localhost:3000';
 
@@ -29,20 +33,15 @@ export function configuracaoOauth() {
 }
 
 function bilhete(plataforma, credenciais, extras = {}) {
-  return cifrar({ plataforma, credenciais, extras, criadoEm: Date.now() });
+  return repo.guardarConexaoPendente({
+    plataforma, credenciais, extras, validadeMinutos: VALIDADE_BILHETE_MINUTOS,
+  });
 }
 
-export function abrirBilhete(texto) {
-  let dados;
-  try {
-    dados = decifrar(String(texto || ''));
-  } catch {
-    throw new Error('bilhete invalido');
-  }
-  if (!dados?.plataforma || !dados?.credenciais) throw new Error('bilhete invalido');
-  if (Date.now() - Number(dados.criadoEm || 0) > VALIDADE_BILHETE_MS) {
-    throw new Error('bilhete vencido, conecte a loja de novo');
-  }
+/** Resgate unico. Id repetido, vencido ou inventado sai daqui como erro. */
+export async function abrirBilhete(id) {
+  const dados = await repo.resgatarConexaoPendente(id);
+  if (!dados) throw new Error('bilhete invalido ou ja usado, conecte a loja de novo');
   return dados;
 }
 
@@ -112,7 +111,7 @@ export function registrarRotasOauth(app) {
         consumerSecret: process.env.TRAY_CONSUMER_SECRET,
       });
       if (!credenciais.store_id && store) credenciais.store_id = String(store);
-      const token = bilhete('tray', credenciais, { storeHost: storeHost ? String(storeHost) : null });
+      const token = await bilhete('tray', credenciais, { storeHost: storeHost ? String(storeHost) : null });
       log.info('oauth.tray.autorizado', { store_id: credenciais.store_id });
       res.redirect(`${URL_PUBLICA()}/#/integracoes?bilhete=${encodeURIComponent(token)}`);
     } catch (erro) {
@@ -138,7 +137,7 @@ export function registrarRotasOauth(app) {
         clientId: process.env.NUVEMSHOP_CLIENT_ID,
         clientSecret: process.env.NUVEMSHOP_CLIENT_SECRET,
       });
-      const token = bilhete('nuvemshop', credenciais);
+      const token = await bilhete('nuvemshop', credenciais);
       log.info('oauth.nuvemshop.autorizado', { store_id: credenciais.store_id });
       res.redirect(`${URL_PUBLICA()}/#/integracoes?bilhete=${encodeURIComponent(token)}`);
     } catch (erro) {
@@ -155,7 +154,7 @@ export function registrarRotasOauth(app) {
  * "Resolver instalacao" no painel.
  */
 export async function concluirOauth({ contaId, bilheteTexto, nomeLoja }) {
-  const dados = abrirBilhete(bilheteTexto);
+  const dados = await abrirBilhete(bilheteTexto);
   const api = adaptador(dados.plataforma);
 
   let loja = { nome: null, dominio: null };

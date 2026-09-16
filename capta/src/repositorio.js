@@ -78,6 +78,49 @@ export async function atualizarConta(contaId, campos) {
   return buscarConta(contaId);
 }
 
+// ------------------------------------------- conexao pendente por oauth ---
+
+/**
+ * Guarda a credencial recem-trocada e devolve so o id. Quem chama poe o id
+ * na URL do painel; a credencial fica no banco, cifrada, e nunca viaja.
+ */
+export async function guardarConexaoPendente({ plataforma, credenciais, extras = {}, validadeMinutos = 15 }) {
+  const { rows } = await consultar(
+    `insert into conexoes_pendentes (plataforma, credenciais, extras, expira_em)
+     values ($1, $2, $3, now() + ($4 || ' minutes')::interval)
+     returning id`,
+    [plataforma, cifrar(credenciais), JSON.stringify(extras), String(validadeMinutos)],
+  );
+  return rows[0].id;
+}
+
+/**
+ * Resgata e queima na mesma consulta. O update condicional e o que impede
+ * duas contas resgatarem o mesmo id numa corrida: a segunda nao acha linha.
+ */
+export async function resgatarConexaoPendente(id) {
+  if (!/^[0-9a-f-]{36}$/i.test(String(id || ''))) return null;
+  const { rows } = await consultar(
+    `update conexoes_pendentes set usado_em = now()
+      where id = $1 and usado_em is null and expira_em > now()
+      returning plataforma, credenciais, extras`,
+    [id],
+  );
+  if (!rows[0]) return null;
+  return {
+    plataforma: rows[0].plataforma,
+    credenciais: decifrar(rows[0].credenciais),
+    extras: rows[0].extras || {},
+  };
+}
+
+/** Limpeza: pendencia vencida nao serve para nada e guarda token cifrado. */
+export async function limparConexoesPendentes() {
+  await consultar(
+    `delete from conexoes_pendentes where expira_em < now() - interval '1 day'`,
+  );
+}
+
 // ------------------------------------------------- recuperacao de senha ---
 
 function hashToken(token) {

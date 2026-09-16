@@ -27,6 +27,24 @@ alter table contas add column if not exists email_aviso text;
 alter table contas add column if not exists whatsapp text;
 alter table contas add column if not exists avisar_lead boolean not null default true;
 
+-- Conexao de loja iniciada por OAuth e ainda sem dono.
+--
+-- A troca do code pelo token acontece na callback da plataforma, antes de
+-- saber qual conta do Captapp vai ficar com a loja. O token fica AQUI,
+-- cifrado, e o que viaja ate o painel e so este id. Assim a credencial da
+-- loja nunca entra numa URL, nunca cai no historico do navegador, e o id e
+-- de uso unico: se vazar depois de usado, nao vale mais nada.
+create table if not exists conexoes_pendentes (
+  id          uuid primary key default gen_random_uuid(),
+  plataforma  text not null,
+  credenciais text not null,
+  extras      jsonb not null default '{}'::jsonb,
+  expira_em   timestamptz not null,
+  usado_em    timestamptz,
+  criado_em   timestamptz not null default now()
+);
+create index if not exists conexoes_pendentes_expira_idx on conexoes_pendentes(expira_em);
+
 -- Aceite dos termos. Guardar a versao junto da data e o que foi aceito: sem
 -- isso, "o cliente aceitou" nao prova nada depois que o texto mudar. A rede
 -- vai mascarada, pela mesma razao que o evento do visitante nao guarda IP.
