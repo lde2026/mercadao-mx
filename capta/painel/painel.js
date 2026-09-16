@@ -287,7 +287,7 @@
   });
 
   document.getElementById('sino').addEventListener('click', function () {
-    location.hash = '#/hoje';
+    location.hash = '#/resumo';
   });
 
   document.getElementById('busca').addEventListener('input', function () {
@@ -299,7 +299,7 @@
   // ------------------------------------------------------------------ hoje ---
 
   function verHoje() {
-    var alvo = pintar('Hoje', 'O que entrou, o que saiu e o que precisa de você.');
+    var alvo = pintar('Resumo', 'O que entrou, o que saiu e o que precisa de você.');
     Promise.all([api('/hoje'), api('/alertas'), api('/leads?situacao=a_contatar&limite=1')])
       .then(function (r) {
         var lojas = r[0].lojas || [];
@@ -881,7 +881,7 @@
 
     var rotuloModo = el('label', 'Formato da conversa');
     var campoModo = el('select');
-    [['painel', 'Janela compacta, contato no fim'], ['chat', 'Chat em popup, nome e WhatsApp primeiro']].forEach(function (par) {
+    [['painel', 'Janela compacta no canto'], ['chat', 'Chat em popup, no meio da tela']].forEach(function (par) {
       var op = el('option', par[1]); op.value = par[0]; if (f.modo === par[0]) op.selected = true; campoModo.appendChild(op);
     });
     campoModo.addEventListener('click', function (e) { e.stopPropagation(); });
@@ -979,7 +979,7 @@
     // Contato, fixo
     quadro.appendChild(ligacao());
     var contato = no('contato', 'Contato', 'contato');
-    contato.querySelector('header').appendChild(el('span', f.modo === 'chat' ? 'fixo, vem primeiro' : 'fixo, sempre o último', 'no-fixo'));
+    contato.querySelector('header').appendChild(el('span', 'fixo, sempre o último', 'no-fixo'));
     var corpoContato = el('div', null, 'no-corpo');
     corpoContato.appendChild(el('div', 'O visitante deixa', 'rotulo'));
     var fixos = el('div', null, 'chips');
@@ -1831,7 +1831,7 @@
         rotulo: 'Alertas abertos', valor: String(resumo.alertasAbertos), nomeIcone: 'alerta',
         tom: resumo.alertasAbertos ? '' : 'bom',
         detalhe: 'cupom falho, webhook, cota',
-        rodape: { texto: 'Um por conta, na tela Hoje de cada uma' },
+        rodape: { texto: 'Um por conta, na tela Resumo de cada uma' },
       }));
       alvo.appendChild(grade);
 
@@ -1869,7 +1869,7 @@
             if (!confirm('Entrar na conta ' + c.nome + ' como operador? Fica registrado.')) return;
             api('/admin/contas/' + c.id + '/entrar', { method: 'POST' }).then(function () {
               cacheLeads = null; construtor = null;
-              location.hash = '#/hoje';
+              location.hash = '#/resumo';
               iniciar();
             });
           });
@@ -1965,14 +1965,16 @@
   }
 
   var ROTAS = {
-    '#/hoje': verHoje, '#/leads': verLeads, '#/chat': verChat,
+    // '#/hoje' continua valendo: a tela virou Resumo, mas quem tem o endereco
+    // antigo salvo nao pode cair numa tela em branco por causa de um rotulo.
+    '#/resumo': verHoje, '#/hoje': verHoje, '#/leads': verLeads, '#/chat': verChat,
     '#/integracoes': verIntegracoes, '#/financeiro': verFinanceiro, '#/admin': verAdmin,
     '#/configuracoes': verConfiguracoes,
   };
 
   function navegar() {
     if (!eu) { abrirNovaSenhaSePedido(); return; }
-    var hash = (location.hash || '#/hoje').split('?')[0];
+    var hash = (location.hash || '#/resumo').split('?')[0];
     document.querySelectorAll('nav a').forEach(function (a) {
       a.classList.toggle('ativo', a.getAttribute('href') === hash);
     });

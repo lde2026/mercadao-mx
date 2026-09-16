@@ -139,10 +139,10 @@ create table if not exists fluxos (
 alter table fluxos add column if not exists recompensa text not null default 'cupom'
   check (recompensa in ('cupom','frete_gratis','diagnostico','especialista','consultoria'));
 
--- Formato do widget. painel e a janela compacta com o contato no fim; chat e
--- o popup em balões no formato do projeto original, com nome e WhatsApp
--- como primeiras perguntas. abrir_apos em segundos abre sozinho uma vez por
--- navegador; zero desliga.
+-- Formato do widget. painel e a janela compacta no canto; chat e o popup em
+-- balões no meio da tela. Muda so a aparencia: a ordem das perguntas e a
+-- mesma nos dois, a do quadro do painel. abrir_apos em segundos abre sozinho
+-- uma vez por navegador; zero desliga.
 alter table fluxos add column if not exists modo text not null default 'painel'
   check (modo in ('painel','chat'));
 alter table fluxos add column if not exists abrir_apos integer not null default 0

@@ -7,9 +7,11 @@
  * para dentro nem para fora, prazo de 3 segundos com desistencia em silencio,
  * e nada nosso no console da loja.
  *
- * Dois formatos, escolhidos pelo lojista: "painel", a janela compacta com o
- * contato no fim; e "chat", o popup em baloes no formato do projeto original,
- * com nome e WhatsApp como primeiras perguntas.
+ * Dois formatos, escolhidos pelo lojista: "painel", a janela compacta; e
+ * "chat", o popup em baloes. Muda a aparencia e o ritmo, nunca a ordem: os
+ * dois seguem o quadro do painel, perguntas do lojista primeiro e contato no
+ * fim. Formato que reordena a conversa entrega na loja algo diferente do que
+ * o lojista montou na tela.
  *
  * O try catch de fora nao e preguica. E a garantia de que um erro nosso nunca
  * quebra a pagina de venda de ninguem.
@@ -538,22 +540,41 @@
         (async function fluxoChat() {
           await bot('Oi! ' + convite + '. Leva menos de um minuto.');
           ms.appendChild(el('div', 'bb lgpd', fluxo.consentimento)); rolar();
-          await bot('Pra começar, qual é o seu nome?');
-          dados.nome = await perguntar({ dica: 'Seu nome' });
-          // O aceite e a primeira resposta, dada com a linha de consentimento
-          // a vista logo acima.
-          chamar('__captaConsentir');
-          var primeiro = dados.nome.split(' ')[0];
-          await bot('Prazer, ' + primeiro + '! E o seu WhatsApp?');
-          dados.telefone = await perguntar({ dica: 'DDD + número', tipo: 'tel', validar: telefoneOk, formatar: telefoneFmt });
 
+          // O aceite e a primeira resposta que a pessoa der, qualquer que
+          // seja, porque a linha de consentimento fica a vista desde antes.
+          var consentiu = false;
+          var consentir = function () {
+            if (consentiu) return;
+            consentiu = true;
+            chamar('__captaConsentir');
+          };
+
+          /*
+           * A ordem e a do quadro do painel: as perguntas do lojista primeiro,
+           * o contato no fim. Antes o chat pedia nome e WhatsApp antes de tudo,
+           * e o lojista via na loja dele uma conversa diferente da que montou,
+           * com duas perguntas que ele nao escreveu aparecendo na frente das
+           * dele. Ganhava nada em troca: o lead so e gravado no fim dos dois
+           * jeitos, entao perguntar o contato cedo nao salvava quem desiste.
+           */
           for (var i = 0; i < perguntas.length; i += 1) {
             await bot(perguntas[i].texto);
             var resposta = perguntas[i].opcoes && perguntas[i].opcoes.length
               ? await escolher(perguntas[i].opcoes)
               : await perguntar({ dica: 'Escreva aqui' });
+            consentir();
             dados.respostas.push({ pergunta: perguntas[i].texto, resposta: resposta });
           }
+
+          // Mesma pergunta de contato do formato painel, palavra por palavra.
+          await bot(textos[0]);
+          await bot('Primeiro, qual é o seu nome?');
+          dados.nome = await perguntar({ dica: 'Seu nome' });
+          consentir();
+          var primeiro = dados.nome.split(' ')[0];
+          await bot('Prazer, ' + primeiro + '! E o seu WhatsApp?');
+          dados.telefone = await perguntar({ dica: 'DDD + número', tipo: 'tel', validar: telefoneOk, formatar: telefoneFmt });
 
           await bot(comCupom
             ? 'Se quiser, deixe um e-mail para receber o cupom também por lá.'
