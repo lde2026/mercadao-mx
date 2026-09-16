@@ -151,13 +151,13 @@ async function falhou({ conexao, lead, desconto, motivo }) {
     contaId: conexao.conta_id,
     tipo: 'cupom_falhou',
     gravidade: 'erro',
-    mensagem: `Cupom nao criado na loja ${conexao.nome_loja}: ${motivo}`,
+    mensagem: `Cupom não criado na loja ${conexao.nome_loja}: ${motivo}`,
     dados: { conexao_id: conexao.id, lead_id: lead.id, plataforma: conexao.plataforma, desconto },
   });
   avisarOperador({
     contaId: conexao.conta_id,
     tipo: 'cupom_falhou',
-    mensagem: `Cupom nao criado na loja ${conexao.nome_loja}: ${motivo}`,
+    mensagem: `Cupom não criado na loja ${conexao.nome_loja}: ${motivo}`,
     dados: { plataforma: conexao.plataforma, conexao_id: conexao.id },
   });
 }

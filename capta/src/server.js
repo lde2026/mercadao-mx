@@ -313,7 +313,7 @@ async function acessoDaConta(contaId) {
   if (acesso.cotaEstourada) {
     await repo.alertarUmaVezNoMes({
       contaId, tipo: 'cota_atingida', gravidade: 'aviso',
-      mensagem: `Cota de ${acesso.cotaLeads} leads do mes atingida. O chat saiu do ar na loja.`,
+      mensagem: `Cota de ${acesso.cotaLeads} leads do mês atingida. O chat saiu do ar na loja.`,
     });
   }
   return acesso;

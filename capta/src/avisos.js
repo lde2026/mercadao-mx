@@ -49,8 +49,8 @@ export async function avisarLoteBaixo({ conexao, disponiveis }) {
       contaId: conexao.conta_id,
       conexaoId: conexao.id,
       mensagem: disponiveis > 0
-        ? `Lote de cupons da ${conexao.nome_loja} em ${disponiveis} codigo(s). Reponha antes de zerar.`
-        : `Lote de cupons da ${conexao.nome_loja} zerado. O proximo lead fica sem o cupom prometido.`,
+        ? `Lote de cupons da ${conexao.nome_loja} em ${disponiveis} código(s). Reponha antes de zerar.`
+        : `Lote de cupons da ${conexao.nome_loja} zerado. O próximo lead fica sem o cupom prometido.`,
       dados: { disponiveis, plataforma: conexao.plataforma },
     });
     if (!inedito) return false;
@@ -133,9 +133,9 @@ export async function avisarCobranca({ conta, acesso }) {
 function avisoDeCobrancaTexto(acesso) {
   const dias = acesso.diasAtraso || 0;
   if (dias <= 0) return null;
-  if (dias < 7) return { degrau: 1, gravidade: 'aviso', texto: `Fatura em aberto ha ${dias} dia(s). No dia 7 o rastreamento de navegacao e desligado.` };
+  if (dias < 7) return { degrau: 1, gravidade: 'aviso', texto: `Fatura em aberto há ${dias} dia(s). No dia 7 o rastreamento de navegação é desligado.` };
   if (dias < 10) return { degrau: 7, gravidade: 'aviso', texto: 'Rastreamento desligado por atraso. No dia 10 o widget sai do ar da loja.' };
-  if (dias < 45) return { degrau: 10, gravidade: 'erro', texto: 'Widget fora do ar e painel em leitura. Seus leads continuam guardados. No dia 45 o script e removido da loja.' };
+  if (dias < 45) return { degrau: 10, gravidade: 'erro', texto: 'Widget fora do ar e painel em leitura. Seus leads continuam guardados. No dia 45 o script é removido da loja.' };
   return { degrau: 45, gravidade: 'erro', texto: 'Script removido da loja. Seus leads continuam guardados e voltam no mesmo minuto do pagamento.' };
 }
 

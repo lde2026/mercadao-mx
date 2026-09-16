@@ -47,7 +47,7 @@ test('lote abaixo do piso avisa uma vez so, mesmo com varios leads seguidos', as
   assert.equal(await avisarLoteBaixo({ conexao: loja, disponiveis: 6 }), false);
   const alertas = await alertasDeLote(conta.id);
   assert.equal(alertas.length, 1);
-  assert.match(alertas[0].mensagem, /8 codigo/);
+  assert.match(alertas[0].mensagem, /8 código/);
 });
 
 test('lote zerado avisa com o texto do estrago, nao com o texto de aviso', async () => {

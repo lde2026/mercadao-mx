@@ -87,7 +87,7 @@ export function avisoDeCobranca(acesso) {
   if (acesso.diasAtraso < DEGRAUS.RASTREAMENTO) {
     return {
       gravidade: 'aviso',
-      texto: `Fatura em aberto ha ${acesso.diasAtraso} dia(s). No dia ${DEGRAUS.RASTREAMENTO} o rastreamento de navegacao e desligado.`,
+      texto: `Fatura em aberto há ${acesso.diasAtraso} dia(s). No dia ${DEGRAUS.RASTREAMENTO} o rastreamento de navegação é desligado.`,
     };
   }
   if (acesso.diasAtraso < DEGRAUS.WIDGET) {
@@ -99,7 +99,7 @@ export function avisoDeCobranca(acesso) {
   if (acesso.diasAtraso < DEGRAUS.SCRIPT) {
     return {
       gravidade: 'erro',
-      texto: `Widget fora do ar e painel em leitura. Seus leads continuam guardados. No dia ${DEGRAUS.SCRIPT} o script e removido da loja.`,
+      texto: `Widget fora do ar e painel em leitura. Seus leads continuam guardados. No dia ${DEGRAUS.SCRIPT} o script é removido da loja.`,
     };
   }
   return {
@@ -113,6 +113,6 @@ export function avisoDeCota(acesso) {
   if (!acesso.cotaEstourada) return null;
   return {
     gravidade: 'erro',
-    texto: `Cota de ${acesso.cotaLeads} leads do mes atingida. O chat saiu do ar na loja e volta no dia 1, ou na hora se voce mudar de plano.`,
+    texto: `Cota de ${acesso.cotaLeads} leads do mês atingida. O chat saiu do ar na loja e volta no dia 1, ou na hora se você mudar de plano.`,
   };
 }
