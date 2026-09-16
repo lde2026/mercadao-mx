@@ -155,6 +155,27 @@ tbody tr.clicavel:hover{background:var(--fundo)}
 pre{background:var(--escuro);color:var(--superficie);padding:13px;border-radius:9px;overflow-x:auto;
   font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;margin-top:12px}
 @media (prefers-color-scheme: dark){pre{background:#0c0e12;color:#dfe3ea}}
+/*
+ * Codigo com botao de copiar. O botao fica por cima do bloco, no canto, para
+ * ficar junto do que ele copia e nao empurrar o layout. O pre ganha espaco a
+ * direita para o texto nao passar por baixo dele.
+ */
+/*
+ * A margem do pre sai para o .codigo, e o pre zera a dele. Sem isso a margem
+ * colapsa para fora do .codigo, o topo dos dois deixa de coincidir e o botao
+ * posicionado por cima cai para fora do bloco.
+ */
+.codigo{position:relative;margin-top:12px}
+.codigo pre{margin-top:0;padding-right:92px}
+/*
+ * O botao fica sobre o bloco escuro, entao precisa das cores dele e nao das
+ * do painel: com o estilo de botao claro ele some no fundo escuro, e o
+ * lojista nao acha justamente o atalho que evita copiar a tag errada pelo
+ * mouse. O `top` acompanha a margem do pre para alinhar com a primeira linha.
+ */
+.codigo > button{position:absolute;top:6px;right:6px;padding:5px 11px;font-size:12px;font-weight:600;
+  background:rgba(255,255,255,.14);color:#fff;border:1px solid rgba(255,255,255,.34);border-radius:7px;cursor:pointer}
+.codigo > button:hover{background:rgba(255,255,255,.26)}
 
 .linha-tempo{list-style:none;border-left:2px solid var(--linha);margin:14px 0 0 8px;padding-left:20px}
 .linha-tempo li{position:relative;padding-bottom:16px}

@@ -92,7 +92,10 @@ create table if not exists modulos_conta (
 create table if not exists conexoes (
   id              uuid primary key default gen_random_uuid(),
   conta_id        uuid not null references contas(id) on delete cascade,
-  plataforma      text not null check (plataforma in ('nuvemshop','woocommerce','tray','loja_integrada')),
+  -- 'outra' e qualquer loja fora das quatro que integram: Shopify, VTEX,
+  -- Magento, Wix, site proprio. O widget e uma tag de script, entao funciona
+  -- em todas; o que nao existe e API, e o adaptador diz isso na cara.
+  plataforma      text not null check (plataforma in ('nuvemshop','woocommerce','tray','loja_integrada','outra')),
   nome_loja       text not null,
   dominio         text,
   credenciais     text not null,
@@ -107,6 +110,14 @@ create table if not exists conexoes (
   atualizado_em   timestamptz not null default now()
 );
 create index if not exists conexoes_conta_idx on conexoes(conta_id);
+
+-- O create table acima so vale em banco novo: onde a tabela ja existe, o
+-- check nasceu com a lista antiga de plataformas e nenhum `if not exists`
+-- atualiza uma restricao. Sem este bloco, o banco de producao recusaria a
+-- plataforma nova e o defeito so apareceria na primeira loja cadastrada.
+alter table conexoes drop constraint if exists conexoes_plataforma_check;
+alter table conexoes add constraint conexoes_plataforma_check
+  check (plataforma in ('nuvemshop','woocommerce','tray','loja_integrada','outra'));
 
 -- ----------------------------------------------------------------- fluxo ---
 

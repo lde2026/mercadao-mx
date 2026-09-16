@@ -1230,13 +1230,17 @@
     pendente: 'Ainda não resolvido.',
   };
 
-  var NOME_PLATAFORMA = { nuvemshop: 'Nuvemshop', tray: 'Tray', woocommerce: 'WooCommerce', loja_integrada: 'Loja Integrada' };
+  var NOME_PLATAFORMA = { nuvemshop: 'Nuvemshop', tray: 'Tray', woocommerce: 'WooCommerce', loja_integrada: 'Loja Integrada', outra: 'Outra plataforma' };
 
   var PLATAFORMAS = [
     { id: 'nuvemshop', nome: 'Nuvemshop', resumo: 'Instalação automática e cupom por API.' },
     { id: 'tray', nome: 'Tray', resumo: 'Instalação automática e cupom por API.' },
     { id: 'woocommerce', nome: 'WooCommerce', resumo: 'Cupom por API. O widget entra pelo nosso plugin.' },
     { id: 'loja_integrada', nome: 'Loja Integrada', resumo: 'Código colado no tema e cupons em lote.' },
+    // Fecha a lista em vez de deixar quem nao usa as quatro sem saida. O
+    // widget e uma tag de script: funciona em Shopify, VTEX, Magento, Wix e
+    // site feito a mao. O que falta nessas e API, nao o chat.
+    { id: 'outra', nome: 'Outra plataforma', resumo: 'Shopify, VTEX, Wix, site próprio. Você cola o código no tema.' },
   ];
 
   /** Campos que cada plataforma pede na conexao manual. */
@@ -1260,6 +1264,11 @@
       ['chave_api', 'Chave de API', 'password', ''],
       ['chave_aplicacao', 'Chave de aplicacao', 'password', ''],
     ],
+    // Sem API, sem credencial. O endereco serve so para identificar a loja
+    // na lista; nada e chamado com ele.
+    outra: [
+      ['url', 'Endereço da loja', 'url', 'https://sualoja.com.br'],
+    ],
   };
 
   var AJUDA_CONEXAO = {
@@ -1267,6 +1276,7 @@
     tray: 'Os tokens vem da autorizacao do aplicativo. Sem o botão acima, gere o code em Meus aplicativos e troque pelos tokens conforme docs/tray-api.md.',
     woocommerce: 'Em WooCommerce, Configurações, Avancado e REST API, crie uma chave com permissao de leitura e escrita.',
     loja_integrada: 'A chave de API sai do painel da Loja Integrada (só em plano pago). A chave de aplicacao a equipe deles emite em 3 a 5 dias úteis.',
+    outra: 'Não pedimos senha nem token: o chat entra por uma tag de script que você cola no tema. Depois de conectar, o código aparece aqui pronto para copiar.',
   };
 
   /**
@@ -1413,17 +1423,27 @@
     }).catch(function (e) { area.appendChild(el('p', e.message, 'erro')); });
   }
 
+  /**
+   * A tag que o lojista cola no tema.
+   *
+   * A tag de fechamento e montada em pedacos porque este arquivo pode ser
+   * lido dentro de um HTML: escrita inteira, ela fecharia o script do painel
+   * antes da hora e a tela ficaria em branco.
+   */
+  function tagDaLoja(chave) {
+    return '<script async src="' + location.origin + '/widget.js?k=' + chave + '"><' + '/script>';
+  }
+
   /** A chave publica identifica a loja no widget e no plugin. Nao e segredo, mas so aparece quando pedida. */
   function mostrarChave(cartao, conexao) {
     var antigo = cartao.querySelector('.chave-loja');
     if (antigo) { antigo.remove(); return; }
     var caixa = el('div', null, 'chave-loja instrucoes');
     caixa.appendChild(el('div', 'Chave da loja (para o plugin do WordPress)', 'rotulo'));
-    caixa.appendChild(el('pre', conexao.chave_publica));
-    caixa.appendChild(el('div', 'Tag para colar no tema, quando a instalação for manual', 'rotulo'));
-    // A tag de fechamento e montada em pedacos para o proprio painel poder
-    // ser embutido num HTML sem fechar o script antes da hora.
-    caixa.appendChild(el('pre', '<script async src="' + location.origin + '/widget.js?k=' + conexao.chave_publica + '"><' + '/script>'));
+    caixa.appendChild(blocoDeCodigo(conexao.chave_publica));
+    caixa.appendChild(el('div', 'Tag para colar no HTML da loja', 'rotulo'));
+    caixa.appendChild(blocoDeCodigo(tagDaLoja(conexao.chave_publica)));
+    caixa.appendChild(el('p', 'Cole antes do </body>, no rodapé de todas as páginas. Uma vez só: o resto muda pelo painel, sem mexer no tema de novo.', 'hora'));
     cartao.appendChild(caixa);
   }
 
@@ -1474,8 +1494,12 @@
       caixa.appendChild(passoNs);
     }
 
+    // "Conexao manual" so faz sentido onde existe a automatica para comparar.
+    // Em Outra plataforma nao ha as duas, e chamar de manual sugere que a
+    // pessoa perdeu um caminho melhor em algum lugar.
+    var semApi = plataforma.id === 'outra';
     var form = el('form');
-    form.appendChild(el('div', 'Conexão manual', 'rotulo'));
+    form.appendChild(el('div', semApi ? 'Dados da loja' : 'Conexão manual', 'rotulo'));
     var nome = el('label', 'Nome da loja');
     var inputNome = el('input'); inputNome.name = 'nomeLoja'; inputNome.required = true; inputNome.placeholder = 'Como aparece para você no painel';
     nome.appendChild(inputNome);
@@ -1500,7 +1524,10 @@
     var erro = el('p', null, 'erro'); erro.hidden = true;
     form.appendChild(erro);
     var acoes = el('div', null, 'acoes');
-    var enviar = el('button', 'Conectar e instalar'); enviar.type = 'submit';
+    // Aqui nao instalamos nada: quem instala e o lojista, colando a tag. O
+    // botao promete o que a tela entrega em seguida.
+    var enviar = el('button', semApi ? 'Conectar e ver o código' : 'Conectar e instalar');
+    enviar.type = 'submit';
     acoes.appendChild(enviar);
     form.appendChild(acoes);
     form.addEventListener('submit', function (evento) {
@@ -1513,13 +1540,43 @@
       if (plataforma.id === 'loja_integrada') credenciais.tema_permite_html = dados.get('tema_permite_html') === 'true';
       var dominio = credenciais.url || credenciais.api_address || null;
       if (dominio) dominio = dominio.replace(/^https?:\/\//, '').split('/')[0];
+      // Sem API nao ha credencial a guardar. O endereco ja virou o dominio
+      // acima, e cifrar uma copia dele no lugar de um token seria guardar
+      // dado por inercia.
+      if (plataforma.id === 'outra') credenciais = {};
       api('/conexoes', { method: 'POST', corpo: {
         plataforma: plataforma.id, nomeLoja: String(dados.get('nomeLoja')).trim(), dominio: dominio, credenciais: credenciais,
       } }).then(function (conexao) {
         // Instalacao logo em seguida: quem conecta quer ver o chat no ar.
-        return api('/conexoes/' + conexao.id + '/instalacao', { method: 'POST' }).catch(function () { return null; });
-      }).then(function () { aoConectar(); })
-        .catch(function (e) { erro.textContent = e.message; erro.hidden = false; enviar.disabled = false; });
+        return api('/conexoes/' + conexao.id + '/instalacao', { method: 'POST' })
+          .catch(function () { return null; })
+          .then(function (resultado) { return { conexao: conexao, resultado: resultado }; });
+      }).then(function (feito) {
+        /*
+         * Instalacao manual termina aqui, com o codigo na tela.
+         *
+         * Voltar para a lista mandaria o lojista procurar um botao para achar
+         * o que ele precisa colar agora, e e nesse pulo que a instalacao fica
+         * pela metade. Nas automaticas nao ha o que copiar, entao a lista e o
+         * destino certo.
+         */
+        if (feito.resultado && feito.resultado.tag) {
+          form.remove();
+          var pronto = el('div', null, 'instrucoes');
+          pronto.appendChild(el('div', 'Loja conectada. Falta colar o código.', 'rotulo'));
+          var passos = el('ol', null, 'passos');
+          (feito.resultado.instrucoes || []).forEach(function (t) { passos.appendChild(el('li', t)); });
+          pronto.appendChild(passos);
+          pronto.appendChild(blocoDeCodigo(feito.resultado.tag));
+          var fechar = el('button', 'Já colei, ver minhas lojas', 'secundario');
+          fechar.type = 'button';
+          fechar.addEventListener('click', function () { aoConectar(); });
+          pronto.appendChild(fechar);
+          caixa.appendChild(pronto);
+          return;
+        }
+        aoConectar();
+      }).catch(function (e) { erro.textContent = e.message; erro.hidden = false; enviar.disabled = false; });
     });
     caixa.appendChild(form);
   }
@@ -1553,6 +1610,44 @@
     return caixa;
   }
 
+  /**
+   * Bloco de codigo com botao de copiar.
+   *
+   * A tag do widget e longa e tem a chave da loja no meio: selecionar com o
+   * mouse erra um caractere e o lojista instala algo que nao funciona, sem
+   * mensagem de erro nenhuma na loja dele. O botao tira esse risco.
+   */
+  function blocoDeCodigo(texto) {
+    var caixa = el('div', null, 'codigo');
+    caixa.appendChild(el('pre', texto));
+    var copiar = el('button', 'Copiar', 'secundario');
+    copiar.type = 'button';
+    copiar.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var pronto = function () {
+        copiar.textContent = 'Copiado';
+        setTimeout(function () { copiar.textContent = 'Copiar'; }, 1600);
+      };
+      // navigator.clipboard so existe em https (ou localhost). Sem ele, a
+      // selecao do texto ja deixa o Ctrl+C a um toque.
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(texto).then(pronto, function () { selecionar(caixa); });
+      } else {
+        selecionar(caixa);
+      }
+    });
+    caixa.appendChild(copiar);
+    return caixa;
+  }
+
+  function selecionar(caixa) {
+    var faixa = document.createRange();
+    faixa.selectNodeContents(caixa.querySelector('pre'));
+    var selecao = window.getSelection();
+    selecao.removeAllRanges();
+    selecao.addRange(faixa);
+  }
+
   function mostrarInstrucoes(cartao, resultado) {
     var antigo = cartao.querySelector('.instrucoes');
     if (antigo) antigo.remove();
@@ -1572,7 +1667,7 @@
       var passos = el('ol', null, 'passos');
       (resultado.instrucoes || []).forEach(function (p) { passos.appendChild(el('li', p)); });
       caixa.appendChild(passos);
-      if (resultado.tag) caixa.appendChild(el('pre', resultado.tag));
+      if (resultado.tag) caixa.appendChild(blocoDeCodigo(resultado.tag));
     }
     cartao.appendChild(caixa);
   }

@@ -25,6 +25,13 @@ export async function varrerPedidos() {
 
   for (const conexao of conexoes) {
     try {
+      // Hoje a consulta ja traz so quem tem API de pedidos. Esta linha e a
+      // rede: o dia em que alguem acrescentar uma plataforma aquela lista sem
+      // reparar nisso, a varredura pula em vez de estourar no meio do lote e
+      // deixar as outras lojas sem varrer.
+      const api = adaptador(conexao.plataforma);
+      if (!api.listarPedidos) continue;
+
       const acesso = await acessoDaConta(conexao.conta_id);
       // Conta cortada nao gera trabalho de varredura, mas o que ja foi
       // atribuido continua no painel.
@@ -35,7 +42,7 @@ export async function varrerPedidos() {
         ? new Date(conexao.varrido_em)
         : new Date(Date.now() - 7 * 24 * 3600 * 1000);
 
-      const pedidos = await adaptador(conexao.plataforma).listarPedidos(credenciais, desde);
+      const pedidos = await api.listarPedidos(credenciais, desde);
       let atribuidos = 0;
       for (const pedido of pedidos) {
         if (!pedido.cupomCodigo) continue;

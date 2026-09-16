@@ -2,12 +2,14 @@ import { nuvemshop } from './nuvemshop.js';
 import { woocommerce } from './woocommerce.js';
 import { tray } from './tray.js';
 import { lojaIntegrada } from './loja-integrada.js';
+import { outra } from './outra.js';
 
 const POR_PLATAFORMA = {
   nuvemshop,
   woocommerce,
   tray,
   loja_integrada: lojaIntegrada,
+  outra,
 };
 
 export function adaptador(plataforma) {
@@ -17,4 +19,4 @@ export function adaptador(plataforma) {
 }
 
 export const PLATAFORMAS = Object.keys(POR_PLATAFORMA);
-export { nuvemshop, woocommerce, tray, lojaIntegrada };
+export { nuvemshop, woocommerce, tray, lojaIntegrada, outra };
