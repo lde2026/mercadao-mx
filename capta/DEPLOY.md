@@ -114,3 +114,56 @@ para producao para ver a tabela vazia. A partir dai, e lojista de verdade.
 
 Sem essas chaves o produto funciona: conexao manual por token, e-mail vira
 linha de log e a cobranca fica manual.
+
+## 8. Paginas juridicas, antes de anunciar
+
+Meta e Google recusam anuncio de pagina sem identificacao da empresa e sem
+politica de privacidade acessivel. As tres paginas ja existem em
+`landing/`, e sobem junto com a landing no Cloudflare Pages:
+
+| Endereco | Arquivo |
+|---|---|
+| `capta.lojadoecommerce.com.br/privacidade` | `landing/privacidade.html` |
+| `capta.lojadoecommerce.com.br/termos` | `landing/termos.html` |
+
+### 8.1 Preencher antes de publicar
+
+Os textos tem marcadores em maiusculas. Nenhum deles pode ir ao ar como
+esta. Ache todos com `grep -rn PREENCHER_ landing/`:
+
+| Marcador | O que e |
+|---|---|
+| `PREENCHER_RAZAO_SOCIAL` | Razao social completa, como no cartao CNPJ |
+| `PREENCHER_CNPJ` | CNPJ formatado |
+| `PREENCHER_ENDERECO_COMPLETO` | Logradouro, numero e CEP |
+| `PREENCHER_NOME_ENCARREGADO` | Nome do encarregado de dados (LGPD art. 41) |
+| `PREENCHER_PRAZO_EVENTOS` | Por quantos meses guardamos a navegacao registrada |
+| `PREENCHER_PRAZO_POS_CANCELAMENTO` | Por quantos dias guardamos os dados apos o cancelamento |
+
+Os dois ultimos sao decisao de negocio, nao de codigo. O que estiver escrito
+na politica passa a valer, entao escolha um prazo que a operacao consiga
+cumprir de verdade.
+
+### 8.2 O e-mail do encarregado precisa existir
+
+A politica manda o titular escrever para `privacidade@lojadoecommerce.com.br`.
+Crie a caixa antes de publicar: pedido de titular tem prazo de resposta de
+15 dias na LGPD, e nao adianta ter o endereco na pagina se ninguem le.
+
+### 8.3 Aceite dos termos
+
+O cadastro no painel so cria conta com o aceite marcado, e grava a versao
+aceita, a data e a rede mascarada em `contas`. A versao vigente fica em
+`src/termos.js`.
+
+**Ao publicar um texto novo**, suba a versao em `src/termos.js` no mesmo
+commit do HTML. As contas antigas continuam com a versao que aceitaram, que
+e exatamente o que serve de prova depois.
+
+### 8.4 Revisao por advogado
+
+Os textos foram escritos a partir do que o sistema faz de fato, e refletem a
+regua de inadimplencia, a cota e a politica de dados que estao no codigo.
+Ainda assim, passe os dois pelo seu advogado antes de anunciar: o texto e
+seu, a responsabilidade e sua, e uma clausula de limitacao de
+responsabilidade mal redigida nao vale nada num processo.

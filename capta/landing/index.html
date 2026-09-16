@@ -140,7 +140,9 @@ p{max-width:62ch}
 .final h2{font-size:clamp(34px,5.6vw,64px);margin-bottom:16px;color:#fff}
 .final p{margin:0 auto 28px}
 .rodape{padding-block:34px;border-top:1px solid var(--linha);font-size:14px;color:var(--cinza)}
-.rodape .faixa{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.rodape .faixa{display:grid;gap:8px}
+.rodape .empresa{font-weight:600;color:var(--tinta)}
+.rodape .legais{margin-top:6px}
 .rodape a{text-decoration:none}
 
 @media(max-width:860px){
@@ -340,8 +342,10 @@ p{max-width:62ch}
 
 <footer class="rodape">
   <div class="faixa">
-    <span>Captapp é um produto da <a href="https://lojadoecommerce.com.br">Loja do E-commerce</a>, Curitiba.</span>
-    <span><a href="https://captapp.lojadoecommerce.com.br/">Entrar no app</a> · <a href="mailto:contato@lojadoecommerce.com.br">contato@lojadoecommerce.com.br</a></span>
+    <span class="empresa">Captapp é um produto da <a href="https://lojadoecommerce.com.br">Loja do E-commerce</a>.</span>
+    <span>PREENCHER_RAZAO_SOCIAL · CNPJ PREENCHER_CNPJ</span>
+    <span>PREENCHER_ENDERECO_COMPLETO, Curitiba, PR · <a href="mailto:contato@lojadoecommerce.com.br">contato@lojadoecommerce.com.br</a></span>
+    <span class="legais"><a href="/termos">Termos de Uso</a> · <a href="/privacidade">Política de Privacidade</a> · <a href="https://captapp.lojadoecommerce.com.br/">Entrar no app</a></span>
   </div>
 </footer>
 

@@ -15,6 +15,10 @@
       <label>E-mail<input type="email" name="email" required autocomplete="email"></label>
       <label>Senha<input type="password" name="senha" required autocomplete="current-password"></label>
       <label id="campo-nome" hidden>Nome da loja<input type="text" name="nome" autocomplete="organization"></label>
+      <label id="campo-aceite" class="aceite" hidden>
+        <input type="checkbox" name="aceite">
+        <span>Li e aceito os <a href="https://capta.lojadoecommerce.com.br/termos" target="_blank" rel="noopener">Termos de Uso</a> e a <a href="https://capta.lojadoecommerce.com.br/privacidade" target="_blank" rel="noopener">Política de Privacidade</a>.</span>
+      </label>
       <p class="erro" id="erro-entrada" hidden></p>
       <button type="submit" id="botao-entrada">Entrar</button>
       <p class="troca"><a href="#" id="alternar">Não tenho conta ainda</a> <span class="sep">|</span> <a href="#" id="esqueci">Esqueci minha senha</a></p>

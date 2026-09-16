@@ -36,7 +36,7 @@ async function pedir(caminho, { metodo = 'GET', corpo, cookie } = {}) {
 
 async function contaLogada(nome, email) {
   const r = await pedir('/api/cadastro', {
-    metodo: 'POST', corpo: { nome, email, senha: 'senha-de-teste-123' },
+    metodo: 'POST', corpo: { nome, email, senha: 'senha-de-teste-123', aceite: true },
   });
   assert.equal(r.status, 200, `cadastro de ${nome} falhou`);
   return { id: r.json.conta.id, cookie: r.cookie.split(';')[0] };
@@ -64,6 +64,21 @@ const contaA = await contaLogada('Bella Moda', 'pierre+a@lojadoecommerce.com.br'
 const contaB = await contaLogada('Casa Verde Decor', 'pierre+b@lojadoecommerce.com.br');
 const lojaA = await lojaComLead(contaA, 'Bella Moda', 'nuvemshop', 'Renata');
 const lojaB = await lojaComLead(contaB, 'Casa Verde Decor', 'tray', 'Marcos');
+
+/**
+ * Express 4 nao propaga rejeicao de handler async sozinho. Sem o embrulho no
+ * server, um id malformado derruba a consulta e a requisicao fica pendurada
+ * ate o cliente desistir, segurando a conexao. O teto de tempo aqui e o que
+ * pega a volta desse defeito.
+ */
+test('erro inesperado na rota vira 500 e nao deixa a requisicao pendurada', async () => {
+  const resposta = await fetch(`${base}/api/leads/nao-e-um-uuid`, {
+    headers: { Cookie: contaA.cookie },
+    signal: AbortSignal.timeout(5000),
+  });
+  assert.equal(resposta.status, 500);
+  assert.equal((await resposta.json()).erro, 'erro interno');
+});
 
 test('conta B lendo o lead da conta A recebe 404', async () => {
   const r = await pedir(`/api/leads/${lojaA.lead.id}`, { cookie: contaB.cookie });

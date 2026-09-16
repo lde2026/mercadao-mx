@@ -6,7 +6,7 @@ import * as repo from './repositorio.js';
 import { log } from './log.js';
 import { adaptador, PLATAFORMAS } from './adapters/index.js';
 import { concluirLead } from './fluxo-lead.js';
-import { registrarEvento, perfilDoLead, esquecerLead } from './eventos.js';
+import { registrarEvento, perfilDoLead, esquecerLead, mascararIp } from './eventos.js';
 import { calcularAcesso, avisoDeCobranca, avisoDeCota } from './billing/acesso.js';
 import { PLANOS, precoDoPlano, IMPLANTACAO, DESCONTO_ANUAL } from './billing/planos.js';
 import { MODELOS } from './modelos.js';
@@ -16,6 +16,7 @@ import { agendar } from './tarefas.js';
 import { credenciaisProntas } from './credenciais.js';
 import { registrarRotasOauth, concluirOauth, configuracaoOauth } from './oauth.js';
 import { enviarRecuperacaoSenha } from './avisos.js';
+import { TERMOS } from './termos.js';
 import {
   carregarConta, exigirConta, exigirOperador, ehOperador, aplicarRegua, entrar,
   montarCookie, limparCookie,
@@ -25,6 +26,33 @@ const aqui = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 app.disable('x-powered-by');
 app.set('trust proxy', true);
+
+/**
+ * Express 4 nao captura promessa rejeitada de handler async: a falha some e a
+ * requisicao fica pendurada ate o cliente desistir, segurando a conexao. Como
+ * quase toda rota aqui e async, embrulhamos uma vez, no topo, em vez de
+ * lembrar de tratar em cada uma. O erro passa a chegar no handler do fim do
+ * arquivo, que registra e responde 500.
+ *
+ * Handler de erro tem quatro argumentos e fica de fora: embrulhar ele mudaria
+ * a aridade e o Express deixaria de reconhece-lo como tratador de erro.
+ */
+function embrulhar(fn) {
+  if (typeof fn !== 'function' || fn.length === 4) return fn;
+  const embrulhado = (req, res, proximo) => {
+    try {
+      return Promise.resolve(fn(req, res, proximo)).catch(proximo);
+    } catch (erro) {
+      return proximo(erro);
+    }
+  };
+  Object.defineProperty(embrulhado, 'name', { value: fn.name });
+  return embrulhado;
+}
+for (const metodo of ['get', 'post', 'put', 'delete', 'options', 'use']) {
+  const original = app[metodo].bind(app);
+  app[metodo] = (...args) => original(...args.map(embrulhar));
+}
 
 const URL_PUBLICA = process.env.URL_PUBLICA || 'http://localhost:3000';
 const PRODUCAO = process.env.NODE_ENV === 'production';
@@ -339,15 +367,25 @@ async function limitarEntrada(req, res, proximo) {
   proximo();
 }
 
+/** Versao vigente dos termos, para a tela de entrada montar o aceite. Publica de proposito. */
+app.get('/api/termos', (_req, res) => {
+  res.set('Cache-Control', 'public, max-age=3600');
+  res.json(TERMOS);
+});
+
 app.post('/api/cadastro', limitarEntrada, async (req, res) => {
-  const { nome, email, senha } = req.body || {};
+  const { nome, email, senha, aceite } = req.body || {};
   if (!nome || !email || !senha) return res.status(400).json({ erro: 'campos obrigatorios' });
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim())) return res.status(400).json({ erro: 'e-mail invalido' });
   if (String(senha).length < 8) return res.status(400).json({ erro: 'senha de no minimo 8 caracteres' });
+  // Sem aceite nao se cria conta: o registro de quem aceitou o que, e quando,
+  // e o que sustenta a cobranca e a politica de dados depois.
+  if (aceite !== true) return res.status(400).json({ erro: 'e preciso aceitar os termos de uso e a politica de privacidade' });
 
   try {
     const conta = await repo.criarConta({
       nome: String(nome).trim().slice(0, 120), email: String(email).trim(), senha: String(senha),
+      termosVersao: TERMOS.versao, termosRede: mascararIp(req.ip),
     });
     const sessaoId = await repo.criarSessao(conta.id);
     log.info('conta.criada', { conta_id: conta.id });

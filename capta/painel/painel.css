@@ -60,6 +60,9 @@ button.secundario{background:transparent;color:var(--tinta);border:1px solid var
 button.secundario:hover{background:var(--fundo);filter:none}
 button:disabled{opacity:.5;cursor:default;filter:none}
 #botao-entrada{width:100%;margin-top:8px;padding:12px}
+.aceite{display:flex;align-items:flex-start;gap:9px;font-size:13px;line-height:1.45;color:var(--texto);margin-bottom:16px}
+.aceite input{width:auto;margin:2px 0 0;flex:none}
+.aceite a{color:var(--acento-texto)}
 .troca{margin-top:16px;font-size:13px;text-align:center}
 .troca .sep{color:var(--fraco);margin:0 6px}
 .form-config{max-width:560px}

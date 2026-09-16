@@ -27,6 +27,13 @@ alter table contas add column if not exists email_aviso text;
 alter table contas add column if not exists whatsapp text;
 alter table contas add column if not exists avisar_lead boolean not null default true;
 
+-- Aceite dos termos. Guardar a versao junto da data e o que foi aceito: sem
+-- isso, "o cliente aceitou" nao prova nada depois que o texto mudar. A rede
+-- vai mascarada, pela mesma razao que o evento do visitante nao guarda IP.
+alter table contas add column if not exists termos_versao text;
+alter table contas add column if not exists termos_aceitos_em timestamptz;
+alter table contas add column if not exists termos_rede text;
+
 -- Recuperacao de senha. Guarda o hash do token, nunca o token: quem le o
 -- banco nao consegue usar a linha para entrar.
 create table if not exists recuperacoes_senha (

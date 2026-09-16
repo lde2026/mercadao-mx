@@ -1,0 +1,64 @@
+/*
+ * Estilo das paginas juridicas. Separado do index.html porque sao tres
+ * paginas com a mesma cara, e porque ninguem deve precisar mexer no HTML da
+ * landing para corrigir uma virgula da politica.
+ *
+ * Os tokens sao os mesmos da landing, para as paginas nao parecerem de outro
+ * produto quando o visitante clica no rodape.
+ */
+:root{
+  --fundo:#ffffff; --suave:#f5f6f8; --tinta:#0b0b0f; --cinza:#5b6068; --linha:#e6e8ec;
+  --laranja:#ff5a1f; --laranja-escuro:#e14b12; --laranja-suave:#fff1eb;
+  --escuro:#111122;
+  --display:"Sora",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --corpo:"Manrope",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font:16px/1.7 var(--corpo);color:var(--tinta);background:var(--fundo);-webkit-font-smoothing:antialiased}
+a{color:var(--laranja-escuro)}
+.faixa{width:min(760px,100% - 40px);margin-inline:auto}
+
+.topo{border-bottom:1px solid var(--linha);padding-block:18px;position:sticky;top:0;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);z-index:10}
+.topo .faixa{width:min(1120px,100% - 40px);display:flex;align-items:center;justify-content:space-between;gap:16px}
+.marca{font-family:var(--display);font-weight:800;font-size:22px;letter-spacing:-.03em;text-decoration:none;color:var(--tinta)}
+.marca::after{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--laranja);margin-left:3px;vertical-align:baseline}
+.voltar{font-size:14px;font-weight:600;text-decoration:none}
+
+main{padding-block:clamp(40px,7vw,72px)}
+h1{font-family:var(--display);font-size:clamp(30px,4.4vw,42px);font-weight:800;letter-spacing:-.02em;line-height:1.12}
+.atualizado{color:var(--cinza);font-size:14px;margin-top:10px}
+.resumo{background:var(--laranja-suave);border-radius:14px;padding:20px 22px;margin-top:28px}
+.resumo strong{display:block;font-family:var(--display);margin-bottom:6px}
+h2{font-family:var(--display);font-size:22px;font-weight:700;letter-spacing:-.01em;margin-top:44px}
+h3{font-family:var(--display);font-size:17px;font-weight:700;margin-top:26px}
+p,li{margin-top:12px}
+ul,ol{margin-left:22px}
+li{margin-top:8px}
+table{width:100%;border-collapse:collapse;margin-top:18px;font-size:15px}
+th,td{text-align:left;padding:11px 12px;border-bottom:1px solid var(--linha);vertical-align:top}
+th{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--cinza);font-weight:700}
+.indice{background:var(--suave);border-radius:14px;padding:20px 22px;margin-top:28px}
+.indice ol{margin-top:6px}
+.indice a{text-decoration:none;font-weight:600}
+.destaque{border-left:3px solid var(--laranja);padding-left:16px;margin-top:20px}
+
+.rodape{border-top:1px solid var(--linha);padding-block:34px;margin-top:64px;font-size:14px;color:var(--cinza)}
+.rodape .faixa{width:min(1120px,100% - 40px);display:grid;gap:10px}
+.rodape a{color:inherit}
+.rodape .empresa{font-weight:600;color:var(--tinta)}
+
+/*
+ * No celular a tabela de tres colunas nao cabe, e rolagem lateral numa
+ * politica que a pessoa precisa ler e pior do que empilhar. Cada linha vira
+ * um bloco e cada celula carrega o rotulo da coluna, que vem do data-rotulo
+ * gravado no HTML.
+ */
+@media (max-width:640px){
+  table,thead,tbody,tr,th,td{display:block}
+  thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  tr{border:1px solid var(--linha);border-radius:12px;padding:6px 14px 10px;margin-top:12px}
+  td{border:0;padding:8px 0 0}
+  td::before{content:attr(data-rotulo);display:block;font-size:11px;text-transform:uppercase;
+    letter-spacing:.06em;color:var(--cinza);font-weight:700;margin-bottom:2px}
+  td[data-rotulo=""]::before{display:none}
+}

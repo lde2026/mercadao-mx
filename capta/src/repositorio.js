@@ -10,13 +10,13 @@ import { cifrar, decifrar, gerarChavePublica, hashSenha, conferirSenha } from '.
 
 // ---------------------------------------------------------------- contas ---
 
-export async function criarConta({ nome, email, senha }) {
+export async function criarConta({ nome, email, senha, termosVersao = null, termosRede = null }) {
   return emTransacao(async (cliente) => {
     const { rows } = await cliente.query(
-      `insert into contas (nome, email, senha_hash)
-       values ($1, lower($2), $3)
-       returning id, nome, email, criado_em`,
-      [nome, email, hashSenha(senha)],
+      `insert into contas (nome, email, senha_hash, termos_versao, termos_aceitos_em, termos_rede)
+       values ($1, lower($2), $3, $4::text, case when $4::text is null then null else now() end, $5)
+       returning id, nome, email, termos_versao, termos_aceitos_em, criado_em`,
+      [nome, email, hashSenha(senha), termosVersao, termosRede],
     );
     const conta = rows[0];
     await cliente.query(

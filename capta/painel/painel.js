@@ -193,6 +193,9 @@
     criando = criar;
     document.getElementById('campo-nome').hidden = !criando;
     document.querySelector('#campo-nome input').required = criando;
+    // O aceite so existe no cadastro: quem ja tem conta aceitou quando criou.
+    document.getElementById('campo-aceite').hidden = !criando;
+    document.querySelector('#campo-aceite input').required = criando;
     document.getElementById('botao-entrada').textContent = criando ? 'Criar conta' : 'Entrar';
     document.getElementById('alternar').textContent = criando ? 'Já tenho conta' : 'Não tenho conta ainda';
   }
@@ -207,7 +210,10 @@
     var erro = document.getElementById('erro-entrada');
     erro.hidden = true;
     var corpo = { email: dados.get('email'), senha: dados.get('senha') };
-    if (criando) corpo.nome = dados.get('nome');
+    if (criando) {
+      corpo.nome = dados.get('nome');
+      corpo.aceite = dados.get('aceite') === 'on';
+    }
     api(criando ? '/cadastro' : '/login', { method: 'POST', corpo: corpo })
       .then(function () { iniciar(); })
       .catch(function (e) {
