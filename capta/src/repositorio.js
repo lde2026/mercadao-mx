@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { consultar, emTransacao } from './db.js';
 import { cifrar, decifrar, gerarChavePublica, hashSenha, conferirSenha } from './cripto.js';
+import { cotaDeLojas } from './billing/planos.js';
 
 /**
  * Regra unica desta camada: id vindo da URL nunca e autorizacao. Toda funcao
@@ -233,6 +234,38 @@ export async function criarConexao({
     throw new Error('criarConexao exige credenciais');
   }
 
+  /*
+   * Teto de lojas do plano, conferido aqui e nao na rota.
+   *
+   * Loja nasce por dois caminhos: o formulario do painel e a volta do OAuth
+   * da plataforma. Conferir em cada rota deixaria a porta do OAuth aberta no
+   * dia em que alguem esquecesse de repetir a verificacao. Aqui passa tudo.
+   *
+   * Conta que ja esta acima do teto, por ter baixado de plano ou por ser
+   * anterior a esta regra, nao perde loja nenhuma: o que ela nao consegue e
+   * conectar mais uma. Tirar do ar a loja de quem esta pagando seria punir o
+   * cliente por uma mudanca nossa.
+   */
+  const { rows: uso } = await consultar(
+    // A assinatura tem que ser a ativa e uma so: a conta guarda as canceladas
+    // ao lado, e uma subconsulta sem filtro devolveria mais de uma linha e
+    // derrubaria a criacao de loja com erro de banco.
+    `select (select count(*) from conexoes where conta_id = $1) as lojas,
+            (select plano from assinaturas
+              where conta_id = $1 and status = 'ativa'
+              order by criado_em desc limit 1) as plano`,
+    [contaId],
+  );
+  const teto = cotaDeLojas(uso[0]?.plano);
+  const conectadas = Number(uso[0]?.lojas || 0);
+  if (conectadas >= teto) {
+    const erro = new Error(`o plano permite ${teto} loja(s) e a conta ja tem ${conectadas}`);
+    erro.codigo = 'teto_de_lojas';
+    erro.teto = teto;
+    erro.conectadas = conectadas;
+    throw erro;
+  }
+
   const { rows } = await consultar(
     `insert into conexoes
        (conta_id, plataforma, nome_loja, dominio, credenciais, chave_publica, modo_instalacao)
@@ -246,6 +279,14 @@ export async function criarConexao({
 
 const CAMPOS_CONEXAO = `id, conta_id, plataforma, nome_loja, dominio, chave_publica,
                         modo_instalacao, status, detalhe_status, varrido_em, criado_em`;
+
+export async function contarConexoes(contaId) {
+  const { rows } = await consultar(
+    `select count(*)::int as total from conexoes where conta_id = $1`,
+    [contaId],
+  );
+  return rows[0].total;
+}
 
 export async function listarConexoes(contaId) {
   const { rows } = await consultar(

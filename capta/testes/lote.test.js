@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { prepararBanco, contaDeTeste, conexaoDeTeste } from './ajuda.js';
+import { prepararBanco, contaDeTeste, conexaoDeTeste, assinarPlano } from './ajuda.js';
 
 const { pool, consultar } = await import('../src/db.js');
 const repo = await import('../src/repositorio.js');
@@ -60,6 +60,8 @@ test('lote zerado avisa com o texto do estrago, nao com o texto de aviso', async
 
 test('duas lojas da mesma conta avisam separado', async () => {
   const { conta, loja } = await lojaComLote(5);
+  // Duas lojas exigem plano que comporte duas: o teto vale desde a criacao.
+  await assinarPlano(conta.id, 'crescimento');
   const outra = await conexaoDeTeste(conta.id, 'loja_integrada', 'Pet Cia Matriz');
   assert.equal(await avisarLoteBaixo({ conexao: loja, disponiveis: 5 }), true);
   assert.equal(await avisarLoteBaixo({ conexao: outra, disponiveis: 2 }), true);

@@ -1576,7 +1576,14 @@
           return;
         }
         aoConectar();
-      }).catch(function (e) { erro.textContent = e.message; erro.hidden = false; enviar.disabled = false; });
+      }).catch(function (e) {
+        // A explicacao e a metade util quando o servidor recusa por regra de
+        // negocio: "limite atingido" sozinho manda o lojista abrir chamado,
+        // "o plano Escala permite 10, troque em Financeiro" resolve sozinho.
+        erro.textContent = e.dados && e.dados.explicacao ? e.message + ' ' + e.dados.explicacao : e.message;
+        erro.hidden = false;
+        enviar.disabled = false;
+      });
     });
     caixa.appendChild(form);
   }
@@ -1677,7 +1684,7 @@
   var cicloEscolhido = 'mensal';
 
   function verFinanceiro() {
-    var alvo = pintar('Financeiro', 'Seu plano, sua cota de leads e as cobranças do Captapp.');
+    var alvo = pintar('Financeiro', 'Seu plano, suas cotas de leads e de lojas, e as cobranças do Captapp.');
     api('/financeiro').then(function (dados) { desenharFinanceiro(alvo, dados); });
   }
 
@@ -1704,6 +1711,22 @@
       nomeIcone: 'leads', tom: estourou ? 'ruim' : pct >= 80 ? '' : 'bom',
       detalhe: uso.cota ? pct + '% da cota' : 'sem limite no seu plano',
       rodape: { texto: estourou ? 'Cota atingida: o chat saiu do ar na loja.' : (uso.cota ? 'A cota zera todo dia 1' : 'Plano sem teto de leads') },
+    }));
+    // Quantas lojas cabem no plano fica ao lado dos leads, e nao escondido na
+    // lista de beneficios: e o numero que decide se o lojista consegue
+    // conectar a proxima loja hoje.
+    var lojasCheias = uso.cotaLojas != null && uso.lojas >= uso.cotaLojas;
+    grade.appendChild(cartaoNumero({
+      rotulo: 'Lojas conectadas', valor: uso.lojas + ' de ' + uso.cotaLojas,
+      nomeIcone: 'loja', tom: uso.lojas > uso.cotaLojas ? 'ruim' : lojasCheias ? '' : 'bom',
+      detalhe: uso.lojas > uso.cotaLojas
+        ? 'acima do teto do plano'
+        : lojasCheias ? 'teto do plano atingido' : 'cabem mais ' + (uso.cotaLojas - uso.lojas),
+      rodape: {
+        texto: uso.lojas > uso.cotaLojas
+          ? 'As lojas continuam no ar. Para conectar outra, mude de plano.'
+          : lojasCheias ? 'Para conectar outra, mude de plano' : 'Cada loja tem seu próprio chat',
+      },
     }));
     grade.appendChild(cartaoNumero({
       rotulo: 'Próxima cobrança', valor: proxima ? dinheiro(proxima.valor) : 'Nada em aberto',
@@ -1743,6 +1766,7 @@
         : '+ ' + dinheiro(dados.implantacao.valor) + ' de implantação, uma vez', 'plano-implantacao'));
       var lista = el('ul', null, 'plano-lista');
       lista.appendChild(el('li', p.leadsMes ? 'Até ' + p.leadsMes.toLocaleString('pt-BR') + ' leads por mês' : 'Leads ilimitados'));
+      lista.appendChild(el('li', p.lojas === 1 ? 'Uma loja ou site' : 'Até ' + p.lojas + ' lojas ou sites'));
       lista.appendChild(el('li', 'Chat com cupom único por pessoa'));
       lista.appendChild(el('li', 'Fila de leads e WhatsApp'));
       lista.appendChild(el('li', p.rastreamento ? 'Rastreamento de navegação' : 'Sem rastreamento de navegação'));
@@ -1792,7 +1816,11 @@
     api('/assinatura', { method: 'POST', corpo: corpo })
       .then(function () { return api('/financeiro'); })
       .then(function (novos) { desenharFinanceiro(alvo, novos); })
-      .catch(function (e) { alert(e.message); });
+      .catch(function (e) {
+        // Mesma razao do formulario de conexao: a recusa por regra de negocio
+        // vem com o caminho da saida, e so a primeira frase nao basta.
+        alert(e.dados && e.dados.explicacao ? e.message + '\n\n' + e.dados.explicacao : e.message);
+      });
   }
 
   // ----------------------------------------------------------------- admin ---

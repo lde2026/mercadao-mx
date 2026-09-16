@@ -25,6 +25,17 @@ export async function contaDeTeste(nome, email) {
   return repo.criarConta({ nome, email, senha: 'senha-de-teste-123' });
 }
 
+/**
+ * Assina um plano para a conta.
+ *
+ * Necessario sempre que o teste conectar mais de uma loja: sem assinatura,
+ * vale o teto do plano de entrada, que e uma loja so.
+ */
+export async function assinarPlano(contaId, plano = 'escala', ciclo = 'mensal') {
+  const repo = await import('../src/repositorio.js');
+  return repo.trocarAssinatura({ contaId, plano, ciclo, origem: 'manual' });
+}
+
 export async function conexaoDeTeste(contaId, plataforma, nomeLoja, credenciais = {}) {
   const repo = await import('../src/repositorio.js');
   return repo.criarConexao({

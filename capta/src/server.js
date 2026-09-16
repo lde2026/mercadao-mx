@@ -584,6 +584,9 @@ app.post('/api/conexoes/oauth', async (req, res) => {
     res.status(201).json(resultado);
   } catch (erro) {
     if (/bilhete/.test(erro.message)) return res.status(400).json({ erro: erro.message });
+    // O teto do plano vale tambem por aqui: autorizar o aplicativo na
+    // plataforma nao compra uma vaga de loja.
+    if (erro.codigo === 'teto_de_lojas') return res.status(409).json(respostaTetoDeLojas(erro));
     log.erro('oauth.conclusao_falhou', { conta_id: req.conta.id, motivo: erro.message });
     res.status(502).json({ erro: erro.message });
   }
@@ -594,9 +597,15 @@ app.post('/api/conexoes', async (req, res) => {
   if (!PLATAFORMAS.includes(plataforma)) return res.status(400).json({ erro: 'plataforma invalida' });
   if (!nomeLoja || !credenciais) return res.status(400).json({ erro: 'campos obrigatorios' });
 
-  const conexao = await repo.criarConexao({
-    contaId: req.conta.id, plataforma, nomeLoja, dominio, credenciais,
-  });
+  let conexao;
+  try {
+    conexao = await repo.criarConexao({
+      contaId: req.conta.id, plataforma, nomeLoja, dominio, credenciais,
+    });
+  } catch (erro) {
+    if (erro.codigo !== 'teto_de_lojas') throw erro;
+    return res.status(409).json(respostaTetoDeLojas(erro));
+  }
   log.info('conexao.criada', {
     conta_id: req.conta.id, conexao_id: conexao.id, plataforma,
   });
@@ -738,6 +747,23 @@ app.put('/api/conexoes/:id/fluxo', async (req, res) => {
 const SITUACOES = new Set(['a_contatar', 'contatados']);
 const RECOMPENSAS = new Set(['cupom', 'frete_gratis', 'diagnostico', 'especialista', 'consultoria']);
 
+/**
+ * Teto de lojas atingido. 409 e nao 400: o pedido esta correto, o que nao
+ * cabe e mais uma loja no plano atual. A explicacao diz o caminho, porque
+ * "limite atingido" sozinho manda o lojista abrir chamado.
+ */
+function respostaTetoDeLojas(erro) {
+  const maior = Object.entries(PLANOS)
+    .filter(([, p]) => p.lojas > erro.teto)
+    .sort((a, b) => a[1].lojas - b[1].lojas)[0];
+  return {
+    erro: `Seu plano permite ${erro.teto} loja${erro.teto > 1 ? 's' : ''} e você já tem ${erro.conectadas}.`,
+    explicacao: maior
+      ? `O plano ${maior[1].nome} permite ${maior[1].lojas}. Troque em Financeiro, ou remova uma loja conectada.`
+      : 'Para mais lojas que isso, fale com a gente: passa a ser contrato, não plano de prateleira.',
+  };
+}
+
 // Os mesmos valores do check no banco. Validar aqui tambem faz a resposta
 // ser 400 com explicacao, e nao 500 de violacao de restricao.
 const FORMATOS_BOTAO = new Set(['retangular', 'redondo']);
@@ -831,11 +857,12 @@ app.delete('/api/leads/:id', async (req, res) => {
  * e no perfil do lead, nao aqui.
  */
 app.get('/api/financeiro', async (req, res) => {
-  const [assinatura, cobrancas, usados, implantacaoPaga] = await Promise.all([
+  const [assinatura, cobrancas, usados, implantacaoPaga, lojasConectadas] = await Promise.all([
     repo.assinaturaDaConta(req.conta.id),
     repo.cobrancasDaConta(req.conta.id),
     repo.leadsNoMes(req.conta.id),
     repo.jaPagouImplantacao(req.conta.id),
+    repo.contarConexoes(req.conta.id),
   ]);
   const precos = {};
   for (const id of Object.keys(PLANOS)) {
@@ -847,7 +874,7 @@ app.get('/api/financeiro', async (req, res) => {
     precos,
     descontoAnual: DESCONTO_ANUAL,
     implantacao: { valor: IMPLANTACAO, cobrada: implantacaoPaga },
-    uso: { leadsMes: usados, cota: req.acesso.cotaLeads },
+    uso: { leadsMes: usados, cota: req.acesso.cotaLeads, lojas: lojasConectadas, cotaLojas: req.acesso.cotaLojas },
     cobrancas,
     acesso: req.acesso,
     cobrancaAutomatica: asaas.configurado(),
@@ -869,6 +896,23 @@ app.post('/api/assinatura', async (req, res) => {
   const atual = await repo.assinaturaDaConta(req.conta.id);
   if (atual && atual.plano === plano && atual.ciclo === ciclo) {
     return res.json({ assinatura: atual, mudou: false });
+  }
+
+  /*
+   * Descer de plano com mais lojas do que o novo comporta fica barrado aqui.
+   *
+   * Deixar passar criaria uma conta acima do proprio teto em silencio: as
+   * lojas continuariam no ar, cobrando um plano que nao as cobre, e a unica
+   * pista apareceria muito depois, ao tentar conectar mais uma. Melhor dizer
+   * agora quantas precisam sair.
+   */
+  const lojas = await repo.contarConexoes(req.conta.id);
+  const tetoNovo = PLANOS[plano].lojas;
+  if (lojas > tetoNovo) {
+    return res.status(409).json({
+      erro: `O plano ${PLANOS[plano].nome} permite ${tetoNovo} loja${tetoNovo > 1 ? 's' : ''} e você tem ${lojas} conectadas.`,
+      explicacao: `Remova ${lojas - tetoNovo} loja(s) em Integrações antes de mudar para este plano. Nenhum lead é apagado ao remover uma loja.`,
+    });
   }
 
   if (!asaas.configurado()) {

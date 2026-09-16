@@ -1,4 +1,4 @@
-import { planoTemRastreamento, cotaDeLeads } from './planos.js';
+import { planoTemRastreamento, cotaDeLeads, cotaDeLojas } from './planos.js';
 
 /**
  * Regua de inadimplencia.
@@ -58,6 +58,9 @@ export function calcularAcesso({
   const acesso = {
     plano,
     cotaLeads: cota,
+    // Quantas lojas o plano permite. Informativo aqui: quem recusa a loja
+    // numero seguinte e o repositorio, no momento de criar.
+    cotaLojas: cotaDeLojas(plano),
     leadsNoMes,
     cotaEstourada,
     diasAtraso: atraso,
