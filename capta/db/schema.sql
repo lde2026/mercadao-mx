@@ -71,6 +71,11 @@ create table if not exists sessoes (
 );
 create index if not exists sessoes_conta_idx on sessoes(conta_id);
 
+-- Quem entrou na conta do cliente como operador. Sem esta coluna, a sessao de
+-- personificacao e indistinguivel da do lojista, e o log das acoes seguintes
+-- (inclusive a exportacao da base de leads) sai so com o id da conta dele.
+alter table sessoes add column if not exists operador_id uuid references contas(id) on delete set null;
+
 -- Modulos ativaveis por conta. O chat de captacao entra como 'captacao'.
 create table if not exists modulos_conta (
   conta_id  uuid not null references contas(id) on delete cascade,

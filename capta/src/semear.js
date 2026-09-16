@@ -7,6 +7,14 @@ import * as repo from './repositorio.js';
  * escondem.
  */
 
+// Este script cria conta com senha publica, escrita aqui no repositorio.
+// Rodar contra producao por engano de DATABASE_URL entregaria uma porta de
+// entrada conhecida; por isso ele se recusa.
+if (process.env.NODE_ENV === 'production') {
+  console.error('semear nao roda em producao: ele cria conta com senha publica.');
+  process.exit(1);
+}
+
 const EMAIL = 'pierre@bellamoda.com.br';
 const SENHA = 'moda-de-teste-2026';
 

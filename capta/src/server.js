@@ -17,6 +17,8 @@ import { credenciaisProntas } from './credenciais.js';
 import { registrarRotasOauth, concluirOauth, configuracaoOauth } from './oauth.js';
 import { enviarRecuperacaoSenha } from './avisos.js';
 import { TERMOS } from './termos.js';
+import { exigirAmbiente } from './ambiente.js';
+import { ipDoCliente, SALTOS_CONFIAVEIS } from './rede.js';
 import {
   carregarConta, exigirConta, exigirOperador, ehOperador, aplicarRegua, entrar,
   montarCookie, limparCookie,
@@ -25,7 +27,8 @@ import {
 const aqui = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 app.disable('x-powered-by');
-app.set('trust proxy', true);
+// Numero exato de saltos confiaveis, nunca `true`: ver src/rede.js.
+app.set('trust proxy', SALTOS_CONFIAVEIS);
 
 /**
  * Express 4 nao captura promessa rejeitada de handler async: a falha some e a
@@ -132,14 +135,19 @@ app.post('/webhook/kiwify', express.raw({ type: '*/*', limit: '256kb' }), async 
 });
 
 /** Webhook de pedido da loja. A verificacao muda por plataforma. */
-app.post('/webhook/loja/:chave', express.raw({ type: '*/*', limit: '512kb' }), async (req, res) => {
+app.post('/webhook/loja/:chave', express.raw({ type: '*/*', limit: '512kb' }),
+  limitar({ porChave: 600, porIp: 120 }), async (req, res) => {
   const conexao = await repo.buscarConexaoPorChave(req.params.chave);
   if (!conexao) return res.status(404).end();
 
   const api = adaptador(conexao.plataforma);
-  const credenciais = await credenciaisProntas(conexao);
   const bruto = req.body.toString('utf8');
 
+  // Conferir a assinatura ANTES de qualquer coisa cara. A chave da loja e
+  // publica, viaja no HTML de toda vitrine; sem esta ordem, quem a copiasse
+  // forcava o servidor a decifrar credencial e, na Tray, a gastar rodadas de
+  // renovacao de token que podem invalidar a credencial do cliente.
+  const credenciais = await repo.credenciaisDaConexao(conexao.conta_id, conexao.id);
   if (!api.verificarWebhook?.(credenciais, bruto, req.headers)) {
     log.aviso('webhook.recusado', {
       conta_id: conexao.conta_id, conexao_id: conexao.id, motivo: 'assinatura',
@@ -153,7 +161,7 @@ app.post('/webhook/loja/:chave', express.raw({ type: '*/*', limit: '512kb' }), a
     let normalizado;
     if (api.lerPedido) {
       const idPedido = api.idDoWebhook ? api.idDoWebhook(bruto) : JSON.parse(bruto).id;
-      normalizado = await api.lerPedido(credenciais, idPedido);
+      normalizado = await api.lerPedido(await credenciaisProntas(conexao), idPedido);
       // Pedido ainda nao pago: responde 200 para a plataforma nao reenviar e
       // espera a proxima notificacao.
       if (!normalizado) return res.json({ ok: true, ignorado: 'nao pago' });
@@ -194,10 +202,13 @@ app.use(express.json({ limit: '32kb' }));
  * um cliente. O limite conta por chave e por IP: so por chave, um atacante
  * derruba a loja inteira; so por IP, ele troca de IP.
  */
-function limitar({ porChave, porIp, janela = 60 }) {
+function limitar({ porChave, porIp, janela = 60, chaveNoCorpo = false }) {
   return async (req, res, proximo) => {
-    const chave = req.params.chave || 'sem-chave';
-    const ip = req.ip || 'sem-ip';
+    // O /e recebe a chave da loja no corpo, e nao na rota. Sem isto o balde
+    // por chave era um so para o mundo inteiro: uma loja sob ataque derrubava
+    // o rastreamento de todas as outras, e nenhuma tinha teto proprio.
+    const chave = req.params.chave || (chaveNoCorpo ? req.body?.chave : null) || 'sem-chave';
+    const ip = ipDoCliente(req) || 'sem-ip';
     const [okChave, okIp] = await Promise.all([
       repo.consumirLimite(`chave:${chave}`, janela, porChave),
       repo.consumirLimite(`ip:${ip}:${chave}`, janela, porIp),
@@ -224,12 +235,9 @@ function limitar({ porChave, porIp, janela = 60 }) {
  */
 function liberarOrigem(req, res, proximo) {
   const origem = req.headers.origin;
-  if (origem) {
-    res.set('Access-Control-Allow-Origin', origem);
-    res.set('Access-Control-Allow-Credentials', 'true');
-  } else {
-    res.set('Access-Control-Allow-Origin', '*');
-  }
+  // Sem Allow-Credentials: nenhuma rota publica le cookie de sessao, e o
+  // cabecalho so serviria de armadilha para a proxima rota que lesse.
+  res.set('Access-Control-Allow-Origin', origem || '*');
   res.set('Access-Control-Allow-Headers', 'Content-Type');
   res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.set('Access-Control-Max-Age', '86400');
@@ -313,7 +321,7 @@ app.post('/w/lead/:chave', liberarOrigem, limitar({ porChave: 120, porIp: 10 }),
 });
 
 /** Rastreamento de navegacao. So do plano Crescimento para cima. */
-app.post('/e', liberarOrigem, limitar({ porChave: 3000, porIp: 240 }), async (req, res) => {
+app.post('/e', liberarOrigem, limitar({ porChave: 3000, porIp: 240, chaveNoCorpo: true }), async (req, res) => {
   const { chave, anonimoId, tipo, url, titulo, dados } = req.body || {};
   if (!chave || !anonimoId) return res.status(204).end();
 
@@ -325,7 +333,9 @@ app.post('/e', liberarOrigem, limitar({ porChave: 3000, porIp: 240 }), async (re
 
   await registrarEvento({
     conexao, anonimoId: String(anonimoId).slice(0, 64), tipo, url, titulo, dados,
-    ip: req.headers['x-forwarded-for'] || req.socket.remoteAddress,
+    // Nunca o cabecalho cru: ele e escrito pelo cliente. A rede que a gente
+    // guarda por LGPD tem que ser a de verdade, ou nao serve para nada.
+    ip: ipDoCliente(req),
   });
   res.status(204).end();
 });
@@ -351,6 +361,9 @@ async function acessoDaConta(contaId) {
 
 // Paginas de callback das plataformas. Publicas: quem chega aqui ainda nao
 // esta logado no Captapp, e o bilhete que sai daqui so vale com sessao.
+// O limite existe porque cada chamada vira requisicao HTTP de saida para a
+// loja; sem ele, a callback e um amplificador de graca.
+app.use(['/tray', '/nuvemshop'], limitar({ porChave: 60, porIp: 20 }));
 registrarRotasOauth(app);
 
 // ------------------------------------------------------------ painel: api ---
@@ -358,8 +371,26 @@ registrarRotasOauth(app);
 app.use(carregarConta);
 
 /** Sem teto, o login e forca bruta livre. Dez por minuto por IP e folgado para gente e apertado para robo. */
+function limitarPor(prefixo, janela, teto) {
+  return async (req, res, proximo) => {
+    const ok = await repo.consumirLimite(`${prefixo}:${ipDoCliente(req) || 'sem-ip'}`, janela, teto);
+    if (!ok) {
+      log.aviso('limite.estourado', { rota: req.path, por: 'ip' });
+      return res.status(429).json({ erro: 'muitas tentativas, espere um pouco' });
+    }
+    proximo();
+  };
+}
+
+// Criar conta e raro; varrer e-mails para descobrir quem e cliente, nao. Como
+// a resposta distingue e-mail ja cadastrado, o teto e o que impede a
+// enumeracao da base virar um script de um minuto. Vinte por hora deixa
+// passar o escritorio inteiro atras do mesmo IP de operadora e ainda assim
+// torna a varredura inviavel.
+const limitarCadastro = limitarPor('cadastro', 3600, 20);
+
 async function limitarEntrada(req, res, proximo) {
-  const ok = await repo.consumirLimite(`entrada:${req.ip || 'sem-ip'}`, 60, 10);
+  const ok = await repo.consumirLimite(`entrada:${ipDoCliente(req) || 'sem-ip'}`, 60, 10);
   if (!ok) {
     log.aviso('limite.estourado', { rota: req.path, por: 'ip' });
     return res.status(429).json({ erro: 'muitas tentativas, espere um minuto' });
@@ -373,7 +404,7 @@ app.get('/api/termos', (_req, res) => {
   res.json(TERMOS);
 });
 
-app.post('/api/cadastro', limitarEntrada, async (req, res) => {
+app.post('/api/cadastro', limitarEntrada, limitarCadastro, async (req, res) => {
   const { nome, email, senha, aceite } = req.body || {};
   if (!nome || !email || !senha) return res.status(400).json({ erro: 'campos obrigatorios' });
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim())) return res.status(400).json({ erro: 'e-mail invalido' });
@@ -385,7 +416,7 @@ app.post('/api/cadastro', limitarEntrada, async (req, res) => {
   try {
     const conta = await repo.criarConta({
       nome: String(nome).trim().slice(0, 120), email: String(email).trim(), senha: String(senha),
-      termosVersao: TERMOS.versao, termosRede: mascararIp(req.ip),
+      termosVersao: TERMOS.versao, termosRede: mascararIp(ipDoCliente(req)),
     });
     const sessaoId = await repo.criarSessao(conta.id);
     log.info('conta.criada', { conta_id: conta.id });
@@ -414,8 +445,12 @@ app.post('/api/senha/esqueci', limitarEntrada, async (req, res) => {
   if (email) {
     const recuperacao = await repo.criarRecuperacaoSenha(email);
     if (recuperacao) {
-      const envio = await enviarRecuperacaoSenha(recuperacao);
-      log.info('senha.recuperacao_pedida', { conta_id: recuperacao.conta.id, enviado: envio.enviado });
+      // O envio sai sem await de proposito: esperar o POST ao provedor faria
+      // a resposta demorar centenas de milissegundos so quando o e-mail
+      // existe, e esse atraso denuncia a base de clientes para quem mede.
+      enviarRecuperacaoSenha(recuperacao)
+        .then((envio) => log.info('senha.recuperacao_pedida', { conta_id: recuperacao.conta.id, enviado: envio.enviado }))
+        .catch((erro) => log.aviso('senha.recuperacao_falhou', { conta_id: recuperacao.conta.id, motivo: erro.message }));
     }
   }
   res.json({ ok: true, mensagem: 'Se o e-mail estiver cadastrado, o link para a senha nova chega em instantes.' });
@@ -437,6 +472,19 @@ app.post('/api/sair', async (req, res) => {
 });
 
 app.use('/api', exigirConta, aplicarRegua);
+
+/**
+ * Rastro da personificacao. Uma linha por acao que muda estado ou exporta
+ * dado, para a pergunta "quem exportou a base deste cliente" ter resposta.
+ */
+app.use('/api', (req, _res, proximo) => {
+  if (req.operadorId && (req.method !== 'GET' || req.path.endsWith('.csv'))) {
+    log.aviso('operador.agiu', {
+      operador_id: req.operadorId, conta_id: req.conta.id, metodo: req.method, rota: req.path,
+    });
+  }
+  proximo();
+});
 
 app.get('/api/eu', async (req, res) => {
   const assinatura = await repo.assinaturaDaConta(req.conta.id);
@@ -501,6 +549,16 @@ app.get('/api/conexoes/oauth', (_req, res) => {
     nuvemshop: cfg.nuvemshop,
     nuvemshopUrl: cfg.nuvemshop ? adaptador('nuvemshop').urlDeAutorizacao({ appId: cfg.nuvemshopAppId }) : null,
   });
+});
+
+/**
+ * O que ha para conectar, sem consumir o bilhete. Serve para o painel mostrar
+ * qual loja esta pedindo para entrar antes de o lojista confirmar.
+ */
+app.get('/api/conexoes/oauth/pendente', async (req, res) => {
+  const pendente = await repo.espiarConexaoPendente(req.query.bilhete);
+  if (!pendente) return res.status(404).json({ erro: 'bilhete invalido, vencido ou ja usado' });
+  res.json(pendente);
 });
 
 /** Fecha a conexao iniciada na callback de OAuth, agora com a conta dona. */
@@ -894,7 +952,7 @@ app.get('/api/admin/contas', exigirOperador, async (_req, res) => {
 app.post('/api/admin/contas/:id/entrar', exigirOperador, async (req, res) => {
   const alvo = await repo.buscarConta(req.params.id);
   if (!alvo) return res.status(404).json({ erro: 'conta nao encontrada' });
-  const sessaoId = await repo.criarSessao(alvo.id, 1);
+  const sessaoId = await repo.criarSessao(alvo.id, 1, req.conta.id);
   log.aviso('operador.entrou', { operador_id: req.conta.id, conta_id: alvo.id });
   res.set('Set-Cookie', montarCookie(sessaoId)).json({ conta: { id: alvo.id, nome: alvo.nome } });
 });
@@ -923,6 +981,9 @@ app.use((erro, req, res, _proximo) => {
 
 const porta = Number(process.env.PORTA) || 3000;
 if (process.env.NODE_ENV !== 'test') {
+  // Antes de aceitar a primeira requisicao: chave que falta tem que derrubar
+  // o deploy, e nao aparecer no primeiro login de cliente.
+  exigirAmbiente();
   app.listen(porta, () => log.info('servidor.subiu', { porta }));
   agendar();
 }

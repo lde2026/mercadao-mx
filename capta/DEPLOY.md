@@ -31,6 +31,8 @@ todo visitante de toda loja cliente.
    | `ASAAS_BASE` | `https://api.asaas.com/v3` |
    | `EMAIL_PROVEDOR`, `EMAIL_CHAVE`, `EMAIL_REMETENTE` | quando o e-mail estiver ligado |
    | `TRAY_CONSUMER_KEY`, `TRAY_CONSUMER_SECRET` | quando a Tray liberar o aplicativo; callback `https://captapp.lojadoecommerce.com.br/tray/callback` |
+   | `TRAY_DOMINIOS` | loja Tray em dominio proprio, uma por virgula |
+   | `CONFIAR_CLOUDFLARE=1` e `PROXY_SALTOS` | obrigatorio, para o limite por IP valer |
    | `NUVEMSHOP_CLIENT_ID`, `NUVEMSHOP_CLIENT_SECRET` | quando o app da Nuvemshop existir; redirecionamento `https://captapp.lojadoecommerce.com.br/nuvemshop/callback` |
    | `OPERADOR_EMAILS` | e-mails de quem administra o Captapp, separados por virgula. So eles veem a tela Admin |
    | `OPERADOR_EMAIL`, `OPERADOR_SENHA_INICIAL` | a conta do operador e criada na primeira subida com esses valores. Troque a senha no painel depois e apague a variavel |
@@ -167,3 +169,29 @@ regua de inadimplencia, a cota e a politica de dados que estao no codigo.
 Ainda assim, passe os dois pelo seu advogado antes de anunciar: o texto e
 seu, a responsabilidade e sua, e uma clausula de limitacao de
 responsabilidade mal redigida nao vale nada num processo.
+
+## 9. Duas coisas de seguranca que dependem do servidor, nao do codigo
+
+### 9.1 O Cloudflare tem que ser a unica porta de entrada
+
+Com `CONFIAR_CLOUDFLARE=1` o servidor passa a confiar no cabecalho
+`CF-Connecting-IP` para saber de onde veio a requisicao. O Cloudflare
+sobrescreve esse cabecalho, entao nao da para forjar **por la**. Mas se
+alguem alcancar o container direto, sem passar pelo Cloudflare, ele escreve o
+cabecalho que quiser e volta a escolher o proprio IP, o que derruba o limite
+de forca bruta de senha.
+
+No Railway, isso significa nao divulgar o dominio `*.up.railway.app` e, se a
+plataforma permitir, restringir a entrada as faixas do Cloudflare. Sem isso,
+deixe `CONFIAR_CLOUDFLARE` vazio e ajuste `PROXY_SALTOS` para o numero real
+de saltos.
+
+### 9.2 A CHAVE_CREDENCIAIS e o backup
+
+O `pg_dump` sozinho nao restaura nada de util: as credenciais das lojas estao
+cifradas com `CHAVE_CREDENCIAIS`, que nao fica no banco. Guarde a chave em
+lugar separado do dump, e com a mesma durabilidade. Perder a chave significa
+pedir a cada cliente que reconecte a loja na mao.
+
+O contrario tambem vale: quem tem o dump **e** a chave tem as credenciais de
+todas as lojas dos clientes. Os dois nunca no mesmo lugar.

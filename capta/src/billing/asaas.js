@@ -96,7 +96,7 @@ export async function processarWebhook(corpo) {
   }
 
   if (QUITAM.has(evento)) {
-    await repo.quitarCobranca('asaas', pagamento.id);
+    await repo.quitarCobranca('asaas', pagamento.id, conta.id);
     log.info('cobranca.paga', { conta_id: conta.id, origem: 'asaas', evento });
     return { tratado: true, acao: 'quitada' };
   }

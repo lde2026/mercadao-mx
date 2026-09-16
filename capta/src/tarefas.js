@@ -129,7 +129,7 @@ export async function reenviarCuponsFalhos() {
       if (api.criaCupomPorApi === false) {
         // No lote a falha anterior foi lote vazio, entao a segunda chance so
         // existe se o lojista tiver reposto os codigos.
-        codigo = await repo.tirarDoLote(cupom.conexao_id, cupom.lead_id);
+        codigo = await repo.tirarDoLote(cupom.conta_id, cupom.conexao_id, cupom.lead_id);
         if (!codigo) continue;
       } else {
         const credenciais = await credenciaisProntas({

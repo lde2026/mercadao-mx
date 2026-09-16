@@ -22,6 +22,52 @@ import * as repo from './repositorio.js';
 
 const VALIDADE_BILHETE_MINUTOS = 15;
 
+/**
+ * Para onde o segredo do nosso aplicativo pode ser enviado.
+ *
+ * A Tray manda o `api_address` na propria query da callback, e a troca do
+ * code exige um POST com consumer_key e consumer_secret para esse endereco.
+ * Sem restricao, qualquer pessoa chama a callback com api_address apontando
+ * para o servidor dela e recebe o segredo do nosso aplicativo, que vale para
+ * TODAS as lojas conectadas. Apontando para 127.0.0.1 ou para o servico de
+ * metadados da nuvem, vira varredura da rede interna com o erro devolvido na
+ * tela como oraculo.
+ *
+ * Por isso o destino e uma lista fechada. Loja em dominio proprio entra em
+ * TRAY_DOMINIOS, uma por vez, na hora de conectar. E chato de proposito:
+ * a alternativa e um segredo que qualquer um coleta.
+ */
+const SUFIXOS_TRAY = ['.commercesuite.com.br'];
+
+function dominiosPermitidos() {
+  const extras = (process.env.TRAY_DOMINIOS || '')
+    .split(',').map((d) => d.trim().toLowerCase()).filter(Boolean);
+  return [...SUFIXOS_TRAY, ...extras];
+}
+
+/** Devolve a URL normalizada, ou null quando o destino nao e aceitavel. */
+export function enderecoDeLojaTray(bruto, { exigirHttps = process.env.NODE_ENV === 'production' } = {}) {
+  let url;
+  try {
+    url = new URL(String(bruto || '').trim());
+  } catch {
+    return null;
+  }
+  if (url.protocol !== 'https:' && (exigirHttps || url.protocol !== 'http:')) return null;
+  if (url.port && !['', '80', '443'].includes(url.port)) return null;
+  if (url.username || url.password) return null;
+
+  const host = url.hostname.toLowerCase();
+  // Endereco numerico nunca e loja: e tentativa de alcancar a rede interna.
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(host) || host.includes(':') || host.startsWith('[')) return null;
+  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') || host.endsWith('.internal')) return null;
+
+  const aceito = dominiosPermitidos().some((sufixo) => (
+    sufixo.startsWith('.') ? host.endsWith(sufixo) : host === sufixo || host.endsWith(`.${sufixo}`)
+  ));
+  return aceito ? url : null;
+}
+
 const URL_PUBLICA = () => process.env.URL_PUBLICA || 'http://localhost:3000';
 
 export function configuracaoOauth() {
@@ -79,15 +125,17 @@ export function registrarRotasOauth(app) {
   app.get('/tray/callback', (req, res) => {
     cabecalhosDeCallback(res);
     const { tray: pronto } = configuracaoOauth();
-    const dominioLoja = String(req.query.url || req.query.store_host || '').trim();
     if (!pronto) {
       return res.status(503).send(pagina('Captapp', '<h1>Captapp</h1><p class="erro">A integracao com a Tray ainda nao esta configurada neste servidor.</p>'));
     }
-    if (!/^https?:\/\/[a-z0-9.-]+/i.test(dominioLoja)) {
-      return res.status(400).send(pagina('Captapp', '<h1>Captapp</h1><p class="erro">Abra esta pagina pelo painel da sua loja Tray, em Meus aplicativos.</p>'));
+    // Sem esta conferencia, a pagina viraria um botao de aparencia oficial,
+    // no nosso dominio, apontando para onde o atacante quisesse.
+    const loja = enderecoDeLojaTray(req.query.url || req.query.store_host);
+    if (!loja) {
+      return res.status(400).send(pagina('Captapp', '<h1>Captapp</h1><p class="erro">Abra esta pagina pelo painel da sua loja Tray, em Meus aplicativos. Se a sua loja usa dominio proprio, fale com a gente para liberar o endereco.</p>'));
     }
     const destino = tray.urlDeAutorizacao({
-      dominioLoja,
+      dominioLoja: loja.origin,
       consumerKey: process.env.TRAY_CONSUMER_KEY,
       callback: `${URL_PUBLICA()}/tray/callback/auth`,
     });
@@ -104,12 +152,26 @@ export function registrarRotasOauth(app) {
     if (!code || !apiAddress) {
       return res.status(400).send(pagina('Captapp', '<h1>Captapp</h1><p class="erro">A Tray nao mandou o codigo de autorizacao. Tente instalar de novo pelo painel da loja.</p>'));
     }
+    // O consumer_secret vai no corpo do POST para este endereco. Ele so pode
+    // sair daqui para uma loja Tray conhecida.
+    const destinoApi = enderecoDeLojaTray(apiAddress);
+    if (!destinoApi) {
+      log.aviso('oauth.tray.destino_recusado', { host: (() => { try { return new URL(String(apiAddress)).hostname; } catch { return 'ilegivel'; } })() });
+      return res.status(400).send(pagina('Captapp', '<h1>Captapp</h1><p class="erro">Endereco de API nao reconhecido como loja Tray. Se a sua loja usa dominio proprio, fale com a gente para liberar o endereco.</p>'));
+    }
     try {
       const credenciais = await tray.trocarCodigo({
-        apiAddress: String(apiAddress), code: String(code),
+        apiAddress: destinoApi.toString().replace(/\/+$/, ''), code: String(code),
         consumerKey: process.env.TRAY_CONSUMER_KEY,
         consumerSecret: process.env.TRAY_CONSUMER_SECRET,
       });
+      // A loja responde com api_host, e e nele que as chamadas futuras vao.
+      // Uma loja comprometida poderia apontar para fora; a lista fechada vale
+      // para a resposta tambem.
+      if (!enderecoDeLojaTray(credenciais.api_address)) {
+        log.aviso('oauth.tray.api_host_recusado', { store_id: credenciais.store_id || null });
+        credenciais.api_address = destinoApi.toString().replace(/\/+$/, '');
+      }
       if (!credenciais.store_id && store) credenciais.store_id = String(store);
       const token = await bilhete('tray', credenciais, { storeHost: storeHost ? String(storeHost) : null });
       log.info('oauth.tray.autorizado', { store_id: credenciais.store_id });

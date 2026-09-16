@@ -34,6 +34,20 @@ test('a versao vigente dos termos e publica, sem sessao', async () => {
   assert.match(dados.urlPrivacidade, /^https:\/\//);
 });
 
+test('cadastro com aceite grava versao, data e rede mascarada', async () => {
+  const email = `com-aceite-${Date.now()}@teste.com.br`;
+  const r = await cadastrar({ nome: 'Loja Com Aceite', email, senha: 'senha-de-teste-123', aceite: true });
+  assert.equal(r.status, 200);
+
+  const { rows } = await consultar(
+    'select termos_versao, termos_aceitos_em, termos_rede from contas where email = $1', [email],
+  );
+  assert.equal(rows[0].termos_versao, TERMOS.versao);
+  assert.ok(rows[0].termos_aceitos_em instanceof Date, 'a data do aceite tem que estar gravada');
+  // Mesma regra do evento do visitante: rede, nunca o endereco inteiro.
+  if (rows[0].termos_rede) assert.match(rows[0].termos_rede, /\/\d+$/);
+});
+
 test('cadastro sem aceite e recusado e nao cria conta', async () => {
   const email = `sem-aceite-${Date.now()}@teste.com.br`;
   const r = await cadastrar({ nome: 'Loja Sem Aceite', email, senha: 'senha-de-teste-123' });
@@ -53,18 +67,5 @@ test('aceite falso ou ausente vale como recusa', async () => {
   }
 });
 
-test('cadastro com aceite grava versao, data e rede mascarada', async () => {
-  const email = `com-aceite-${Date.now()}@teste.com.br`;
-  const r = await cadastrar({ nome: 'Loja Com Aceite', email, senha: 'senha-de-teste-123', aceite: true });
-  assert.equal(r.status, 200);
-
-  const { rows } = await consultar(
-    'select termos_versao, termos_aceitos_em, termos_rede from contas where email = $1', [email],
-  );
-  assert.equal(rows[0].termos_versao, TERMOS.versao);
-  assert.ok(rows[0].termos_aceitos_em instanceof Date, 'a data do aceite tem que estar gravada');
-  // Mesma regra do evento do visitante: rede, nunca o endereco inteiro.
-  if (rows[0].termos_rede) assert.match(rows[0].termos_rede, /\/\d+$/);
-});
 
 test.after(async () => { servidor.close(); await pool.end(); });

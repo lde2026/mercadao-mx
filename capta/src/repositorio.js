@@ -114,6 +114,22 @@ export async function resgatarConexaoPendente(id) {
   };
 }
 
+/**
+ * Espia sem queimar, so para o painel poder perguntar "conectar a loja X a
+ * esta conta?" antes de conectar. Devolve o minimo: plataforma e endereco da
+ * loja, nunca credencial.
+ */
+export async function espiarConexaoPendente(id) {
+  if (!/^[0-9a-f-]{36}$/i.test(String(id || ''))) return null;
+  const { rows } = await consultar(
+    `select plataforma, extras from conexoes_pendentes
+      where id = $1 and usado_em is null and expira_em > now()`,
+    [id],
+  );
+  if (!rows[0]) return null;
+  return { plataforma: rows[0].plataforma, loja: rows[0].extras?.storeHost || null };
+}
+
 /** Limpeza: pendencia vencida nao serve para nada e guarda token cifrado. */
 export async function limparConexoesPendentes() {
   await consultar(
@@ -166,12 +182,12 @@ export async function usarRecuperacaoSenha(token, novaSenha) {
 
 // --------------------------------------------------------------- sessoes ---
 
-export async function criarSessao(contaId, duracaoDias = 14) {
+export async function criarSessao(contaId, duracaoDias = 14, operadorId = null) {
   const id = crypto.randomBytes(32).toString('base64url');
   await consultar(
-    `insert into sessoes (id, conta_id, expira_em)
-     values ($1, $2, now() + ($3 || ' days')::interval)`,
-    [id, contaId, String(duracaoDias)],
+    `insert into sessoes (id, conta_id, expira_em, operador_id)
+     values ($1, $2, now() + ($3 || ' days')::interval, $4)`,
+    [id, contaId, String(duracaoDias), operadorId],
   );
   return id;
 }
@@ -179,7 +195,7 @@ export async function criarSessao(contaId, duracaoDias = 14) {
 export async function buscarSessao(id) {
   if (!id) return null;
   const { rows } = await consultar(
-    `select s.conta_id, c.nome, c.email
+    `select s.conta_id, s.operador_id, c.nome, c.email
        from sessoes s join contas c on c.id = s.conta_id
       where s.id = $1 and s.expira_em > now()`,
     [id],
@@ -490,9 +506,11 @@ export async function registrarCupomPendente({
   return rows[0];
 }
 
-export async function marcarCupom(cupomId, status, erro = null) {
-  await consultar(`update cupons set status = $1, erro = $2 where id = $3`,
-    [status, erro, cupomId]);
+export async function marcarCupom(contaId, cupomId, status, erro = null) {
+  await consultar(
+    `update cupons set status = $1, erro = $2 where id = $3 and conta_id = $4`,
+    [status, erro, cupomId, contaId],
+  );
 }
 
 export async function adicionarAoLote(contaId, conexaoId, codigos) {
@@ -514,17 +532,17 @@ export async function adicionarAoLote(contaId, conexaoId, codigos) {
  * Tira um codigo do lote de forma atomica. O update com subselect e for update
  * skip locked evita que dois leads simultaneos levem o mesmo codigo.
  */
-export async function tirarDoLote(conexaoId, leadId) {
+export async function tirarDoLote(contaId, conexaoId, leadId) {
   const { rows } = await consultar(
-    `update lote_cupons set lead_id = $2, usado_em = now()
+    `update lote_cupons set lead_id = $3, usado_em = now()
       where id = (
         select id from lote_cupons
-         where conexao_id = $1 and lead_id is null
+         where conexao_id = $2 and conta_id = $1 and lead_id is null
          order by criado_em
          limit 1 for update skip locked
       )
       returning codigo`,
-    [conexaoId, leadId],
+    [contaId, conexaoId, leadId],
   );
   return rows[0]?.codigo || null;
 }
@@ -665,12 +683,17 @@ export async function registrarCobranca({
   return rows[0];
 }
 
-export async function quitarCobranca(origem, idExterno) {
+/**
+ * Quita a cobranca. O contaId vem de quem ja resolveu o dono pelo webhook, e
+ * entra no where: se o provedor repetir um id_externo de outra conta, a
+ * consulta nao acha linha em vez de quitar a fatura de outro cliente.
+ */
+export async function quitarCobranca(origem, idExterno, contaId = null) {
   const { rows } = await consultar(
     `update cobrancas set status = 'paga', pago_em = now(), atualizado_em = now()
-      where origem = $1 and id_externo = $2
+      where origem = $1 and id_externo = $2 and ($3::uuid is null or conta_id = $3)
       returning conta_id`,
-    [origem, idExterno],
+    [origem, idExterno, contaId],
   );
   return rows[0] || null;
 }
@@ -719,20 +742,16 @@ export async function alertarLoteBaixo({ contaId, conexaoId, mensagem, dados = {
   return true;
 }
 
-export async function alertasAbertos(limite = 50) {
-  const { rows } = await consultar(
-    `select * from alertas where resolvido = false order by criado_em desc limit $1`,
-    [limite],
-  );
-  return rows;
-}
-
 /**
  * Contador por janela em banco, e nao em memoria, porque o limite precisa
  * valer com mais de um processo e sobreviver a restart. A janela vira parte
  * da chave primaria, entao contar e um unico insert.
  */
-export async function consumirLimite(chave, janelaSegundos, teto) {
+export async function consumirLimite(chaveBruta, janelaSegundos, teto) {
+  // A chave entra na chave primaria da tabela. Sem teto de tamanho, quem
+  // manda chave de loja gigante enche o indice de lixo e, passado o limite do
+  // btree, a rota passa a devolver 500 em vez de 429.
+  const chave = String(chaveBruta).slice(0, 120);
   const janela = Math.floor(Date.now() / 1000 / janelaSegundos);
   const { rows } = await consultar(
     `insert into limites (chave, janela, contagem) values ($1, $2, 1)

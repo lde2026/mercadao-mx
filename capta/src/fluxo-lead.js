@@ -62,7 +62,7 @@ async function entregarCupom({ conexao, fluxo, lead }) {
   // Na Loja Integrada o codigo sai do lote que o lojista cadastrou antes,
   // porque a v1 publica nao expoe endpoint de cupom.
   if (api.criaCupomPorApi === false) {
-    const codigo = await repo.tirarDoLote(conexao.id, lead.id);
+    const codigo = await repo.tirarDoLote(conexao.conta_id, conexao.id, lead.id);
     if (!codigo) {
       await avisarLoteBaixo({ conexao, disponiveis: 0 });
       await falhou({ conexao, lead, desconto, motivo: 'lote de cupons vazio' });
@@ -71,7 +71,7 @@ async function entregarCupom({ conexao, fluxo, lead }) {
     const registro = await repo.registrarCupomPendente({
       contaId: conexao.conta_id, conexaoId: conexao.id, leadId: lead.id, codigo, desconto, tipo,
     });
-    await repo.marcarCupom(registro.id, 'criado');
+    await repo.marcarCupom(conexao.conta_id, registro.id, 'criado');
     log.info('cupom.entregue', {
       conta_id: conexao.conta_id, conexao_id: conexao.id, lead_id: lead.id, origem: 'lote',
     });
@@ -94,13 +94,13 @@ async function entregarCupom({ conexao, fluxo, lead }) {
   try {
     const credenciais = await credenciaisProntas(conexao);
     await api.criarCupom(credenciais, { codigo, desconto, frete });
-    await repo.marcarCupom(registro.id, 'criado');
+    await repo.marcarCupom(conexao.conta_id, registro.id, 'criado');
     log.info('cupom.entregue', {
       conta_id: conexao.conta_id, conexao_id: conexao.id, lead_id: lead.id, origem: 'api',
     });
     return { status: 'criado', codigo, desconto, frete };
   } catch (erro) {
-    await repo.marcarCupom(registro.id, 'falhou', erro.message);
+    await repo.marcarCupom(conexao.conta_id, registro.id, 'falhou', erro.message);
 
     // 402 da Nuvemshop nao e defeito nosso: e a loja inadimplente com a
     // propria plataforma. Marcar na conexao evita o lojista abrir chamado

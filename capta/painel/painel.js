@@ -1198,19 +1198,58 @@
   function verIntegracoes() {
     var alvo = pintar('Integrações', 'Conecte a loja, resolva a instalação e o chat entra no ar.');
     var bilhete = bilheteNoEndereco();
-    if (bilhete) {
-      var aviso = el('p', 'Fechando a conexão com a loja autorizada...', 'legenda');
-      alvo.appendChild(aviso);
-      api('/conexoes/oauth', { method: 'POST', corpo: { bilhete: bilhete } })
-        .then(function (r) {
-          aviso.textContent = r.conexao.nome_loja + ' conectada' + (r.instalacao && r.instalacao.modo === 'auto' ? ' e widget instalado.' : '.');
-          aviso.className = 'ok';
-          listarConexoes(alvo);
-        })
-        .catch(function (e) { aviso.textContent = 'Não deu para fechar a conexão: ' + e.message; aviso.className = 'erro'; listarConexoes(alvo); });
-      return;
-    }
+    if (bilhete) perguntarAntesDeConectar(alvo, bilhete);
     listarConexoes(alvo);
+  }
+
+  /**
+   * Chegar com um bilhete no endereço não conecta nada sozinho.
+   *
+   * Sem esta confirmação, bastaria induzir um lojista logado a abrir um link
+   * de callback para que a loja de outra pessoa fosse plantada na conta dele,
+   * queimando a cota e misturando os leads. Aqui ele vê de qual loja se trata
+   * e decide.
+   */
+  function perguntarAntesDeConectar(alvo, bilhete) {
+    var cartao = el('div', null, 'cartao confirmar-loja');
+    alvo.appendChild(cartao);
+    cartao.appendChild(el('p', 'Conferindo o pedido de conexão...', 'legenda'));
+
+    api('/conexoes/oauth/pendente?bilhete=' + encodeURIComponent(bilhete)).then(function (p) {
+      cartao.textContent = '';
+      cartao.appendChild(el('div', 'Uma loja quer se conectar', 'rotulo'));
+      cartao.appendChild(el('p', 'Uma loja ' + (NOME_PLATAFORMA[p.plataforma] || p.plataforma)
+        + (p.loja ? ' (' + String(p.loja).replace(/^https?:\/\//, '') + ')' : '')
+        + ' autorizou o Captapp. Conectar à conta ' + (eu && eu.conta ? eu.conta.nome : 'atual') + '?', 'legenda'));
+      cartao.appendChild(el('p', 'Se você não começou esta conexão agora, descarte.', 'hora'));
+
+      var erro = el('p', null, 'erro'); erro.hidden = true;
+      var acoes = el('div', null, 'acoes');
+      var conectar = el('button', 'Conectar esta loja');
+      var descartar = el('button', 'Descartar', 'secundario');
+      conectar.type = 'button'; descartar.type = 'button';
+      conectar.addEventListener('click', function () {
+        conectar.disabled = true; descartar.disabled = true; erro.hidden = true;
+        api('/conexoes/oauth', { method: 'POST', corpo: { bilhete: bilhete } })
+          .then(function (r) {
+            cartao.textContent = '';
+            cartao.appendChild(el('p', r.conexao.nome_loja + ' conectada'
+              + (r.instalacao && r.instalacao.modo === 'auto' ? ' e widget instalado.' : '.'), 'ok'));
+            listarConexoes(alvo);
+          })
+          .catch(function (e) {
+            erro.textContent = e.message; erro.hidden = false;
+            conectar.disabled = false; descartar.disabled = false;
+          });
+      });
+      descartar.addEventListener('click', function () { cartao.remove(); });
+      acoes.appendChild(conectar); acoes.appendChild(descartar);
+      cartao.appendChild(erro);
+      cartao.appendChild(acoes);
+    }).catch(function (e) {
+      cartao.textContent = '';
+      cartao.appendChild(el('p', 'Não foi possível conectar: ' + e.message, 'erro'));
+    });
   }
 
   function listarConexoes(alvo) {

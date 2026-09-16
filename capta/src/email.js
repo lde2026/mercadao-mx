@@ -69,9 +69,24 @@ function escapar(texto) {
   }[c]));
 }
 
+/**
+ * O titulo e escapado AQUI, e nao em cada chamador, porque quem escreve um
+ * template novo esquece. Ele carrega nome de loja, que e texto livre digitado
+ * pelo lojista, e este HTML sai do nosso dominio para a caixa de entrada de
+ * um terceiro: o lead. O corpo chega pronto e ja escapado pelo template.
+ */
 function moldura(titulo, corpo) {
   return `<div style="font:15px/1.6 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#111318;max-width:520px;margin:0 auto;padding:24px">
-<h1 style="font-size:20px;margin:0 0 16px">${titulo}</h1>${corpo}</div>`;
+<h1 style="font-size:20px;margin:0 0 16px">${escapar(titulo)}</h1>${corpo}</div>`;
+}
+
+/**
+ * Assunto nao aceita quebra de linha: e o formato que separa um cabecalho do
+ * proximo. Resend e Postmark ja recusam, mas a limpeza fica do nosso lado
+ * para nao depender do provedor da vez.
+ */
+function assuntoLimpo(texto) {
+  return String(texto).replace(/[\r\n]+/g, ' ').trim().slice(0, 200);
 }
 
 /**
@@ -82,7 +97,7 @@ function moldura(titulo, corpo) {
 export function cupomAtrasado({ nomeLead, nomeLoja, codigo, desconto }) {
   const texto = `Olá, ${nomeLead}.\n\nSeu cupom de ${desconto}% na ${nomeLoja} é ${codigo}.\n\nUse no carrinho. Ele é só seu e vale uma vez.`;
   return {
-    assunto: `Seu cupom de ${desconto}% na ${nomeLoja}`,
+    assunto: assuntoLimpo(`Seu cupom de ${desconto}% na ${nomeLoja}`),
     texto,
     html: moldura(`Seu cupom de ${desconto}% na ${nomeLoja}`,
       `<p>Olá, ${escapar(nomeLead)}.</p>
@@ -109,13 +124,13 @@ export function avisoDeCobranca({ nomeConta, aviso, diasAtraso }) {
 export function leadQuente({ nomeConta, nomeLead, nomeLoja, telefone, respostas, urlPainel }) {
   const linhas = respostas.map((r) => `- ${r.pergunta} ${r.resposta}`).join('\n');
   return {
-    assunto: `Lead novo na ${nomeLoja}: ${nomeLead}`,
+    assunto: assuntoLimpo(`Lead novo na ${nomeLoja}: ${nomeLead}`),
     texto: `Olá, ${nomeConta}.\n\n${nomeLead} acabou de responder o chat na ${nomeLoja}.\n\n${linhas}\n\nWhatsApp: ${telefone}\n\nAbra no painel: ${urlPainel}`,
     html: moldura(`Lead novo na ${nomeLoja}`,
       `<p><strong>${escapar(nomeLead)}</strong> acabou de responder o chat.</p>
        <ul>${respostas.map((r) => `<li>${escapar(r.pergunta)} <strong>${escapar(r.resposta)}</strong></li>`).join('')}</ul>
        <p>WhatsApp: <strong>${escapar(telefone)}</strong></p>
-       <p><a href="${urlPainel}">Abrir no painel</a></p>`),
+       <p><a href="${escapar(urlPainel)}">Abrir no painel</a></p>`),
   };
 }
 
@@ -125,25 +140,25 @@ export function alertaOperador({ tipo, mensagem, nomeConta, dados, urlPainel }) 
     .filter(([, v]) => v != null && typeof v !== 'object')
     .map(([k, v]) => `${k}: ${v}`);
   return {
-    assunto: `[Captapp] ${tipo}${nomeConta ? ` em ${nomeConta}` : ''}`,
+    assunto: assuntoLimpo(`[Captapp] ${tipo}${nomeConta ? ` em ${nomeConta}` : ''}`),
     texto: `${mensagem}\n\n${detalhes.join('\n')}\n\nPainel do operador: ${urlPainel}`,
     html: moldura(`Alerta: ${tipo}`,
       `<p>${escapar(mensagem)}</p>
        ${nomeConta ? `<p>Conta: <strong>${escapar(nomeConta)}</strong></p>` : ''}
        ${detalhes.length ? `<ul>${detalhes.map((d) => `<li>${escapar(d)}</li>`).join('')}</ul>` : ''}
-       <p><a href="${urlPainel}">Abrir o painel do operador</a></p>`),
+       <p><a href="${escapar(urlPainel)}">Abrir o painel do operador</a></p>`),
   };
 }
 
 /** Recuperacao de senha. O link vale uma hora e uma vez so. */
 export function recuperacaoSenha({ nomeConta, url }) {
   return {
-    assunto: 'Redefinir sua senha do Captapp',
+    assunto: assuntoLimpo('Redefinir sua senha do Captapp'),
     texto: `Olá, ${nomeConta}.\n\nPara escolher uma senha nova, abra este link em até uma hora:\n${url}\n\nSe você não pediu isso, ignore este e-mail. Sua senha continua a mesma.`,
     html: moldura('Redefinir sua senha',
       `<p>Olá, ${escapar(nomeConta)}.</p>
        <p>Para escolher uma senha nova, abra o link abaixo em até uma hora.</p>
-       <p><a href="${url}" style="display:inline-block;background:#15803d;color:#fff;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:10px">Escolher senha nova</a></p>
+       <p><a href="${escapar(url)}" style="display:inline-block;background:#15803d;color:#fff;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:10px">Escolher senha nova</a></p>
        <p>Se você não pediu isso, ignore este e-mail. Sua senha continua a mesma.</p>`),
   };
 }
@@ -156,12 +171,12 @@ export function recuperacaoSenha({ nomeConta, url }) {
 export function loteAcabando({ nomeConta, nomeLoja, disponiveis, urlPainel }) {
   const texto = `Olá, ${nomeConta}.\n\nO lote de cupons da ${nomeLoja} está em ${disponiveis} código(s) disponível(is).\n\nQuando ele zerar, quem responder o chat fica sem o cupom prometido. Cadastre novos códigos no painel da plataforma e cole em ${urlPainel}.`;
   return {
-    assunto: `Lote de cupons acabando na ${nomeLoja}: ${disponiveis} restantes`,
+    assunto: assuntoLimpo(`Lote de cupons acabando na ${nomeLoja}: ${disponiveis} restantes`),
     texto,
     html: moldura('Lote de cupons acabando',
       `<p>Olá, ${escapar(nomeConta)}.</p>
        <p>O lote de cupons da <strong>${escapar(nomeLoja)}</strong> está em <strong>${escapar(disponiveis)}</strong> código(s) disponível(is).</p>
        <p>Quando ele zerar, quem responder o chat fica sem o cupom prometido.</p>
-       <p><a href="${urlPainel}">Repor o lote no painel</a></p>`),
+       <p><a href="${escapar(urlPainel)}">Repor o lote no painel</a></p>`),
   };
 }

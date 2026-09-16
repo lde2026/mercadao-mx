@@ -5,18 +5,31 @@
  */
 
 const PROIBIDOS = new Set([
-  'email', 'telefone', 'whatsapp', 'nome', 'senha', 'credenciais',
-  'access_token', 'refresh_token', 'consumer_secret', 'chave_api',
+  'email', 'telefone', 'whatsapp', 'nome', 'senha', 'senha_hash', 'credenciais',
+  'access_token', 'refresh_token', 'consumer_key', 'consumer_secret',
+  'client_secret', 'chave_api', 'chave_aplicacao', 'segredo_webhook',
+  'bilhete', 'token', 'token_hash', 'cookie', 'authorization',
 ]);
 
-function limpar(campos) {
+/**
+ * A limpeza desce nos objetos aninhados. Antes ela so olhava o primeiro
+ * nivel, entao um `{ dados: { access_token } }` passava inteiro para o log.
+ * Nenhuma chamada fazia isso hoje, mas a proxima faria, e log e para sempre.
+ */
+function limpar(campos, profundidade = 0) {
   const saida = {};
   for (const [chave, valor] of Object.entries(campos || {})) {
-    if (PROIBIDOS.has(chave)) {
+    if (PROIBIDOS.has(chave.toLowerCase())) {
       saida[chave] = '[removido]';
       continue;
     }
-    saida[chave] = valor instanceof Error ? valor.message : valor;
+    if (valor instanceof Error) {
+      saida[chave] = valor.message;
+    } else if (valor && typeof valor === 'object' && !Array.isArray(valor) && profundidade < 3) {
+      saida[chave] = limpar(valor, profundidade + 1);
+    } else {
+      saida[chave] = valor;
+    }
   }
   return saida;
 }

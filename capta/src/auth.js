@@ -30,7 +30,13 @@ export function montarCookie(sessaoId) {
 }
 
 export function limparCookie() {
-  return `${COOKIE}=; Path=/; HttpOnly; Max-Age=0`;
+  // Mesmos atributos do cookie original: navegador que nao casa atributo
+  // pode deixar o cookie antigo de pe e o logout nao acontece.
+  const producao = process.env.NODE_ENV === 'production';
+  return [
+    `${COOKIE}=`, 'Path=/', 'HttpOnly', 'SameSite=Lax', 'Max-Age=0',
+    producao ? 'Secure' : '',
+  ].filter(Boolean).join('; ');
 }
 
 function lerCookie(req) {
@@ -55,6 +61,9 @@ export async function carregarConta(req, _res, proximo) {
     if (sessao) {
       req.conta = { id: sessao.conta_id, nome: sessao.nome, email: sessao.email };
       req.sessaoId = sessaoId;
+      // Sessao de personificacao: quem investiga o log depois precisa saber
+      // que a acao foi de um operador dentro da conta, e nao do lojista.
+      req.operadorId = sessao.operador_id || null;
     }
   }
   proximo();
