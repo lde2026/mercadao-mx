@@ -41,18 +41,24 @@ export const woocommerce = {
 
   /**
    * O WooCommerce nao tem API de injecao de script porque quem manda no tema
-   * e o WordPress. Quem resolve e o nosso plugin, que de quebra vira canal de
-   * distribuicao no repositorio oficial. Por isso o modo e manual mesmo com a
-   * API sendo a mais aberta das quatro.
+   * e o WordPress. Por isso o modo e manual mesmo com a API sendo a mais
+   * aberta das quatro.
+   *
+   * Duas saidas, e a tag vem junto de proposito: o plugin so aparece em
+   * "Plugins, Adicionar novo" depois de publicado no repositorio oficial do
+   * WordPress, e ate la essa instrucao sozinha manda o lojista procurar uma
+   * coisa que nao existe. Colar a tag no tema funciona hoje, em qualquer
+   * loja WooCommerce, sem depender de aprovacao de ninguem.
    */
   async instalarScript(credenciais, urlScript) {
     return {
       modo: 'manual',
       instrucoes: [
-        'Instale o plugin Captapp no WordPress da loja, em Plugins e Adicionar novo.',
-        'Em Configuracoes e Captapp, cole a chave da loja mostrada nesta tela.',
-        'O plugin injeta o widget sozinho e mantem a atualizacao.',
+        'Cole a tag abaixo no tema, antes do </body>: em Aparencia, Editor de temas, ou pelo seu plugin de cabecalho e rodape.',
+        'Salve e recarregue a loja. O botao aparece no canto que voce escolheu.',
+        'Alternativa, quando o plugin Captapp estiver publicado no WordPress: instale por Plugins, Adicionar novo, e cole a chave da loja em Configuracoes, Captapp. Ele injeta o widget sozinho e se mantem atualizado.',
       ],
+      tag: `<script async src="${urlScript}"></script>`,
       urlScript,
     };
   },

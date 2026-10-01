@@ -87,6 +87,17 @@ test('a varredura de pedidos nao enxerga esta loja', async () => {
   assert.ok(!paraVarrer.some((c) => c.plataforma === 'outra'));
 });
 
+test('WooCommerce tambem entrega a tag, nao so a instrucao do plugin', async () => {
+  // O plugin so existe em "Plugins, Adicionar novo" depois de publicado no
+  // repositorio do WordPress. Sem a tag junto, a instrucao manda o lojista
+  // procurar uma coisa que ainda nao esta la, e a instalacao trava.
+  const api = adaptador('woocommerce');
+  const r = await api.instalarScript({}, 'https://captapp.lojadoecommerce.com.br/widget.js?k=pk_x');
+  assert.equal(r.modo, 'manual');
+  assert.match(r.tag, /^<script async src="https:\/\/captapp\.lojadoecommerce\.com\.br\/widget\.js\?k=pk_x"/);
+  assert.ok(r.instrucoes.some((i) => /tema/i.test(i)), 'o primeiro caminho tem que ser o que funciona hoje');
+});
+
 test('plataforma inventada continua sendo recusada', async () => {
   const r = await pedir('/api/conexoes', {
     metodo: 'POST',
