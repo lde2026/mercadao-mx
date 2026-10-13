@@ -1141,6 +1141,28 @@ app.post('/api/admin/contas', exigirOperador, async (req, res) => {
   }
 });
 
+/**
+ * Sorteia uma senha nova para a conta de um cliente.
+ *
+ * O "Esqueci minha senha" resolve quase sempre, e e o caminho preferido. Esta
+ * rota e para quando ele nao resolve: cliente que nao tem mais acesso a caixa
+ * de e-mail do cadastro, ou que cadastrou um e-mail errado. Sem ela a conta
+ * fica inalcancavel e a implantacao para.
+ *
+ * Nao enfraquece a troca de senha de ninguem: a de dentro do painel continua
+ * exigindo a senha atual, porque ali a sessao e a unica prova de identidade.
+ * Aqui a prova e o login de operador, e fica no log quem fez em qual conta.
+ */
+app.post('/api/admin/contas/:id/senha', exigirOperador, async (req, res) => {
+  const alvo = await repo.buscarConta(req.params.id);
+  if (!alvo) return res.status(404).json({ erro: 'conta nao encontrada' });
+  const senha = crypto.randomBytes(9).toString('base64url');
+  await repo.redefinirSenha(alvo.id, senha);
+  log.aviso('senha.redefinida_pelo_operador', { operador_id: req.conta.id, conta_id: alvo.id });
+  // Uma vez so, igual a criacao de conta: nao fica guardada em texto.
+  res.json({ conta: { id: alvo.id, nome: alvo.nome, email: alvo.email }, senhaNova: senha });
+});
+
 app.post('/api/admin/contas/:id/entrar', exigirOperador, async (req, res) => {
   const alvo = await repo.buscarConta(req.params.id);
   if (!alvo) return res.status(404).json({ erro: 'conta nao encontrada' });

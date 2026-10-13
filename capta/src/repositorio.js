@@ -59,6 +59,26 @@ export async function trocarSenha(contaId, sessaoAtual, { atual, nova }) {
   return true;
 }
 
+/**
+ * Senha nova sorteada pelo operador, sem a senha atual.
+ *
+ * E a saida para o cliente que perdeu o acesso e nao consegue usar o e-mail
+ * do cadastro. Nao existe caminho de cliente para ca: so o operador chama, e
+ * a troca derruba todas as sessoes da conta, inclusive a de quem estivesse
+ * logado naquele momento, que e o ponto de redefinir senha.
+ */
+export async function redefinirSenha(contaId, senha) {
+  return emTransacao(async (cliente) => {
+    const { rowCount } = await cliente.query(
+      `update contas set senha_hash = $2, atualizado_em = now() where id = $1`,
+      [contaId, hashSenha(senha)],
+    );
+    if (!rowCount) return false;
+    await cliente.query(`delete from sessoes where conta_id = $1`, [contaId]);
+    return true;
+  });
+}
+
 export async function buscarConta(contaId) {
   const { rows } = await consultar(
     `select id, nome, email, documento, cliente_externo, email_aviso, whatsapp, avisar_lead,

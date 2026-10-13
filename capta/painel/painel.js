@@ -1897,6 +1897,38 @@
   // ----------------------------------------------------------------- admin ---
 
   /**
+   * A senha sorteada aparece uma vez, aqui, e nao volta.
+   *
+   * Em modal e nao numa linha da tabela de proposito: e a unica chance de
+   * copiar, e uma tabela que rola leva isso para fora da tela sem aviso.
+   */
+  function mostrarSenhaNova(r) {
+    var existente = document.querySelector('.sobreposicao');
+    if (existente) existente.remove();
+    var fundo = el('div', null, 'sobreposicao');
+    var modal = el('div', null, 'modal');
+    var cab = el('div', null, 'modal-cab');
+    cab.appendChild(el('strong', 'Senha nova de ' + r.conta.nome));
+    var fechar = el('button', '×', 'icone');
+    fechar.type = 'button'; fechar.setAttribute('aria-label', 'Fechar');
+    fechar.addEventListener('click', function () { fundo.remove(); });
+    cab.appendChild(fechar);
+    modal.appendChild(cab);
+    modal.appendChild(el('p', 'Mande estes dados ao cliente. A senha antiga parou de valer e quem estava logado nessa conta caiu.', 'legenda'));
+    modal.appendChild(blocoDeCodigo(
+      'Acesso ao Captapp\n\n'
+      + 'Endereço: ' + location.origin + '\n'
+      + 'E-mail: ' + r.conta.email + '\n'
+      + 'Senha: ' + r.senhaNova + '\n\n'
+      + 'Troque a senha no primeiro acesso, em Configurações.',
+    ));
+    modal.appendChild(el('p', 'Ela aparece uma vez só: não fica guardada em texto em lugar nenhum. Se fechar sem copiar, sorteie outra.', 'hora'));
+    fundo.appendChild(modal);
+    fundo.addEventListener('click', function (e) { if (e.target === fundo) fundo.remove(); });
+    document.body.appendChild(fundo);
+  }
+
+  /**
    * Criar conta de cliente com o teste rodando.
    *
    * E para a venda assistida: você fecha no WhatsApp e entrega o acesso na
@@ -2056,6 +2088,25 @@
               iniciar();
             });
           });
+
+          var senha = el('button', 'Nova senha', 'secundario');
+          senha.type = 'button';
+          senha.style.padding = '6px 10px';
+          senha.addEventListener('click', function (e) {
+            e.stopPropagation();
+            if (!confirm('Sortear uma senha nova para ' + c.nome + '?\n\nA senha de agora para de valer e quem estiver logado nessa conta cai.')) return;
+            senha.disabled = true;
+            api('/admin/contas/' + c.id + '/senha', { method: 'POST' })
+              .then(function (r) { mostrarSenhaNova(r); })
+              .catch(function (erro) { alert(erro.message); })
+              .then(function () { senha.disabled = false; });
+          });
+
+          var acoesConta = el('div');
+          acoesConta.style.display = 'flex';
+          acoesConta.style.gap = '6px';
+          acoesConta.appendChild(entrar);
+          acoesConta.appendChild(senha);
           var nome = el('div');
           nome.appendChild(el('strong', c.nome));
           nome.appendChild(el('div', c.email, 'hora'));
@@ -2066,7 +2117,7 @@
             c.ultimo_lead ? tempoRelativo(c.ultimo_lead) : 'nunca',
             c.conexoes,
             c.diasAtraso ? selo(c.diasAtraso + ' dias', 'falhou') : selo('em dia', 'criado'),
-            entrar,
+            acoesConta,
           ] };
         }),
       ));

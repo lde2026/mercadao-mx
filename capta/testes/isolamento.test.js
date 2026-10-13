@@ -10,6 +10,7 @@ await prepararBanco();
 
 const { app } = await import('../src/server.js');
 const repo = await import('../src/repositorio.js');
+const { conferirSenha } = await import('../src/cripto.js');
 
 const servidor = app.listen(0);
 const base = `http://127.0.0.1:${servidor.address().port}`;
@@ -75,6 +76,10 @@ const contaA = await contaLogada('Bella Moda', 'pierre+a@lojadoecommerce.com.br'
 const contaB = await contaLogada('Casa Verde Decor', 'pierre+b@lojadoecommerce.com.br');
 const lojaA = await lojaComLead(contaA, 'Bella Moda', 'nuvemshop', 'Renata');
 const lojaB = await lojaComLead(contaB, 'Casa Verde Decor', 'tray', 'Marcos');
+// Um login so para o operador, reaproveitado pelas provas que precisam dele:
+// o teto de tentativas de entrada e por IP e por minuto, e cada chamada a
+// mais aqui derruba as provas seguintes com 429.
+const operador = await operadorLogado('Loja do E-commerce', 'contato@lojadoecommerce.com.br');
 
 /**
  * Express 4 nao propaga rejeicao de handler async sozinho. Sem o embrulho no
@@ -219,7 +224,8 @@ test('o endpoint publico corta por limite de requisicoes', async () => {
 
 test('lojista comum nao alcanca as rotas do operador', async () => {
   for (const [caminho, metodo] of [['/api/admin/resumo', 'GET'], ['/api/admin/contas', 'GET'],
-    ['/api/admin/rede', 'GET'], [`/api/admin/contas/${contaA.id}/entrar`, 'POST']]) {
+    ['/api/admin/rede', 'GET'], [`/api/admin/contas/${contaA.id}/entrar`, 'POST'],
+    [`/api/admin/contas/${contaA.id}/senha`, 'POST']]) {
     const r = await pedir(caminho, { metodo, cookie: contaB.cookie });
     assert.equal(r.status, 403, `${metodo} ${caminho} tinha que ser 403 para lojista`);
   }
@@ -228,7 +234,6 @@ test('lojista comum nao alcanca as rotas do operador', async () => {
 });
 
 test('o operador ve o Captapp inteiro e entra na conta de um cliente', async () => {
-  const operador = await operadorLogado('Loja do E-commerce', 'contato@lojadoecommerce.com.br');
   const eu = await pedir('/api/eu', { cookie: operador.cookie });
   assert.equal(eu.json.conta.operador, true);
 
@@ -258,6 +263,38 @@ test('o operador ve o Captapp inteiro e entra na conta de um cliente', async () 
 
   // E o operador perde os poderes de admin enquanto esta dentro da conta.
   assert.equal((await pedir('/api/admin/contas', { cookie: cookieA })).status, 403);
+});
+
+test('o operador sorteia senha nova e a conta perde as sessoes antigas', async () => {
+  // A conta alvo nasce direto pelo repositorio, sem passar pelo cadastro: o
+  // teto de tentativas por IP e por minuto, e cada chamada de entrada a mais
+  // neste arquivo derruba as provas que vem depois.
+  const email = 'pierre+semacesso@lojadoecommerce.com.br';
+  const conta = await repo.criarConta({ nome: 'Lojista Sem Acesso', email, senha: 'senha-de-teste-123' });
+  const sessao = await repo.criarSessao(conta.id);
+  assert.ok(await repo.buscarSessao(sessao));
+
+  const r = await pedir(`/api/admin/contas/${conta.id}/senha`, {
+    metodo: 'POST', cookie: operador.cookie,
+  });
+  assert.equal(r.status, 200);
+  assert.ok(r.json.senhaNova.length >= 10, 'a senha sorteada nao pode ser curta');
+  assert.equal(r.json.conta.id, conta.id);
+
+  // A sessao de antes morre. Redefinir senha serve justamente para tirar da
+  // conta quem nao deveria mais estar nela.
+  assert.ok(!(await repo.buscarSessao(sessao)), 'a sessao antiga tinha que cair');
+
+  // E a senha que apareceu na tela e a unica que vale dali em diante.
+  const salva = await repo.buscarContaPorEmail(email);
+  assert.ok(conferirSenha(r.json.senhaNova, salva.senha_hash));
+  assert.ok(!conferirSenha('senha-de-teste-123', salva.senha_hash));
+
+  // Conta que nao existe nao vira senha nova.
+  const fantasma = await pedir('/api/admin/contas/00000000-0000-0000-0000-000000000000/senha', {
+    metodo: 'POST', cookie: operador.cookie,
+  });
+  assert.equal(fantasma.status, 404);
 });
 
 test('conta criada pelo operador nasce em teste, e nao vira operador', async () => {
