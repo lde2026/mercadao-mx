@@ -57,6 +57,12 @@ Isso define o produto. Elas nao se comportam igual.
 A Tray esta descrita em detalhe em [docs/tray-api.md](docs/tray-api.md),
 conferido com a documentacao oficial.
 
+Loja que nao tem integracao automatica, ou que tem mas a parceria ainda nao
+saiu, entra pela [implantacao manual](docs/implantacao-manual.md): a tag colada
+no tema, com o cupom saindo de um lote. O roteiro inclui o prompt pronto para
+pedir a insercao a uma IA e a lista de conferencia antes de entregar ao
+cliente.
+
 A Loja Integrada e a unica das quatro que nao tem OAuth: as duas chaves sao
 coladas a mao no painel, e a de aplicacao a equipe deles emite por formulario.
 O adaptador dela e o unico ainda nao conferido contra documentacao oficial,
