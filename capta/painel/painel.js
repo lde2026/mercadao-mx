@@ -1444,7 +1444,48 @@
     caixa.appendChild(el('div', 'Tag para colar no HTML da loja', 'rotulo'));
     caixa.appendChild(blocoDeCodigo(tagDaLoja(conexao.chave_publica)));
     caixa.appendChild(el('p', 'Cole antes do </body>, no rodapé de todas as páginas. Uma vez só: o resto muda pelo painel, sem mexer no tema de novo.', 'hora'));
+
+    caixa.appendChild(el('div', 'Prompt para pedir a instalação a uma IA', 'rotulo'));
+    caixa.appendChild(blocoDeCodigo(promptDeInstalacao(conexao)));
+    caixa.appendChild(el('p', 'Cole este texto na Claude, ou em outra IA, junto com o HTML do tema da loja. Ele devolve o arquivo com a tag no lugar certo, sem mexer em mais nada.', 'hora'));
+
     cartao.appendChild(caixa);
+  }
+
+  /**
+   * Texto pronto para pedir a instalação a uma IA.
+   *
+   * Implantação manual é onde o erro acontece: a tag vai parar dentro do
+   * <head>, ou só na página inicial, ou colada duas vezes. O prompt diz o
+   * lugar exato, proíbe o resto e pede a conferência, para quem implanta não
+   * depender de lembrar disso tudo em cada loja.
+   */
+  function promptDeInstalacao(conexao) {
+    // "numa loja Outra plataforma" nao e frase. Quando a plataforma nao tem
+    // nome proprio, o prompt fala da loja sem tentar nomea-la.
+    var nome = NOME_PLATAFORMA[conexao.plataforma];
+    var onde = conexao.plataforma === 'outra' || !nome
+      ? 'no tema de uma loja virtual'
+      : 'no tema de uma loja ' + nome;
+    return [
+      'Você vai inserir uma tag de script ' + onde + '.',
+      '',
+      'A tag, exatamente como está, sem alterar nada:',
+      '',
+      tagDaLoja(conexao.chave_publica),
+      '',
+      'Regras:',
+      '1. Cole a tag imediatamente antes do fechamento de </body>.',
+      '2. Se o arquivo não tiver </body>, use o rodapé que aparece em todas as páginas.',
+      '3. Não mexa em nenhuma outra linha do arquivo. Nada de formatar, indentar ou reorganizar.',
+      '4. Se já existir uma tag apontando para widget.js, substitua a antiga em vez de somar outra.',
+      '5. Mantenha o atributo async.',
+      '',
+      'Devolva o arquivo inteiro, pronto para colar de volta no editor de tema,',
+      'e depois me diga em qual linha a tag ficou.',
+      '',
+      'Vou colar o HTML do tema na próxima mensagem.',
+    ].join('\n');
   }
 
   /**
