@@ -46,7 +46,8 @@ todo visitante de toda loja cliente.
    | `TRAY_CONSUMER_KEY`, `TRAY_CONSUMER_SECRET` | quando a Tray liberar o aplicativo; callback `https://captapp.lojadoecommerce.com.br/tray/callback` |
    | `TRAY_DOMINIOS` | loja Tray em dominio proprio, uma por virgula |
    | `DATABASE_SSL` | vazio no Postgres do Railway (rede privada). `1` em banco gerenciado de fora, como Supabase, Neon ou RDS. Ver secao 1.1 |
-   | `CONFIAR_CLOUDFLARE` e `PROXY_SALTOS` | ver secao 9.1 antes de escolher. Errado aqui, todo limite por IP para de valer em silencio |
+   | `PROXY_SALTOS` | **2** no Railway sem Cloudflare na frente. Confira depois de subir, pela secao 6 |
+   | `CONFIAR_CLOUDFLARE` | so com o Cloudflare na frente. Ver secao 9.1 |
    | `NUVEMSHOP_CLIENT_ID`, `NUVEMSHOP_CLIENT_SECRET` | quando o app da Nuvemshop existir; redirecionamento `https://captapp.lojadoecommerce.com.br/nuvemshop/callback` |
    | `OPERADOR_EMAILS` | e-mails de quem administra o Captapp, separados por virgula. So eles veem a tela Admin |
    | `OPERADOR_EMAIL`, `OPERADOR_SENHA_INICIAL` | a conta do operador e criada na primeira subida com esses valores. Troque a senha no painel depois e apague a variavel |
@@ -120,9 +121,29 @@ Vimeo. Vazio, o quadro fica como convite.
 
 ## 4. Asaas
 
-Com o dominio no ar, cadastre o webhook em `https://captapp.lojadoecommerce.com.br/webhook/asaas`
-como descrito no `SETUP.md`, e rode `npm run asaas:teste` na sua maquina
-com a chave de producao para confirmar que ela e valida.
+**O DNS precisa estar propagado antes.** O Asaas testa a URL na hora de salvar
+e recusa com "a url informada e invalida" se o dominio ainda nao resolve. Ou
+espere a propagacao, ou cadastre primeiro com o endereco `.up.railway.app` e
+troque depois.
+
+Cadastre o webhook em `https://captapp.lojadoecommerce.com.br/webhook/asaas`,
+com **Tipo de envio: Sequencial**. Nao sequencial entrega fora de ordem, e um
+`PAYMENT_RECEIVED` que chega antes do `PAYMENT_CREATED` deixa a cobranca
+gravada como aberta: cliente que pagou vira inadimplente para a regua.
+
+Marque so os nove eventos que o codigo trata, nao use "Selecionar Todos":
+
+```
+PAYMENT_CREATED     PAYMENT_RECEIVED           PAYMENT_DELETED
+PAYMENT_UPDATED     PAYMENT_CONFIRMED          PAYMENT_REFUNDED
+PAYMENT_OVERDUE     PAYMENT_RECEIVED_IN_CASH   PAYMENT_CHARGEBACK_REQUESTED
+```
+
+As tres variaveis entram juntas, nunca so a chave: sem
+`ASAAS_WEBHOOK_TOKEN` o app recusa todo webhook com 401, o Asaas comeca a
+penalizar entregas e acaba desativando o webhook sozinho.
+
+Depois, `npm run asaas:teste` na sua maquina confirma que a chave e valida.
 
 ## 5. Backup
 
@@ -159,10 +180,20 @@ o servidor acha que veio a requisicao:
 ```
 
 `ipVisto` tem que ser o **seu** IP de casa, e `protocoloVisto` tem que ser
-`https`. Se `ipVisto` vier como endereco interno, `127.0.0.1` ou o IP de um
-proxy, ajuste `PROXY_SALTOS` e confira a secao 9.1: enquanto isso estiver
-errado, todo limite por IP conta baldes separados, inclusive o de forca bruta
-de senha.
+`https`.
+
+Como achar o numero certo: `cadeiaEncaminhada` lista os enderecos por onde a
+requisicao passou, do visitante para o servidor. Conte quantos sao. No Railway
+sem Cloudflare a cadeia tem dois, e `PROXY_SALTOS` e **2**. Com `1`, o servidor
+le o endereco do proxio em vez do visitante.
+
+Para saber qual deles e voce, abra meuip.com.br e compare: o seu tem que ser o
+**primeiro** da cadeia, e tem que ser o que aparece em `ipVisto` depois do
+ajuste.
+
+Enquanto isso estiver errado, todo visitante de toda loja chega ao app com o
+mesmo endereco, e todo limite por IP vira um balde so, inclusive o de forca
+bruta de senha no painel dos clientes.
 
 Por fim, `npm run hoje` apontando para producao mostra a tabela vazia. A
 partir dai, e lojista de verdade.
