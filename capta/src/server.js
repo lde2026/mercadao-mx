@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -7,7 +8,7 @@ import { log } from './log.js';
 import { adaptador, PLATAFORMAS } from './adapters/index.js';
 import { concluirLead } from './fluxo-lead.js';
 import { registrarEvento, perfilDoLead, esquecerLead, mascararIp } from './eventos.js';
-import { calcularAcesso, avisoDeCobranca, avisoDeCota } from './billing/acesso.js';
+import { calcularAcesso, avisoDeCobranca, avisoDeCota, avisoDeTeste } from './billing/acesso.js';
 import {
   PLANOS, precoDoPlano, IMPLANTACAO, DESCONTO_ANUAL,
   precoDaImplantacao, FORMAS_IMPLANTACAO, PARCELAS_IMPLANTACAO, DESCONTO_AVISTA,
@@ -374,12 +375,15 @@ app.post('/e', liberarOrigem, limitar({ porChave: 3000, porIp: 240, chaveNoCorpo
 });
 
 async function acessoDaConta(contaId) {
-  const [assinatura, abertas, leadsNoMes] = await Promise.all([
+  const [assinatura, abertas, leadsNoMes, conta] = await Promise.all([
     repo.assinaturaDaConta(contaId),
     repo.cobrancasEmAberto(contaId),
     repo.leadsNoMes(contaId),
+    repo.buscarConta(contaId),
   ]);
-  const acesso = calcularAcesso({ assinatura, cobrancasAbertas: abertas, leadsNoMes });
+  const acesso = calcularAcesso({
+    assinatura, cobrancasAbertas: abertas, leadsNoMes, testeAte: conta?.teste_ate,
+  });
   // Cota atingida e chance de upgrade, entao vira alerta, mas um por mes.
   if (acesso.cotaEstourada) {
     await repo.alertarUmaVezNoMes({
@@ -537,7 +541,10 @@ app.get('/api/eu', async (req, res) => {
     conta: { ...req.conta, operador: ehOperador(req.conta.email) },
     assinatura,
     acesso: req.acesso,
-    aviso: avisoDeCobranca(req.acesso) || avisoDeCota(req.acesso),
+    // Ordem de gravidade: fatura em aberto corta mais que cota, que corta
+    // mais que teste acabando. So o primeiro aparece, para a faixa do painel
+    // nao virar mural.
+    aviso: avisoDeCobranca(req.acesso) || avisoDeCota(req.acesso) || avisoDeTeste(req.acesso),
     planos: PLANOS,
   });
 });
@@ -1090,6 +1097,50 @@ app.get('/api/admin/contas', exigirOperador, async (_req, res) => {
  * precisa para conectar loja e montar o fluxo sem mexer no banco. Fica em
  * log com quem entrou e onde.
  */
+/**
+ * Cria conta de cliente com o teste rodando, a pedido do operador.
+ *
+ * Existe para a venda assistida: voce fecha no WhatsApp e entrega o acesso na
+ * hora, sem mandar a pessoa se cadastrar. A senha e sorteada aqui e aparece
+ * uma vez na resposta, porque gravar senha escolhida por terceiro, ou mandar
+ * por e-mail sem provedor configurado, seria pior.
+ */
+app.post('/api/admin/contas', exigirOperador, async (req, res) => {
+  const { nome, email, dias } = req.body || {};
+  if (!nome || !email) return res.status(400).json({ erro: 'nome e e-mail obrigatorios' });
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim())) {
+    return res.status(400).json({ erro: 'e-mail invalido' });
+  }
+  if (ehOperador(String(email).trim())) {
+    return res.status(409).json({ erro: 'esse e-mail e de operador, nao de cliente' });
+  }
+  const diasDeTeste = Math.min(Math.max(Number(dias) || repo.DIAS_DE_TESTE, 1), 90);
+
+  const senha = crypto.randomBytes(9).toString('base64url');
+  try {
+    const conta = await repo.criarConta({
+      nome: String(nome).trim().slice(0, 120),
+      email: String(email).trim(),
+      senha,
+      // Aceite dos termos e ato do cliente, nao do operador: a conta nasce sem
+      // versao aceita, e o painel pede o aceite no primeiro acesso dele.
+      diasDeTeste,
+    });
+    log.aviso('conta.criada_pelo_operador', {
+      operador_id: req.conta.id, conta_id: conta.id, dias: diasDeTeste,
+    });
+    res.status(201).json({
+      conta: { id: conta.id, nome: conta.nome, email: conta.email, teste_ate: conta.teste_ate },
+      // Uma vez so. Nao fica guardada em lugar nenhum em texto.
+      senhaInicial: senha,
+      dias: diasDeTeste,
+    });
+  } catch (erro) {
+    if (erro.code === '23505') return res.status(409).json({ erro: 'ja existe conta com esse e-mail' });
+    throw erro;
+  }
+});
+
 app.post('/api/admin/contas/:id/entrar', exigirOperador, async (req, res) => {
   const alvo = await repo.buscarConta(req.params.id);
   if (!alvo) return res.status(404).json({ erro: 'conta nao encontrada' });

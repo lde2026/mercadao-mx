@@ -260,6 +260,39 @@ test('o operador ve o Captapp inteiro e entra na conta de um cliente', async () 
   assert.equal((await pedir('/api/admin/contas', { cookie: cookieA })).status, 403);
 });
 
+test('conta criada pelo operador nasce em teste, e nao vira operador', async () => {
+  const operador = await operadorLogado('Loja do E-commerce 2', 'contato+adm@lojadoecommerce.com.br');
+  process.env.OPERADOR_EMAILS = 'contato@lojadoecommerce.com.br,contato+adm@lojadoecommerce.com.br';
+
+  const r = await pedir('/api/admin/contas', {
+    metodo: 'POST', cookie: operador.cookie,
+    corpo: { nome: 'Aurora Boutique', email: 'aurora@teste.com.br', dias: 7 },
+  });
+  assert.equal(r.status, 201);
+  assert.equal(r.json.dias, 7);
+  assert.ok(r.json.senhaInicial.length >= 10, 'a senha sorteada nao pode ser curta');
+  assert.ok(r.json.conta.teste_ate, 'a conta tem que nascer com prazo de teste');
+
+  // A senha sorteada funciona, e so ela.
+  const entrou = await pedir('/api/login', {
+    metodo: 'POST', corpo: { email: 'aurora@teste.com.br', senha: r.json.senhaInicial },
+  });
+  assert.equal(entrou.status, 200);
+
+  // E o cliente criado assim nao ganha poder de operador.
+  const cookieCliente = entrou.cookie.split(';')[0];
+  assert.equal((await pedir('/api/admin/contas', { cookie: cookieCliente })).status, 403);
+
+  // Operador nao cria conta com e-mail de operador, nem por aqui.
+  const comEmailDeOperador = await pedir('/api/admin/contas', {
+    metodo: 'POST', cookie: operador.cookie,
+    corpo: { nome: 'x', email: 'contato@lojadoecommerce.com.br' },
+  });
+  assert.equal(comEmailDeOperador.status, 409);
+
+  process.env.OPERADOR_EMAILS = 'contato@lojadoecommerce.com.br';
+});
+
 test('cadastro publico nao cria conta de operador', async () => {
   // O e-mail do operador e publico: esta no rodape da landing e nas paginas
   // juridicas. Se o cadastro aceitasse, quem chegasse primeiro levava o

@@ -191,11 +191,12 @@ export async function avisarInadimplentes() {
 }
 
 async function acessoDaConta(contaId) {
-  const [assinatura, abertas] = await Promise.all([
+  const [assinatura, abertas, conta] = await Promise.all([
     repo.assinaturaDaConta(contaId),
     repo.cobrancasEmAberto(contaId),
+    repo.buscarConta(contaId),
   ]);
-  return calcularAcesso({ assinatura, cobrancasAbertas: abertas });
+  return calcularAcesso({ assinatura, cobrancasAbertas: abertas, testeAte: conta?.teste_ate });
 }
 
 export function agendar() {

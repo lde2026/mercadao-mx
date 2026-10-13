@@ -39,11 +39,32 @@ export function diasDeAtraso(cobrancasAbertas, hoje = new Date()) {
   return pior;
 }
 
+/** Dias que faltam do teste. Negativo quer dizer que ja acabou. */
+export function diasDeTeste(testeAte, hoje = new Date()) {
+  if (!testeAte) return null;
+  return Math.ceil((paraDiaUtc(testeAte) - paraDiaUtc(hoje)) / DIA_EM_MS);
+}
+
 export function calcularAcesso({
-  assinatura, cobrancasAbertas = [], hoje = new Date(), leadsNoMes = 0,
+  assinatura, cobrancasAbertas = [], hoje = new Date(), leadsNoMes = 0, testeAte = null,
 } = {}) {
   const atraso = diasDeAtraso(cobrancasAbertas, hoje);
   const plano = assinatura?.plano || null;
+
+  /*
+   * Teste de 7 dias vencido sem assinatura.
+   *
+   * So o widget sai da loja. O painel continua inteiro, e os leads captados
+   * no teste continuam la, visiveis e exportaveis: quem experimentou e nao
+   * assinou ainda pode voltar, e tirar dele o que ja captou seria cobrar
+   * duas vezes pela mesma decisao.
+   *
+   * Conta com assinatura ativa ignora o teste: quem assinou saiu dele.
+   * Conta sem teste_ate e conta anterior a esta regra, e nao perde nada.
+   */
+  const assinou = Boolean(assinatura) && assinatura.status === 'ativa';
+  const diasRestantes = diasDeTeste(testeAte, hoje);
+  const testeVencido = !assinou && diasRestantes != null && diasRestantes < 0;
 
   // Cota do plano atingida: o chat sai do ar na loja ate o dia 1 ou ate o
   // upgrade. So o widget cai; o painel e os leads ja captados ficam.
@@ -64,8 +85,11 @@ export function calcularAcesso({
     leadsNoMes,
     cotaEstourada,
     diasAtraso: atraso,
+    emTeste: !assinou && diasRestantes != null && diasRestantes >= 0,
+    diasDeTeste: diasRestantes,
+    testeVencido,
     rastreamento: !parada && planoTemRastreamento(plano) && atraso < DEGRAUS.RASTREAMENTO,
-    widget: !parada && atraso < DEGRAUS.WIDGET && !cotaEstourada,
+    widget: !parada && !testeVencido && atraso < DEGRAUS.WIDGET && !cotaEstourada,
     painel: parada || atraso >= DEGRAUS.WIDGET ? 'leitura' : 'total',
     // A remocao do script depende so do atraso, nunca do status da assinatura:
     // cancelamento e outro assunto e nao esta na regua que voce definiu.
@@ -75,7 +99,8 @@ export function calcularAcesso({
     leadsPreservados: true,
   };
 
-  if (parada) acesso.motivo = `assinatura ${assinatura.status}`;
+  if (testeVencido) acesso.motivo = 'teste de 7 dias encerrado, sem plano escolhido';
+  else if (parada) acesso.motivo = `assinatura ${assinatura.status}`;
   else if (atraso >= DEGRAUS.SCRIPT) acesso.motivo = `script removido da loja, ${atraso} dias de atraso`;
   else if (atraso >= DEGRAUS.WIDGET) acesso.motivo = `widget fora do ar e painel em leitura, ${atraso} dias de atraso`;
   else if (atraso >= DEGRAUS.RASTREAMENTO) acesso.motivo = `rastreamento desligado, ${atraso} dias de atraso`;
@@ -109,6 +134,25 @@ export function avisoDeCobranca(acesso) {
     gravidade: 'erro',
     texto: 'Script removido da loja. Seus leads continuam guardados e voltam no mesmo minuto do pagamento.',
   };
+}
+
+/** Aviso do teste: quanto falta, e o que acontece quando acabar. */
+export function avisoDeTeste(acesso) {
+  if (acesso.testeVencido) {
+    return {
+      gravidade: 'erro',
+      texto: 'Seu teste de 7 dias acabou e o chat saiu do ar na loja. O painel e os leads que você já captou continuam seus. Escolha um plano para o chat voltar.',
+    };
+  }
+  if (!acesso.emTeste) return null;
+  const dias = acesso.diasDeTeste;
+  if (dias === 0) {
+    return { gravidade: 'aviso', texto: 'Último dia do teste. Amanhã o chat sai do ar na loja, mas o painel e os leads continuam com você.' };
+  }
+  if (dias <= 3) {
+    return { gravidade: 'aviso', texto: `Faltam ${dias} dia(s) de teste. Depois disso o chat sai do ar na loja; o painel e os leads ficam.` };
+  }
+  return { gravidade: 'aviso', texto: `Teste gratuito: faltam ${dias} dias.` };
 }
 
 /** Aviso no painel quando a cota derrubou o chat. */

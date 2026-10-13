@@ -59,7 +59,9 @@ export async function carregarConta(req, _res, proximo) {
   if (sessaoId) {
     const sessao = await repo.buscarSessao(sessaoId);
     if (sessao) {
-      req.conta = { id: sessao.conta_id, nome: sessao.nome, email: sessao.email };
+      req.conta = {
+        id: sessao.conta_id, nome: sessao.nome, email: sessao.email, testeAte: sessao.teste_ate,
+      };
       req.sessaoId = sessaoId;
       // Sessao de personificacao: quem investiga o log depois precisa saber
       // que a acao foi de um operador dentro da conta, e nao do lojista.
@@ -102,7 +104,9 @@ export async function aplicarRegua(req, res, proximo) {
     repo.cobrancasEmAberto(req.conta.id),
     repo.leadsNoMes(req.conta.id),
   ]);
-  req.acesso = calcularAcesso({ assinatura, cobrancasAbertas: abertas, leadsNoMes });
+  req.acesso = calcularAcesso({
+    assinatura, cobrancasAbertas: abertas, leadsNoMes, testeAte: req.conta.testeAte,
+  });
 
   const escrita = !['GET', 'HEAD', 'OPTIONS'].includes(req.method);
   if (escrita && req.acesso.painel === 'leitura' && !req.path.startsWith('/api/sair')) {

@@ -1893,9 +1893,93 @@
 
   // ----------------------------------------------------------------- admin ---
 
+  /**
+   * Criar conta de cliente com o teste rodando.
+   *
+   * E para a venda assistida: você fecha no WhatsApp e entrega o acesso na
+   * hora, em vez de mandar a pessoa se cadastrar sozinha. A senha é sorteada
+   * pelo servidor e aparece uma vez só, aqui, para você copiar e mandar.
+   */
+  function cartaoNovaConta(aoCriar) {
+    var cartao = el('div', null, 'cartao');
+    cartao.appendChild(el('div', 'Criar conta de cliente', 'rotulo'));
+    cartao.appendChild(el('p', 'A conta nasce com o teste rodando. Enquanto ele durar, o cliente usa tudo; depois o chat sai do ar na loja e o painel continua.', 'legenda'));
+
+    var form = el('form');
+    form.className = 'form-config';
+
+    var rotuloNome = el('label', 'Nome da loja ou do cliente');
+    var campoNome = el('input');
+    campoNome.name = 'nome'; campoNome.required = true; campoNome.maxLength = 120;
+    rotuloNome.appendChild(campoNome);
+    form.appendChild(rotuloNome);
+
+    var rotuloEmail = el('label', 'E-mail de acesso');
+    var campoEmail = el('input');
+    campoEmail.name = 'email'; campoEmail.type = 'email'; campoEmail.required = true;
+    rotuloEmail.appendChild(campoEmail);
+    form.appendChild(rotuloEmail);
+
+    var rotuloDias = el('label', 'Dias de teste');
+    var campoDias = el('input');
+    campoDias.name = 'dias'; campoDias.type = 'number'; campoDias.min = 1; campoDias.max = 90;
+    campoDias.value = 7;
+    rotuloDias.appendChild(campoDias);
+    form.appendChild(rotuloDias);
+
+    var erro = el('p', null, 'erro'); erro.hidden = true;
+    form.appendChild(erro);
+
+    var acoes = el('div', null, 'acoes');
+    var enviar = el('button', 'Criar conta'); enviar.type = 'submit';
+    acoes.appendChild(enviar);
+    form.appendChild(acoes);
+
+    form.addEventListener('submit', function (evento) {
+      evento.preventDefault();
+      erro.hidden = true;
+      enviar.disabled = true;
+      var dados = new FormData(form);
+      api('/admin/contas', {
+        method: 'POST',
+        corpo: {
+          nome: String(dados.get('nome')).trim(),
+          email: String(dados.get('email')).trim(),
+          dias: Number(dados.get('dias')) || 7,
+        },
+      }).then(function (r) {
+        form.remove();
+        var pronto = el('div', null, 'instrucoes');
+        pronto.appendChild(el('div', 'Conta criada. Mande estes dados ao cliente.', 'rotulo'));
+        pronto.appendChild(blocoDeCodigo(
+          'Acesso ao Captapp\n\n'
+          + 'Endereço: ' + location.origin + '\n'
+          + 'E-mail: ' + r.conta.email + '\n'
+          + 'Senha: ' + r.senhaInicial + '\n\n'
+          + 'Troque a senha no primeiro acesso, em Configurações.\n'
+          + 'Seu teste vale ' + r.dias + ' dias.',
+        ));
+        pronto.appendChild(el('p', 'A senha aparece uma vez só: ela não fica guardada em texto em lugar nenhum. Se perder, use "Esqueci minha senha".', 'hora'));
+        var voltar = el('button', 'Criar outra', 'secundario');
+        voltar.type = 'button';
+        voltar.addEventListener('click', function () { aoCriar(); });
+        pronto.appendChild(voltar);
+        cartao.appendChild(pronto);
+      }).catch(function (e) {
+        erro.textContent = e.dados && e.dados.explicacao ? e.message + ' ' + e.dados.explicacao : e.message;
+        erro.hidden = false;
+        enviar.disabled = false;
+      });
+    });
+
+    cartao.appendChild(form);
+    return cartao;
+  }
+
   /** Visao do operador: o Captapp inteiro, nao uma conta. */
   function verAdmin() {
     var alvo = pintar('Admin', 'O Captapp inteiro: assinantes, receita, inadimplência e o que precisa de atenção.');
+    alvo.appendChild(cartaoNovaConta(function () { verAdmin(); }));
     Promise.all([api('/admin/resumo'), api('/admin/contas')]).then(function (r) {
       var resumo = r[0];
       var contas = r[1];

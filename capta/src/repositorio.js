@@ -11,13 +11,20 @@ import { cotaDeLojas } from './billing/planos.js';
 
 // ---------------------------------------------------------------- contas ---
 
-export async function criarConta({ nome, email, senha, termosVersao = null, termosRede = null }) {
+export const DIAS_DE_TESTE = 7;
+
+export async function criarConta({
+  nome, email, senha, termosVersao = null, termosRede = null, diasDeTeste = DIAS_DE_TESTE,
+}) {
   return emTransacao(async (cliente) => {
+    // O teste comeca na criacao da conta, nao no primeiro acesso: a data tem
+    // que ser a mesma que o cliente vai ver no painel e no e-mail.
     const { rows } = await cliente.query(
-      `insert into contas (nome, email, senha_hash, termos_versao, termos_aceitos_em, termos_rede)
-       values ($1, lower($2), $3, $4::text, case when $4::text is null then null else now() end, $5)
-       returning id, nome, email, termos_versao, termos_aceitos_em, criado_em`,
-      [nome, email, hashSenha(senha), termosVersao, termosRede],
+      `insert into contas (nome, email, senha_hash, termos_versao, termos_aceitos_em, termos_rede, teste_ate)
+       values ($1, lower($2), $3, $4::text, case when $4::text is null then null else now() end, $5,
+               case when $6::int is null then null else now() + ($6 || ' days')::interval end)
+       returning id, nome, email, termos_versao, termos_aceitos_em, teste_ate, criado_em`,
+      [nome, email, hashSenha(senha), termosVersao, termosRede, diasDeTeste],
     );
     const conta = rows[0];
     await cliente.query(
@@ -54,7 +61,8 @@ export async function trocarSenha(contaId, sessaoAtual, { atual, nova }) {
 
 export async function buscarConta(contaId) {
   const { rows } = await consultar(
-    `select id, nome, email, documento, cliente_externo, email_aviso, whatsapp, avisar_lead, criado_em
+    `select id, nome, email, documento, cliente_externo, email_aviso, whatsapp, avisar_lead,
+            teste_ate, criado_em
        from contas where id = $1`,
     [contaId],
   );
@@ -196,7 +204,7 @@ export async function criarSessao(contaId, duracaoDias = 14, operadorId = null) 
 export async function buscarSessao(id) {
   if (!id) return null;
   const { rows } = await consultar(
-    `select s.conta_id, s.operador_id, c.nome, c.email
+    `select s.conta_id, s.operador_id, c.nome, c.email, c.teste_ate
        from sessoes s join contas c on c.id = s.conta_id
       where s.id = $1 and s.expira_em > now()`,
     [id],

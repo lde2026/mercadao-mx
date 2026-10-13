@@ -23,6 +23,12 @@ alter table contas add column if not exists cliente_externo text;
 -- Preferencias de aviso. O e-mail de aviso pode ser diferente do login (o
 -- dono entra, a equipe atende). O WhatsApp da loja e o que o visitante ve na
 -- tela final quando o beneficio e o contato humano.
+-- Teste de 7 dias. A data fica na conta e nao na assinatura porque o teste
+-- acontece ANTES de existir assinatura: e justamente a janela em que a pessoa
+-- usa sem ter escolhido plano. Nula significa conta antiga, de antes desta
+-- regra, e essas nao perdem nada.
+alter table contas add column if not exists teste_ate timestamptz;
+
 alter table contas add column if not exists email_aviso text;
 alter table contas add column if not exists whatsapp text;
 alter table contas add column if not exists avisar_lead boolean not null default true;
