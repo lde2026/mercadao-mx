@@ -30,6 +30,23 @@ test('o fluxo da demonstracao sai pronto, sem precisar de conta', async () => {
   assert.equal(fluxo.rastrear, false);
 });
 
+test('a demonstracao abre sozinha e pergunta se a pessoa quer atendimento', async () => {
+  const { PEDIU_ATENDIMENTO } = await import('../src/demo.js');
+  const fluxo = await fetch(`${base}/w/fluxo/demo`).then((r) => r.json());
+
+  // Sem isso quem veio experimentar pode nao reparar no botao do canto e sair
+  // da pagina sem ter visto o produto funcionando.
+  assert.ok(fluxo.abrirApos > 0, 'a demonstracao precisa abrir o chat sozinha');
+
+  // A pergunta consultiva e a que o painel destaca, e ele reconhece o par pelo
+  // texto: pergunta com "quer ajuda" e resposta comecando em "sim". Mudar a
+  // redacao sem mexer no painel apaga o destaque sem quebrar nada visivel.
+  const consultiva = fluxo.perguntas[fluxo.perguntas.length - 1];
+  assert.match(consultiva.texto, /quer ajuda/i);
+  assert.ok(consultiva.opcoes.includes(PEDIU_ATENDIMENTO), 'a opcao do destaque saiu do fluxo');
+  assert.match(PEDIU_ATENDIMENTO, /^sim/i);
+});
+
 test('o lead da demonstracao volta para a pagina e nao entra no banco', async () => {
   const antes = await consultar('select count(*)::int as n from leads');
 

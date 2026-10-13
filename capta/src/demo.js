@@ -1,4 +1,3 @@
-import { MODELOS } from './modelos.js';
 
 /**
  * Demonstracao publica, sem cadastro.
@@ -21,18 +20,47 @@ import { MODELOS } from './modelos.js';
 
 export const CHAVE_DEMO = 'demo';
 
-const MODELO = MODELOS.find((m) => m.id === 'moda');
-
 export const LOJA_DEMO = 'Aurora Boutique';
+
+/**
+ * As tres perguntas da demonstracao.
+ *
+ * A ultima e a que mais vende o produto: ela mostra que o chat nao so
+ * qualifica, ele separa quem quer ser atendido por gente de quem quer comprar
+ * sozinho. Numa loja de ticket alto, saber isso vale mais que o tamanho e a
+ * faixa de preco juntos, porque diz em qual lead a vendedora deve gastar a
+ * proxima hora.
+ */
+const PERGUNTAS = [
+  { texto: 'Qual o seu tamanho?', opcoes: ['PP', 'P', 'M', 'G', 'GG', 'Plus Size'] },
+  {
+    texto: 'Qual faixa de preço você costuma procurar?',
+    opcoes: ['Até R$ 150', 'R$ 150 a R$ 300', 'R$ 300 a R$ 600', 'Acima de R$ 600'],
+  },
+  {
+    texto: 'Quer ajuda de alguém da equipe para escolher?',
+    opcoes: [
+      'Sim, me chamem no WhatsApp',
+      'Só se eu travar na escolha',
+      'Prefiro escolher sozinha',
+    ],
+  },
+];
+
+/** A resposta que transforma o lead em atendimento. O painel destaca ela. */
+export const PEDIU_ATENDIMENTO = 'Sim, me chamem no WhatsApp';
 
 export function fluxoDemo() {
   return {
     convite: 'Ganhe 10% de desconto',
     consentimento: `Ao continuar, você concorda que a ${LOJA_DEMO} use seus dados para entrar em contato sobre esta compra.`,
-    perguntas: MODELO.perguntas.map((p) => ({ texto: p.texto, opcoes: p.opcoes.slice() })),
+    perguntas: PERGUNTAS.map((p) => ({ texto: p.texto, opcoes: p.opcoes.slice() })),
     recompensa: 'cupom',
     modo: 'painel',
-    abrirApos: 0,
+    // Abre sozinho depois de 4 segundos. Numa loja isso e escolha do lojista;
+    // aqui e o ponto da pagina: quem veio experimentar nao pode sair sem ter
+    // visto o chat por nao ter reparado no botao do canto.
+    abrirApos: 4,
     cor: '#ff5a1f',
     botaoFormato: 'retangular',
     botaoPosicao: 'direita-inferior',

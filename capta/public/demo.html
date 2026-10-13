@@ -50,10 +50,12 @@ body{font:16px/1.6 var(--corpo);color:var(--tinta);background:var(--suave);-webk
 .loja-menu{display:flex;gap:20px;font-size:14px;color:var(--cinza)}
 .vitrine{max-width:1000px;margin:0 auto;padding:34px 28px 60px;
   display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:start}
-.foto{aspect-ratio:1;border-radius:18px;background:linear-gradient(150deg,#2a2d3a,#15171f);
-  display:grid;place-items:center;text-align:center;color:#fff;padding:28px}
-.foto b{display:block;font-family:var(--display);font-size:40px;letter-spacing:-.03em}
-.foto span{opacity:.7;font-size:14px}
+.foto{aspect-ratio:1;border-radius:18px;background:linear-gradient(160deg,#fbf6f1,#efe2d8);
+  border:1px solid #e8dace;position:relative;display:grid;place-items:center;overflow:hidden}
+.foto svg{width:78%;height:78%;display:block}
+.foto-nome{position:absolute;left:20px;bottom:18px;text-align:left}
+.foto-nome b{display:block;font-family:var(--display);font-size:26px;letter-spacing:-.02em;color:#2a2118}
+.foto-nome span{font-size:13px;color:#7a6a5c}
 .produto h1{font-family:var(--display);font-size:clamp(22px,3vw,30px);line-height:1.2;letter-spacing:-.02em}
 .preco{font-family:var(--display);font-size:28px;font-weight:700;margin-top:16px}
 .parcela{color:var(--cinza);font-size:14px;margin-top:2px}
@@ -87,6 +89,11 @@ body{font:16px/1.6 var(--corpo);color:var(--tinta);background:var(--suave);-webk
 .selo{background:#41bfbb;color:#fff;font-size:10px;font-weight:700;text-transform:uppercase;
   letter-spacing:.06em;padding:3px 9px;border-radius:999px}
 .lead-contato{color:var(--cinza);font-size:14px;margin-bottom:14px}
+.pediu-ajuda{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:14px;
+  background:var(--laranja-suave);border-left:3px solid var(--laranja);border-radius:10px;padding:11px 14px}
+.pediu-ajuda b{font-family:var(--display);font-size:13px;text-transform:uppercase;letter-spacing:.06em;
+  color:var(--laranja-escuro)}
+.pediu-ajuda span{font-size:14px;color:#7a4a35}
 .respostas{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
 .resposta{background:var(--suave);border:1px solid var(--linha);border-radius:10px;padding:8px 12px}
 .resposta b{display:block;font-size:11px;color:var(--cinza);font-weight:500}
@@ -106,6 +113,24 @@ body{font:16px/1.6 var(--corpo);color:var(--tinta);background:var(--suave);-webk
 .botao:hover{background:var(--laranja-escuro)}
 .botao.vazio{background:transparent;border:1px solid rgba(255,255,255,.35)}
 .aviso{margin-top:18px;font-size:13px;color:var(--cinza);line-height:1.6}
+
+/* -------------------------------- convite para a segunda metade */
+.convite-mascara{position:fixed;inset:0;z-index:60;background:rgba(10,10,15,.82);
+  display:grid;place-items:center;padding:24px;animation:surge .22s ease-out}
+@keyframes surge{from{opacity:0}to{opacity:1}}
+.convite-caixa{background:#fff;border-radius:20px;padding:34px 34px 30px;max-width:460px;width:100%;
+  text-align:center;box-shadow:0 30px 80px rgba(0,0,0,.4);animation:sobe .25s ease-out}
+@keyframes sobe{from{transform:translateY(14px)}to{transform:none}}
+.convite-selo{display:inline-block;background:var(--laranja-suave);color:var(--laranja-escuro);
+  font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;
+  padding:6px 13px;border-radius:999px}
+.convite-caixa h2{font-family:var(--display);font-size:25px;line-height:1.18;letter-spacing:-.02em;margin-top:16px}
+.convite-caixa p{color:var(--cinza);margin-top:12px;font-size:16px}
+.convite-botao{margin-top:24px;width:100%;padding:15px;border:0;border-radius:12px;
+  background:var(--laranja);color:#fff;font:700 16px var(--corpo);cursor:pointer}
+.convite-botao:hover{background:var(--laranja-escuro)}
+.convite-botao:focus-visible{outline:3px solid var(--escuro);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){.convite-mascara,.convite-caixa{animation:none}}
 
 @media(max-width:760px){
   .vitrine{grid-template-columns:1fr;gap:24px;padding:24px 18px 50px}
@@ -129,7 +154,51 @@ body{font:16px/1.6 var(--corpo);color:var(--tinta);background:var(--suave);-webk
     <nav class="loja-menu"><span>Vestidos</span><span>Blusas</span><span>Calças</span><span>Acessórios</span></nav>
   </div>
   <div class="vitrine">
-    <div class="foto"><div><b>Aurora</b><span>Vestido Midi Floral</span></div></div>
+    <!--
+      O vestido e desenhado em SVG, nao e foto carregada de fora.
+
+      A pagina mora dentro do app, e o Content-Security-Policy dele so deixa
+      carregar o que vem do proprio servidor. Um SVG inline respeita isso,
+      aparece instantaneo e nao depende de nenhum servico de imagem continuar
+      no ar daqui a um ano.
+    -->
+    <div class="foto">
+      <svg viewBox="0 0 320 400" role="img" aria-label="Ilustração de um vestido midi floral">
+        <defs>
+          <linearGradient id="tecido" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#f3e6dd"/>
+            <stop offset="1" stop-color="#d9c2b4"/>
+          </linearGradient>
+          <pattern id="flores" width="42" height="42" patternUnits="userSpaceOnUse">
+            <g fill="#b9705f" opacity=".55">
+              <circle cx="12" cy="12" r="3.4"/>
+              <circle cx="7" cy="7" r="2"/><circle cx="17" cy="7" r="2"/>
+              <circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/>
+            </g>
+            <g fill="#6f8d6a" opacity=".5">
+              <ellipse cx="31" cy="30" rx="2.6" ry="5" transform="rotate(28 31 30)"/>
+              <ellipse cx="25" cy="34" rx="2.2" ry="4.2" transform="rotate(-24 25 34)"/>
+            </g>
+          </pattern>
+        </defs>
+        <!-- alcas -->
+        <path d="M126 74 L138 44 M194 74 L182 44" stroke="#c9ad9d" stroke-width="5" fill="none" stroke-linecap="round"/>
+        <!-- corpo do vestido: busto justo, saia midi rodada -->
+        <path d="M120 74 Q160 92 200 74 L206 150 Q232 268 246 352 Q160 376 74 352 Q88 268 114 150 Z" fill="url(#tecido)"/>
+        <path d="M120 74 Q160 92 200 74 L206 150 Q232 268 246 352 Q160 376 74 352 Q88 268 114 150 Z" fill="url(#flores)"/>
+        <!-- cintura marcada -->
+        <path d="M112 152 Q160 168 208 152" stroke="#b9705f" stroke-width="7" fill="none" opacity=".75" stroke-linecap="round"/>
+        <!-- caimento do tecido -->
+        <g stroke="#b59683" stroke-width="2" fill="none" opacity=".45">
+          <path d="M136 176 Q128 268 118 348"/>
+          <path d="M160 178 Q160 268 160 356"/>
+          <path d="M184 176 Q192 268 202 348"/>
+        </g>
+        <!-- barra -->
+        <path d="M74 352 Q160 376 246 352" stroke="#b59683" stroke-width="3" fill="none" opacity=".6"/>
+      </svg>
+      <div class="foto-nome"><b>Aurora</b><span>Vestido Midi Floral</span></div>
+    </div>
     <div class="produto">
       <h1>Vestido Midi Floral Aurora, tecido leve com forro</h1>
       <div class="preco">R$ 189,90</div>
