@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import { pedir } from '../adapters/http.js';
 import { log } from '../log.js';
-import { precoDoPlano, IMPLANTACAO } from './planos.js';
+import { precoDoPlano, precoDaImplantacao } from './planos.js';
 import * as repo from '../repositorio.js';
 
 /**
@@ -42,17 +42,40 @@ export async function criarAssinatura({ clienteExterno, plano, ciclo, formaPagam
   }, { plataforma: 'asaas' });
 }
 
-export async function cobrarImplantacao({ clienteExterno, venceEm }) {
+/**
+ * Implantacao, a vista ou parcelada.
+ *
+ * Parcelado vai como installmentCount mais totalValue: o Asaas divide e gera
+ * as parcelas, e e ele quem controla o vencimento de cada uma. Mandar o valor
+ * da parcela calculado aqui abriria divergencia de centavo entre o que a
+ * pagina promete e o que a fatura cobra.
+ *
+ * A vista vai com o valor ja com desconto, porque desconto de 10% sobre o
+ * total e preco, nao campo de desconto por pontualidade: quem escolhe esta
+ * forma esta comprando por 891, nao por 990 com abatimento se pagar no prazo.
+ */
+export async function cobrarImplantacao({ clienteExterno, venceEm, forma = 'avista' }) {
+  const preco = precoDaImplantacao(forma);
+  const corpo = {
+    customer: clienteExterno,
+    billingType: 'UNDEFINED',
+    dueDate: venceEm,
+    description: preco.forma === 'parcelado'
+      ? `Implantacao Captapp em ${preco.parcelas}x sem juros`
+      : 'Implantacao Captapp a vista',
+  };
+
+  if (preco.forma === 'parcelado') {
+    corpo.installmentCount = preco.parcelas;
+    corpo.totalValue = preco.total;
+  } else {
+    corpo.value = preco.total;
+  }
+
   return pedir(`${base()}/payments`, {
     method: 'POST',
     headers: cabecalhos(),
-    body: JSON.stringify({
-      customer: clienteExterno,
-      billingType: 'UNDEFINED',
-      value: IMPLANTACAO,
-      dueDate: venceEm,
-      description: 'Implantacao Captapp',
-    }),
+    body: JSON.stringify(corpo),
   }, { plataforma: 'asaas' });
 }
 

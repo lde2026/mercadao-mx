@@ -8,7 +8,10 @@ import { adaptador, PLATAFORMAS } from './adapters/index.js';
 import { concluirLead } from './fluxo-lead.js';
 import { registrarEvento, perfilDoLead, esquecerLead, mascararIp } from './eventos.js';
 import { calcularAcesso, avisoDeCobranca, avisoDeCota } from './billing/acesso.js';
-import { PLANOS, precoDoPlano, IMPLANTACAO, DESCONTO_ANUAL } from './billing/planos.js';
+import {
+  PLANOS, precoDoPlano, IMPLANTACAO, DESCONTO_ANUAL,
+  precoDaImplantacao, FORMAS_IMPLANTACAO, PARCELAS_IMPLANTACAO, DESCONTO_AVISTA,
+} from './billing/planos.js';
 import { MODELOS } from './modelos.js';
 import * as asaas from './billing/asaas.js';
 import * as kiwify from './billing/kiwify.js';
@@ -873,7 +876,15 @@ app.get('/api/financeiro', async (req, res) => {
     planos: PLANOS,
     precos,
     descontoAnual: DESCONTO_ANUAL,
-    implantacao: { valor: IMPLANTACAO, cobrada: implantacaoPaga },
+    implantacao: {
+      valor: IMPLANTACAO,
+      cobrada: implantacaoPaga,
+      // As duas formas ja calculadas, para a tela nunca fazer conta de preco.
+      avista: precoDaImplantacao('avista'),
+      parcelado: precoDaImplantacao('parcelado'),
+      parcelasMax: PARCELAS_IMPLANTACAO,
+      descontoAvista: DESCONTO_AVISTA,
+    },
     uso: { leadsMes: usados, cota: req.acesso.cotaLeads, lojas: lojasConectadas, cotaLojas: req.acesso.cotaLojas },
     cobrancas,
     acesso: req.acesso,
@@ -889,9 +900,12 @@ app.get('/api/financeiro', async (req, res) => {
  * fatura que nunca existiu.
  */
 app.post('/api/assinatura', async (req, res) => {
-  const { plano, ciclo = 'mensal', documento } = req.body || {};
+  const { plano, ciclo = 'mensal', documento, implantacao = 'avista' } = req.body || {};
   if (!PLANOS[plano]) return res.status(400).json({ erro: 'plano invalido' });
   if (!['mensal', 'anual'].includes(ciclo)) return res.status(400).json({ erro: 'ciclo invalido' });
+  if (!FORMAS_IMPLANTACAO.includes(implantacao)) {
+    return res.status(400).json({ erro: 'forma de pagamento da implantacao invalida' });
+  }
 
   const atual = await repo.assinaturaDaConta(req.conta.id);
   if (atual && atual.plano === plano && atual.ciclo === ciclo) {
@@ -944,9 +958,13 @@ app.post('/api/assinatura', async (req, res) => {
 
     if (!(await repo.jaPagouImplantacao(req.conta.id))) {
       const venceEm = new Date(Date.now() + 3 * 24 * 3600 * 1000).toISOString().slice(0, 10);
-      const cobranca = await asaas.cobrarImplantacao({ clienteExterno, venceEm });
+      const preco = precoDaImplantacao(implantacao);
+      const cobranca = await asaas.cobrarImplantacao({ clienteExterno, venceEm, forma: implantacao });
+      // O valor gravado e o total da forma escolhida, nao os 990 de tabela: e
+      // ele que a regua compara com o que entrou, e quem pagou a vista pagou
+      // 891 e esta quite.
       await repo.registrarCobranca({
-        contaId: req.conta.id, tipo: 'implantacao', valor: IMPLANTACAO,
+        contaId: req.conta.id, tipo: 'implantacao', valor: preco.total,
         origem: 'asaas', idExterno: cobranca.id, venceEm,
       });
     }

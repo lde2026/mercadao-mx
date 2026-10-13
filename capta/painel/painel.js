@@ -1761,9 +1761,18 @@
       preco.appendChild(el('small', '/mês'));
       col.appendChild(preco);
       if (cicloEscolhido === 'anual') col.appendChild(el('div', dinheiro(dados.precos[id].anual) + ' por ano', 'hora'));
-      col.appendChild(el('div', dados.implantacao.cobrada
-        ? 'Implantação já cobrada'
-        : '+ ' + dinheiro(dados.implantacao.valor) + ' de implantação, uma vez', 'plano-implantacao'));
+      // A implantacao e uma vez so, entao quem ja pagou nao precisa reler o
+      // preco dela em cada cartao de plano.
+      if (dados.implantacao.cobrada) {
+        col.appendChild(el('div', 'Implantação já cobrada', 'plano-implantacao'));
+      } else {
+        var imp = el('div', null, 'plano-implantacao');
+        imp.appendChild(el('div', '+ implantação, uma vez só:'));
+        imp.appendChild(el('strong', dinheiro(dados.implantacao.avista.total) + ' à vista'));
+        imp.appendChild(el('div', 'ou ' + dados.implantacao.parcelado.parcelas + 'x de '
+          + dinheiro(dados.implantacao.parcelado.valorParcela) + ' sem juros'));
+        col.appendChild(imp);
+      }
       var lista = el('ul', null, 'plano-lista');
       lista.appendChild(el('li', p.leadsMes ? 'Até ' + p.leadsMes.toLocaleString('pt-BR') + ' leads por mês' : 'Leads ilimitados'));
       lista.appendChild(el('li', p.lojas === 1 ? 'Uma loja ou site' : 'Até ' + p.lojas + ' lojas ou sites'));
@@ -1808,6 +1817,24 @@
 
   function escolherPlano(alvo, dados, plano) {
     var corpo = { plano: plano, ciclo: cicloEscolhido };
+
+    /*
+     * A forma da implantacao so e perguntada enquanto ela nao foi cobrada.
+     * Depois disso a pergunta nao tem resposta util: a cobranca ja existe e
+     * nao e a troca de plano que vai refaze-la.
+     */
+    if (!dados.implantacao.cobrada) {
+      var a = dados.implantacao.avista;
+      var pc = dados.implantacao.parcelado;
+      var avista = confirm(
+        'Implantação, cobrada uma vez só.\n\n'
+        + 'OK para ' + dinheiro(a.total) + ' à vista (economia de ' + dinheiro(a.economia) + ').\n'
+        + 'Cancelar para ' + pc.parcelas + 'x de ' + dinheiro(pc.valorParcela) + ' sem juros, total '
+        + dinheiro(pc.total) + '.',
+      );
+      corpo.implantacao = avista ? 'avista' : 'parcelado';
+    }
+
     if (dados.cobrancaAutomatica && !(dados.assinatura && dados.assinatura.origem === 'asaas')) {
       var doc = prompt('CPF ou CNPJ para a cobrança:');
       if (!doc) return;
