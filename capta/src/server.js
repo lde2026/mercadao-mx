@@ -20,6 +20,7 @@ import { credenciaisProntas } from './credenciais.js';
 import { registrarRotasOauth, concluirOauth, configuracaoOauth } from './oauth.js';
 import { enviarRecuperacaoSenha } from './avisos.js';
 import { TERMOS } from './termos.js';
+import { CHAVE_DEMO, fluxoDemo, cupomDemo, LOJA_DEMO } from './demo.js';
 import { exigirAmbiente } from './ambiente.js';
 import { ipDoCliente, SALTOS_CONFIAVEIS } from './rede.js';
 import {
@@ -250,6 +251,33 @@ function liberarOrigem(req, res, proximo) {
 
 app.options('/w/*', liberarOrigem, (_req, res) => res.status(204).end());
 app.options('/e', liberarOrigem, (_req, res) => res.status(204).end());
+
+/**
+ * Demonstracao publica. Vem antes das rotas de chave de verdade porque a
+ * chave `demo` e reservada: ela nunca pode cair na busca por conexao, nem que
+ * alguem consiga cadastrar uma loja com esse valor.
+ */
+app.get(`/w/fluxo/${CHAVE_DEMO}`, liberarOrigem, limitar({ porChave: 600, porIp: 60 }), (_req, res) => {
+  res.set('Cache-Control', 'public, max-age=120');
+  res.json(fluxoDemo());
+});
+
+app.post(`/w/lead/${CHAVE_DEMO}`, liberarOrigem, limitar({ porChave: 300, porIp: 20 }), (req, res) => {
+  // Nada de banco: ver o porque em src/demo.js. O corpo volta junto para a
+  // pagina da demonstracao poder mostrar o lead no painel sem guardar nada.
+  const corpo = req.body || {};
+  res.json({
+    demo: true,
+    leadId: 'demo',
+    cupom: cupomDemo(),
+    lead: {
+      nome: String(corpo.nome || '').slice(0, 120),
+      email: String(corpo.email || '').slice(0, 160),
+      telefone: String(corpo.telefone || '').slice(0, 40),
+      respostas: Array.isArray(corpo.respostas) ? corpo.respostas.slice(0, 4) : [],
+    },
+  });
+});
 
 /** Configuracao do widget. A conexao e conferida antes de qualquer trabalho. */
 app.get('/w/fluxo/:chave', liberarOrigem, limitar({ porChave: 600, porIp: 60 }), async (req, res) => {
@@ -1076,6 +1104,18 @@ app.post('/api/admin/contas/:id/entrar', exigirOperador, async (req, res) => {
 // widget.js por todo visitante de toda loja, e uma versao nova chega em ate
 // uma hora sem ninguem precisar limpar cache. Se precisar antes, purga no
 // Cloudflare.
+/**
+ * /demo e a mesma pagina de public/demo.html, com endereco curto para caber
+ * num botao da landing e numa conversa de WhatsApp.
+ *
+ * Fora do express.static porque a pagina nao leva o Access-Control-Allow-Origin
+ * nem o cache de uma hora dos arquivos do widget: ela e uma pagina de venda,
+ * nao um recurso que a loja de terceiro baixa.
+ */
+app.get('/demo', (_req, res) => {
+  res.sendFile(path.join(aqui, '..', 'public', 'demo.html'));
+});
+
 app.use(express.static(path.join(aqui, '..', 'public'), {
   maxAge: '1h',
   setHeaders: (res) => {

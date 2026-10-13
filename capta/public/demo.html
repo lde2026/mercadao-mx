@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Experimente o Captapp</title>
+<meta name="description" content="Responda o chat como se fosse um visitante da loja e veja o seu lead chegar no painel do lojista.">
+<!--
+  Demonstracao publica, sem cadastro.
+
+  A loja desta pagina e ficticia, mas o widget que roda nela e o mesmo arquivo
+  que vai para a loja dos clientes. Nada do que a pessoa digitar e gravado:
+  ver o porque em src/demo.js.
+-->
+<style>
+:root{
+  --fundo:#ffffff; --suave:#f5f6f8; --tinta:#0b0b0f; --cinza:#5b6068; --linha:#e6e8ec;
+  --laranja:#ff5a1f; --laranja-escuro:#e14b12; --laranja-suave:#fff1eb;
+  --escuro:#111122;
+  /*
+   * Fonte do sistema, nao do Google.
+   *
+   * Esta pagina mora dentro do app, e o app tem Content-Security-Policy
+   * fechado: so carrega o que vem dele mesmo. Abrir excecao para uma fonte
+   * numa pagina de venda seria afrouxar a politica que protege o painel dos
+   * clientes. A fonte do sistema ainda carrega mais rapido.
+   */
+  --display:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+  --corpo:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font:16px/1.6 var(--corpo);color:var(--tinta);background:var(--suave);-webkit-font-smoothing:antialiased}
+
+/* faixa de orientacao, sempre visivel */
+.guia{position:sticky;top:0;z-index:40;background:var(--escuro);color:#fff;padding:11px 18px;
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap;font-size:14px}
+.guia .marca{font-family:var(--display);font-weight:800;letter-spacing:-.03em}
+.guia .marca::after{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;
+  background:var(--laranja);margin-left:3px}
+.guia .passo{opacity:.88}
+.guia .passo b{color:#ffd9c9}
+.guia .sair{margin-left:auto;color:#fff;text-decoration:none;font-weight:600;opacity:.8;font-size:13px}
+.guia .sair:hover{opacity:1}
+
+/* ------------------------------------------------------------ a loja */
+.loja{min-height:calc(100vh - 46px);background:#faf8f5}
+.loja-topo{display:flex;align-items:center;justify-content:space-between;gap:16px;
+  padding:16px 28px;background:#fff;border-bottom:1px solid #eee4d8;flex-wrap:wrap}
+.loja-marca{font-family:var(--display);font-weight:800;font-size:19px;letter-spacing:-.02em}
+.loja-menu{display:flex;gap:20px;font-size:14px;color:var(--cinza)}
+.vitrine{max-width:1000px;margin:0 auto;padding:34px 28px 60px;
+  display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:start}
+.foto{aspect-ratio:1;border-radius:18px;background:linear-gradient(150deg,#2a2d3a,#15171f);
+  display:grid;place-items:center;text-align:center;color:#fff;padding:28px}
+.foto b{display:block;font-family:var(--display);font-size:40px;letter-spacing:-.03em}
+.foto span{opacity:.7;font-size:14px}
+.produto h1{font-family:var(--display);font-size:clamp(22px,3vw,30px);line-height:1.2;letter-spacing:-.02em}
+.preco{font-family:var(--display);font-size:28px;font-weight:700;margin-top:16px}
+.parcela{color:var(--cinza);font-size:14px;margin-top:2px}
+.comprar{display:block;width:100%;margin-top:22px;padding:15px;border:0;border-radius:12px;
+  background:var(--laranja);color:#fff;font:700 16px var(--corpo);cursor:pointer}
+.comprar:hover{background:var(--laranja-escuro)}
+.ficha{margin-top:22px;color:var(--cinza);font-size:14px;line-height:1.8}
+.dica{max-width:1000px;margin:0 auto;padding:0 28px 50px;color:var(--cinza);font-size:14px}
+
+/* ------------------------------------------------------- o painel */
+.painel{display:none;min-height:calc(100vh - 46px);background:var(--suave)}
+.painel.aberto{display:block}
+.painel-topo{background:#fff;border-bottom:1px solid var(--linha);padding:14px 24px;
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.painel-topo .marca{font-family:var(--display);font-weight:800;font-size:18px;letter-spacing:-.03em}
+.painel-topo .marca::after{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;
+  background:#41bfbb;margin-left:3px}
+.painel-topo .quem{margin-left:auto;font-size:13px;color:var(--cinza)}
+.painel-corpo{max-width:900px;margin:0 auto;padding:30px 24px 60px}
+.painel-corpo h2{font-family:var(--display);font-size:22px;letter-spacing:-.02em}
+.painel-corpo .legenda{color:var(--cinza);margin-bottom:22px}
+.numeros{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-bottom:22px}
+.num{background:#fff;border:1px solid var(--linha);border-radius:14px;padding:16px 18px}
+.num .rot{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--cinza);font-weight:700}
+.num .val{font-family:var(--display);font-size:26px;font-weight:700;margin-top:4px}
+.num .pe{font-size:12px;color:var(--cinza);margin-top:2px}
+.lead{background:#fff;border:1px solid var(--linha);border-left:4px solid #41bfbb;border-radius:14px;
+  padding:18px 20px;box-shadow:0 1px 2px rgba(0,0,0,.05)}
+.lead-topo{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px}
+.lead-nome{font-family:var(--display);font-size:18px;font-weight:700}
+.selo{background:#41bfbb;color:#fff;font-size:10px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.06em;padding:3px 9px;border-radius:999px}
+.lead-contato{color:var(--cinza);font-size:14px;margin-bottom:14px}
+.respostas{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.resposta{background:var(--suave);border:1px solid var(--linha);border-radius:10px;padding:8px 12px}
+.resposta b{display:block;font-size:11px;color:var(--cinza);font-weight:500}
+.resposta span{font-weight:700;font-size:14px}
+.cupom-linha{display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  border-top:1px dashed var(--linha);padding-top:14px}
+.cupom{font:700 16px/1 ui-monospace,Menlo,monospace;letter-spacing:1px;color:var(--laranja-escuro);
+  border:2px dashed var(--laranja);border-radius:10px;padding:10px 14px}
+.zap{margin-left:auto;background:#25d366;color:#fff;text-decoration:none;font-weight:700;
+  padding:11px 18px;border-radius:10px;font-size:14px}
+.remate{margin-top:28px;background:var(--escuro);color:#fff;border-radius:16px;padding:26px 28px}
+.remate h3{font-family:var(--display);font-size:20px;letter-spacing:-.02em}
+.remate p{opacity:.8;margin-top:6px;font-size:15px}
+.remate .acoes{display:flex;gap:12px;flex-wrap:wrap;margin-top:18px}
+.botao{display:inline-block;background:var(--laranja);color:#fff;text-decoration:none;font-weight:700;
+  padding:13px 22px;border-radius:12px}
+.botao:hover{background:var(--laranja-escuro)}
+.botao.vazio{background:transparent;border:1px solid rgba(255,255,255,.35)}
+.aviso{margin-top:18px;font-size:13px;color:var(--cinza);line-height:1.6}
+
+@media(max-width:760px){
+  .vitrine{grid-template-columns:1fr;gap:24px;padding:24px 18px 50px}
+  .loja-menu{display:none}
+  .guia{font-size:13px;gap:10px}
+}
+</style>
+</head>
+<body>
+
+<div class="guia">
+  <span class="marca">captapp</span>
+  <span class="passo" id="passo"><b>Passo 1 de 2.</b> Você é um visitante desta loja. Clique no botão laranja no canto da tela.</span>
+  <a class="sair" href="https://capta.lojadoecommerce.com.br">Sair da demonstração</a>
+</div>
+
+<!-- A loja ficticia. O widget entra sozinho no canto. -->
+<section class="loja" id="loja">
+  <div class="loja-topo">
+    <div class="loja-marca">Aurora Boutique</div>
+    <nav class="loja-menu"><span>Vestidos</span><span>Blusas</span><span>Calças</span><span>Acessórios</span></nav>
+  </div>
+  <div class="vitrine">
+    <div class="foto"><div><b>Aurora</b><span>Vestido Midi Floral</span></div></div>
+    <div class="produto">
+      <h1>Vestido Midi Floral Aurora, tecido leve com forro</h1>
+      <div class="preco">R$ 189,90</div>
+      <div class="parcela">em até 3x de R$ 63,30 sem juros</div>
+      <button type="button" class="comprar">Comprar agora</button>
+      <div class="ficha">
+        Tamanhos PP ao Plus Size<br>
+        Viscose com forro, lavagem à mão<br>
+        Envio em até 2 dias úteis
+      </div>
+    </div>
+  </div>
+  <p class="dica">Esta loja é de mentira, mas o chat do canto é o mesmo que roda na loja dos clientes. Responda como se fosse comprar.</p>
+</section>
+
+<!-- O painel do lojista, com o lead que a pessoa acabou de preencher. -->
+<section class="painel" id="painel">
+  <div class="painel-topo">
+    <span class="marca">captapp</span>
+    <span class="quem">Aurora Boutique</span>
+  </div>
+  <div class="painel-corpo">
+    <h2>Resumo</h2>
+    <p class="legenda">É isto que o lojista vê, segundos depois de você responder.</p>
+
+    <div class="numeros">
+      <div class="num"><div class="rot">Leads hoje</div><div class="val" id="n-leads">1</div><div class="pe">o seu, agora</div></div>
+      <div class="num"><div class="rot">Cupons entregues</div><div class="val">1</div><div class="pe">único por pessoa</div></div>
+      <div class="num"><div class="rot">Esperando contato</div><div class="val">1</div><div class="pe">na fila</div></div>
+    </div>
+
+    <div class="lead" id="lead"></div>
+
+    <div class="remate">
+      <h3>Era esse o ponto.</h3>
+      <p>O visitante que ia embora sem deixar nada virou um nome, um WhatsApp e três respostas sobre o que ele quer comprar.</p>
+      <div class="acoes">
+        <a class="botao" href="https://captapp.lojadoecommerce.com.br/">Criar minha conta</a>
+        <a class="botao vazio" href="https://capta.lojadoecommerce.com.br/#planos">Ver os planos</a>
+      </div>
+    </div>
+
+    <p class="aviso">
+      Nada do que você digitou aqui foi guardado. A demonstração não grava lead, não cria cupom
+      de verdade e não manda mensagem para ninguém.
+    </p>
+  </div>
+</section>
+
+<script src="/demo.js"></script>
+<script async src="/widget.js?k=demo"></script>
+</body>
+</html>

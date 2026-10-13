@@ -1,0 +1,87 @@
+(function () {
+  'use strict';
+
+  /*
+   * O widget posta o lead direto para o servidor. Em vez de mexer no widget
+   * para ele avisar a pagina, que seria carregar peso de demonstracao no
+   * arquivo que vai para a loja de todo cliente, a demonstracao escuta a
+   * propria chamada aqui.
+   */
+  var fetchOriginal = window.fetch;
+  window.fetch = function (recurso, config) {
+    var url = typeof recurso === 'string' ? recurso : (recurso && recurso.url) || '';
+    var resposta = fetchOriginal.apply(this, arguments);
+    if (url.indexOf('/w/lead/demo') === -1) return resposta;
+    return resposta.then(function (r) {
+      // O corpo so pode ser lido uma vez, entao a copia e para nos.
+      r.clone().json().then(function (dados) { mostrarPainel(dados); }).catch(function () {});
+      return r;
+    });
+  };
+
+  function texto(tag, classe, conteudo) {
+    var n = document.createElement(tag);
+    if (classe) n.className = classe;
+    if (conteudo != null) n.textContent = conteudo;
+    return n;
+  }
+
+  function primeiroNome(nome) {
+    return String(nome || '').trim().split(/\s+/)[0] || 'Visitante';
+  }
+
+  function mostrarPainel(dados) {
+    var lead = (dados && dados.lead) || {};
+    var caixa = document.getElementById('lead');
+    caixa.textContent = '';
+
+    var topo = texto('div', 'lead-topo');
+    topo.appendChild(texto('span', 'lead-nome', lead.nome || 'Visitante'));
+    topo.appendChild(texto('span', 'selo', 'novo'));
+    caixa.appendChild(topo);
+
+    var contato = [lead.telefone, lead.email].filter(Boolean).join('  ·  ');
+    caixa.appendChild(texto('div', 'lead-contato', contato || 'sem contato informado'));
+
+    var respostas = texto('div', 'respostas');
+    (lead.respostas || []).forEach(function (r) {
+      var bloco = texto('div', 'resposta');
+      bloco.appendChild(texto('b', null, r.pergunta));
+      bloco.appendChild(texto('span', null, r.resposta));
+      respostas.appendChild(bloco);
+    });
+    if (respostas.children.length) caixa.appendChild(respostas);
+
+    var linha = texto('div', 'cupom-linha');
+    linha.appendChild(texto('span', 'cupom', dados.cupom || 'AURORA-XXXXXX'));
+    var zap = document.createElement('a');
+    zap.className = 'zap';
+    zap.href = '#';
+    zap.textContent = 'Chamar ' + primeiroNome(lead.nome) + ' no WhatsApp';
+    zap.addEventListener('click', function (e) {
+      e.preventDefault();
+      alert('Na sua conta, este botão abre a conversa com o lead, com a primeira mensagem já escrita.');
+    });
+    linha.appendChild(zap);
+    caixa.appendChild(linha);
+
+    document.getElementById('passo').innerHTML =
+      '<b>Passo 2 de 2.</b> Este é o painel do lojista. O lead é o que você acabou de responder.';
+
+    // Um respiro antes de trocar a tela: o widget ainda esta mostrando o
+    // cupom, e cortar isso no meio tira o fecho da experiencia.
+    setTimeout(function () {
+      document.getElementById('loja').style.display = 'none';
+      document.getElementById('painel').classList.add('aberto');
+      // O widget sai junto com a loja. Deixado no ar, ele fica flutuando por
+      // cima do painel e tapa justamente o botao de criar conta.
+      var hospedeiro = document.querySelector('div[data-capta]');
+      if (hospedeiro) hospedeiro.remove();
+      window.scrollTo(0, 0);
+    }, 2600);
+  }
+
+  document.querySelector('.comprar').addEventListener('click', function () {
+    alert('A loja é de mentira. O que funciona de verdade aqui é o chat no canto da tela.');
+  });
+}());
