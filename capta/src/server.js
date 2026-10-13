@@ -296,7 +296,7 @@ app.get('/w/fluxo/:chave', liberarOrigem, limitar({ porChave: 600, porIp: 60 }),
     consentimento: fluxo.consentimento,
     perguntas: (fluxo.perguntas || []).slice(0, 3),
     recompensa: fluxo.recompensa || 'cupom',
-    modo: fluxo.modo || 'painel',
+    modo: fluxo.modo || 'chat',
     abrirApos: fluxo.abrir_apos || 0,
     cor: fluxo.cor || null,
     botaoFormato: fluxo.botao_formato || 'retangular',
@@ -743,7 +743,7 @@ app.put('/api/conexoes/:id/fluxo', async (req, res) => {
   if (!conexao) return res.status(404).json({ erro: 'nao encontrada' });
 
   const {
-    convite, consentimento, desconto, perguntas, recompensa = 'cupom', modo = 'painel', abrirApos = 0, cor = null,
+    convite, consentimento, desconto, perguntas, recompensa = 'cupom', modo = 'chat', abrirApos = 0, cor = null,
     botaoFormato = 'retangular', botaoPosicao = 'direita-inferior',
   } = req.body || {};
   if (cor && !/^#[0-9a-f]{6}$/i.test(String(cor))) return res.status(400).json({ erro: 'cor invalida' });

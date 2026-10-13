@@ -115,7 +115,9 @@ body{font:16px/1.6 var(--corpo);color:var(--tinta);background:var(--suave);-webk
 .aviso{margin-top:18px;font-size:13px;color:var(--cinza);line-height:1.6}
 
 /* -------------------------------- convite para a segunda metade */
-.convite-mascara{position:fixed;inset:0;z-index:60;background:rgba(10,10,15,.82);
+/* Acima do widget, que em popup ocupa a tela inteira com z-index proprio.
+   Abaixo dele o convite simplesmente nao apareceria. */
+.convite-mascara{position:fixed;inset:0;z-index:2147483002;background:rgba(10,10,15,.82);
   display:grid;place-items:center;padding:24px;animation:surge .22s ease-out}
 @keyframes surge{from{opacity:0}to{opacity:1}}
 .convite-caixa{background:#fff;border-radius:20px;padding:34px 34px 30px;max-width:460px;width:100%;
@@ -143,7 +145,7 @@ body{font:16px/1.6 var(--corpo);color:var(--tinta);background:var(--suave);-webk
 
 <div class="guia">
   <span class="marca">captapp</span>
-  <span class="passo" id="passo"><b>Passo 1 de 2.</b> Você é um visitante desta loja. Clique no botão laranja no canto da tela.</span>
+  <span class="passo" id="passo"><b>Passo 1 de 2.</b> Você é um visitante desta loja. O chat abre em alguns segundos, como abriria na loja do seu cliente.</span>
   <a class="sair" href="https://capta.lojadoecommerce.com.br">Sair da demonstração</a>
 </div>
 
@@ -211,7 +213,7 @@ body{font:16px/1.6 var(--corpo);color:var(--tinta);background:var(--suave);-webk
       </div>
     </div>
   </div>
-  <p class="dica">Esta loja é de mentira, mas o chat do canto é o mesmo que roda na loja dos clientes. Responda como se fosse comprar.</p>
+  <p class="dica">Esta loja é de mentira, mas o chat é o mesmo que roda na loja dos clientes. Responda como se fosse comprar.</p>
 </section>
 
 <!-- O painel do lojista, com o lead que a pessoa acabou de preencher. -->

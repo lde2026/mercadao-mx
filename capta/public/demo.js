@@ -134,6 +134,10 @@
       // cima do painel e tapa justamente o botao de criar conta.
       var hospedeiro = document.querySelector('div[data-capta]');
       if (hospedeiro) hospedeiro.remove();
+      // Em popup o widget trava a rolagem da pagina enquanto esta aberto, e
+      // quem destrava e o botao de fechar dele, que aqui nunca e clicado.
+      // Sem isto o painel abriria preso no topo, sem rolar.
+      document.body.style.overflow = '';
       window.scrollTo(0, 0);
     });
     caixa.appendChild(botao);
@@ -144,6 +148,6 @@
   }
 
   document.querySelector('.comprar').addEventListener('click', function () {
-    alert('A loja é de mentira. O que funciona de verdade aqui é o chat no canto da tela.');
+    alert('A loja é de mentira. O que funciona de verdade aqui é o chat.');
   });
 }());

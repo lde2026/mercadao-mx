@@ -56,7 +56,9 @@ export function fluxoDemo() {
     consentimento: `Ao continuar, você concorda que a ${LOJA_DEMO} use seus dados para entrar em contato sobre esta compra.`,
     perguntas: PERGUNTAS.map((p) => ({ texto: p.texto, opcoes: p.opcoes.slice() })),
     recompensa: 'cupom',
-    modo: 'painel',
+    // Popup no meio da tela, que e o padrao do produto. A demonstracao tem
+    // que mostrar o que o cliente vai receber quando conectar a loja dele.
+    modo: 'chat',
     // Abre sozinho depois de 4 segundos. Numa loja isso e escolha do lojista;
     // aqui e o ponto da pagina: quem veio experimentar nao pode sair sem ter
     // visto o chat por nao ter reparado no botao do canto.

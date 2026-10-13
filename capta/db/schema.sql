@@ -145,12 +145,18 @@ create table if not exists fluxos (
 alter table fluxos add column if not exists recompensa text not null default 'cupom'
   check (recompensa in ('cupom','frete_gratis','diagnostico','especialista','consultoria'));
 
--- Formato do widget. painel e a janela compacta no canto; chat e o popup em
--- balões no meio da tela. Muda so a aparencia: a ordem das perguntas e a
--- mesma nos dois, a do quadro do painel. abrir_apos em segundos abre sozinho
--- uma vez por navegador; zero desliga.
-alter table fluxos add column if not exists modo text not null default 'painel'
+-- Formato do widget. chat e o popup em balões no meio da tela, e e o padrao
+-- porque e o que converte: ocupa a tela e a pessoa responde. painel e a
+-- janela compacta no canto, para loja que nao quer interromper a navegacao.
+-- Muda so a aparencia: a ordem das perguntas e a mesma nos dois, a do quadro
+-- do painel. abrir_apos em segundos abre sozinho uma vez por navegador; zero
+-- desliga.
+alter table fluxos add column if not exists modo text not null default 'chat'
   check (modo in ('painel','chat'));
+-- O add acima nao roda em banco que ja tem a coluna, e foi assim que ela
+-- nasceu com 'painel'. O default novo precisa ser dito em separado. Linha
+-- nenhuma muda de valor: quem ja escolheu continua com o que escolheu.
+alter table fluxos alter column modo set default 'chat';
 alter table fluxos add column if not exists abrir_apos integer not null default 0
   check (abrir_apos between 0 and 120);
 -- Cor do botao e do cabecalho do widget, em hex. Nula usa o preto padrao.

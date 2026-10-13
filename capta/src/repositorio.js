@@ -373,7 +373,7 @@ export async function conexoesParaVarrer(minutos = 30) {
 // ----------------------------------------------------------------- fluxo ---
 
 export async function salvarFluxo(contaId, conexaoId, {
-  convite, consentimento, desconto, perguntas, recompensa = 'cupom', modo = 'painel', abrirApos = 0, cor = null,
+  convite, consentimento, desconto, perguntas, recompensa = 'cupom', modo = 'chat', abrirApos = 0, cor = null,
   botaoFormato = 'retangular', botaoPosicao = 'direita-inferior',
 }) {
   if (perguntas.length > 3) {

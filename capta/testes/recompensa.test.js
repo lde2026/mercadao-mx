@@ -93,6 +93,14 @@ test('formato, abrir sozinho e cor do botao chegam ao widget', async () => {
   assert.equal(r.loja, 'Loja do E-commerce');
 });
 
+test('fluxo publicado sem formato nasce em popup', async () => {
+  // O padrao e popup no meio da tela, nao a janela do canto. Quem conecta uma
+  // loja e nao mexe no seletor precisa receber o formato que converte.
+  await publicar('cupom');
+  const r = await (await fetch(`${base}/w/fluxo/${loja.chave_publica}`)).json();
+  assert.equal(r.modo, 'chat');
+});
+
 test('o painel recusa formato e cor invalidos', async () => {
   const entrada = await fetch(`${base}/api/login`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },

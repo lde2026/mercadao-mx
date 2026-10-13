@@ -639,7 +639,10 @@
     consentimento: '',
     desconto: 10,
     recompensa: 'cupom',
-    modo: 'painel',
+    // Popup no meio da tela por padrao. A janela do canto nao interrompe
+    // nada, e por isso tambem nao e respondida: quem esta olhando produto nao
+    // para para clicar nela. Lojista que prefira o canto troca no seletor.
+    modo: 'chat',
     abrirApos: 0,
     cor: '',
     botaoFormato: 'retangular',
@@ -697,7 +700,7 @@
         fluxo: fluxo ? {
           convite: fluxo.convite, consentimento: fluxo.consentimento,
           desconto: fluxo.desconto, recompensa: fluxo.recompensa || 'cupom',
-          modo: fluxo.modo || 'painel', abrirApos: fluxo.abrir_apos || 0, cor: fluxo.cor || '',
+          modo: fluxo.modo || 'chat', abrirApos: fluxo.abrir_apos || 0, cor: fluxo.cor || '',
           botaoFormato: fluxo.botao_formato || 'retangular',
           botaoPosicao: fluxo.botao_posicao || 'direita-inferior',
           perguntas: (fluxo.perguntas || []).map(function (p) {
@@ -881,7 +884,7 @@
 
     var rotuloModo = el('label', 'Formato da conversa');
     var campoModo = el('select');
-    [['painel', 'Janela compacta no canto'], ['chat', 'Chat em popup, no meio da tela']].forEach(function (par) {
+    [['chat', 'Chat em popup, no meio da tela'], ['painel', 'Janela compacta no canto']].forEach(function (par) {
       var op = el('option', par[1]); op.value = par[0]; if (f.modo === par[0]) op.selected = true; campoModo.appendChild(op);
     });
     campoModo.addEventListener('click', function (e) { e.stopPropagation(); });
