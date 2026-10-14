@@ -142,15 +142,13 @@ test('o aviso muda antes de cada corte', () => {
   assert.match(avisoDeCobranca(acessoNoDia(12)).texto, /leads continuam guardados/);
 });
 
-test('o anual tem preco proprio, nao desconto percentual', () => {
-  assert.equal(precoDoPlano('essencial'), 99);
-  assert.equal(precoDoPlano('crescimento'), 199);
-  // Doze meses de R$ 59 e de R$ 99. O numero da pagina e este, cobrado de uma
-  // vez: anunciar mensal e cobrar outro valor e problema de consumidor.
-  assert.equal(precoDoPlano('essencial', 'anual'), 708);
-  assert.equal(precoDoPlano('crescimento', 'anual'), 1188);
-  assert.equal(precoDoPlano('essencial', 'anual') / 12, 59);
-  assert.equal(precoDoPlano('crescimento', 'anual') / 12, 99);
+test('o anual tem 20% de desconto sobre doze mensalidades', () => {
+  assert.equal(precoDoPlano('essencial'), 59);
+  assert.equal(precoDoPlano('crescimento'), 99);
+  // O que a pagina anuncia e o que a fatura cobra: anunciar um valor mensal e
+  // cobrar outro no anual e problema de consumidor, nao de codigo.
+  assert.equal(precoDoPlano('essencial', 'anual'), 566.4);
+  assert.equal(precoDoPlano('crescimento', 'anual'), 950.4);
 });
 
 test('a diferenca entre os dois planos e a cota de leads, e o de cima nao tem teto', () => {

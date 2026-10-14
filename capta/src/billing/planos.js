@@ -11,23 +11,21 @@
  * o que a pessoa olhou antes de responder e o que faz a vendedora abrir a
  * conversa certa, e isso vale para a loja pequena tambem.
  *
- * O anual nao e desconto percentual, e preco proprio: R$ 59 e R$ 99 por mes.
- * Doze meses pagos na frente valem mais que a conta de juros, e o numero
- * redondo vende melhor que "20% off".
+ * O anual e 20% sobre doze mensalidades, para os dois planos. Uma conta so,
+ * no lugar de preco escrito a mao em cada plano: assim mexer no mensal ja
+ * acerta o anual, e nao existe a chance de um dos dois ficar para tras.
  */
 export const PLANOS = {
   essencial: {
     nome: 'Essencial',
-    mensal: 99,
-    anualMensal: 59,
+    mensal: 59,
     leadsMes: 500,
     lojas: 1,
     rastreamento: true,
   },
   crescimento: {
     nome: 'Ilimitado',
-    mensal: 199,
-    anualMensal: 99,
+    mensal: 99,
     leadsMes: null,
     lojas: 10,
     rastreamento: true,
@@ -43,7 +41,8 @@ export const PLANOS = {
  */
 export const PLANO_DE_ENTRADA = 'essencial';
 
-export const IMPLANTACAO = 990;
+export const IMPLANTACAO = 699;
+export const DESCONTO_ANUAL = 0.2;
 
 /**
  * Implantacao: a vista com desconto, ou parcelado sem juros.
@@ -86,18 +85,7 @@ export function precoDoPlano(plano, ciclo = 'mensal') {
   if (!escolhido) throw new Error(`plano desconhecido: ${plano}`);
   if (ciclo !== 'anual') return escolhido.mensal;
   // O anual e cobrado de uma vez, entao o que vale e o total do ano.
-  return Math.round(escolhido.anualMensal * 12 * 100) / 100;
-}
-
-/**
- * Quanto o anual economiza, em fracao, no plano que economiza mais.
- *
- * E so para a etiqueta do seletor. Cada plano tem o seu, e mostrar o maior e
- * honesto desde que o preco de cada um apareca ao lado, que e o que a tela
- * faz.
- */
-export function descontoAnualMaximo() {
-  return Math.max(...Object.values(PLANOS).map((p) => 1 - (p.anualMensal / p.mensal)));
+  return Math.round(escolhido.mensal * 12 * (1 - DESCONTO_ANUAL) * 100) / 100;
 }
 
 export function planoTemRastreamento(plano) {

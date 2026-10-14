@@ -84,11 +84,9 @@ venda.
 
 ## Cobranca
 
-Implantacao de R$ 990, cobrada uma vez. Dois planos: R$ 99 por mes ate 500
-leads e uma loja, e R$ 199 por mes sem teto de leads e ate dez lojas. No
-anual eles caem para R$ 59 e R$ 99 por mes, cobrados de uma vez. O anual nao
-e desconto percentual, e preco proprio: mudar um exige mudar o outro a mao,
-de proposito.
+Implantacao de R$ 699, cobrada uma vez. Dois planos: R$ 59 por mes ate 500
+leads e uma loja, e R$ 99 por mes sem teto de leads e ate dez lojas. O anual
+tem 20% de desconto sobre doze mensalidades, cobrado de uma vez.
 
 Cota atingida tira o chat do ar na loja ate o dia 1 ou ate o upgrade. O
 Financeiro do painel mostra so isso: o que a loja paga pelo Captapp.

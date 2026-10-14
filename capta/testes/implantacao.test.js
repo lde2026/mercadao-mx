@@ -16,8 +16,8 @@ const {
 
 test('a vista tem 10% de desconto sobre a tabela', () => {
   const p = precoDaImplantacao('avista');
-  assert.equal(p.total, 891);
-  assert.equal(p.economia, 99);
+  assert.equal(p.total, 629.1);
+  assert.equal(p.economia, 69.9);
   assert.equal(p.parcelas, 1);
   assert.equal(p.desconto, DESCONTO_AVISTA);
 });
@@ -28,19 +28,21 @@ test('sem juros quer dizer sem juros: as parcelas somam a tabela', () => {
   assert.equal(p.total, IMPLANTACAO);
   // Sem centavo sobrando nem faltando.
   assert.equal(Number((p.valorParcela * p.parcelas).toFixed(2)), IMPLANTACAO);
-  assert.equal(p.valorParcela, 165);
+  assert.equal(p.valorParcela, 116.5);
 });
 
 test('parcelado custa mais que a vista, e a diferenca e o desconto', () => {
   const avista = precoDaImplantacao('avista');
   const parcelado = precoDaImplantacao('parcelado');
-  assert.equal(parcelado.total - avista.total, avista.economia);
+  // Arredondado na comparacao: em ponto flutuante 699 menos 629,10 da
+  // 69,90000000000003, e o que o cliente ve e sempre o valor em centavos.
+  assert.equal(Number((parcelado.total - avista.total).toFixed(2)), avista.economia);
 });
 
 test('forma desconhecida cai na a vista, nunca em preco zero', () => {
   // Fluxo antigo e chamada sem argumento continuam valendo, e o pior caso e
   // cobrar o preco com desconto, nunca deixar de cobrar.
-  assert.equal(precoDaImplantacao().total, 891);
-  assert.equal(precoDaImplantacao('inventada').total, 891);
+  assert.equal(precoDaImplantacao().total, 629.1);
+  assert.equal(precoDaImplantacao('inventada').total, 629.1);
   assert.deepEqual(FORMAS_IMPLANTACAO, ['avista', 'parcelado']);
 });
