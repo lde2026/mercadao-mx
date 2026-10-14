@@ -75,6 +75,20 @@ app.use((req, res, proximo) => {
   res.set('X-Content-Type-Options', 'nosniff');
   res.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   if (PRODUCAO) res.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  if (ehLanding(req)) {
+    // A landing usa fonte do Google. Ela nao tem sessao, nao tem formulario e
+    // nao toca em dado de ninguem, entao abrir a folha de estilo e a fonte
+    // nao aumenta o que um atacante alcanca. O script continua so do proprio
+    // dominio, que e a linha que importa.
+    res.set('X-Frame-Options', 'DENY');
+    res.set('Content-Security-Policy',
+      "default-src 'self'; script-src 'self'; "
+      + "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+      + "font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; "
+      + "connect-src 'self'; frame-src https://www.youtube.com https://player.vimeo.com; "
+      + "frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
+    return proximo();
+  }
   const publico = req.path === '/widget.js' || req.path === '/rastreador.js'
     || req.path.startsWith('/w/') || req.path === '/e' || req.path.startsWith('/webhook/')
     || req.path.startsWith('/tray/') || req.path.startsWith('/nuvemshop/');
@@ -85,6 +99,48 @@ app.use((req, res, proximo) => {
       + "connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
   }
   proximo();
+});
+
+/**
+ * A landing mora no mesmo servidor, escolhida pelo Host.
+ *
+ * Ela podia ficar numa hospedagem estatica, mas seria mais uma conta, mais um
+ * deploy e mais um lugar onde o preco escrito na pagina envelhece separado do
+ * preco cobrado no produto. Aqui ela sobe no mesmo commit que o resto.
+ *
+ * Quem chega por capta ve so a pagina de venda. As rotas de API, widget e
+ * webhook nem sao oferecidas nesse host, e o painel continua em captapp.
+ */
+const HOST_LANDING = String(process.env.HOST_LANDING || 'capta.lojadoecommerce.com.br')
+  .split(',').map((h) => h.trim().toLowerCase()).filter(Boolean);
+
+const PASTA_LANDING = path.join(aqui, '..', 'landing');
+const PAGINAS_LANDING = {
+  '/': 'index.html',
+  '/termos': 'termos.html',
+  '/privacidade': 'privacidade.html',
+};
+
+function ehLanding(req) {
+  const host = String(req.headers.host || '').toLowerCase().split(':')[0];
+  return HOST_LANDING.includes(host);
+}
+
+const estaticoLanding = express.static(PASTA_LANDING, { maxAge: '5m' });
+
+app.use((req, res, proximo) => {
+  if (!ehLanding(req)) return proximo();
+  // O Railway bate no /saude pelo dominio que ele quiser; respondendo so no
+  // host do painel, o servico apareceria fora do ar sem estar.
+  if (req.path === '/saude') return proximo();
+
+  const caminho = req.path.replace(/\/+$/, '') || '/';
+  const pagina = PAGINAS_LANDING[caminho];
+  if (pagina) return res.sendFile(path.join(PASTA_LANDING, pagina));
+
+  // Endereco errado numa pagina de venda nao merece tela de erro: leva de
+  // volta para a oferta.
+  return estaticoLanding(req, res, () => res.redirect(302, '/'));
 });
 
 /** Para o Railway e para o monitoramento. Confere o banco, nao so o processo. */

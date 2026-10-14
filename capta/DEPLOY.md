@@ -4,7 +4,7 @@ Dois hosts no mesmo dominio:
 
 | Host | O que e |
 |---|---|
-| `capta.lojadoecommerce.com.br` | Landing page, so venda. Nao passa pelo Railway. |
+| `capta.lojadoecommerce.com.br` | Landing page, so venda. Mesmo servico do Railway, escolhido pelo Host. |
 | `captapp.lojadoecommerce.com.br` | O app: painel, API, widget e webhooks. E o que este guia sobe. |
 
 O Cloudflare fica na frente do app e segura o `widget.js`, que e baixado por
@@ -110,14 +110,28 @@ Nada de registro A: os dois alvos mudam de IP sem avisar.
 
 ## 3. Landing page em capta.lojadoecommerce.com.br
 
-E um arquivo so, `landing/index.html`, sem servidor. O caminho mais simples
-e o Cloudflare Pages: novo projeto, conectar o repositorio, **Root
-directory** `capta/landing`, sem comando de build, e o dominio customizado
-`capta.lojadoecommerce.com.br`. O Pages cria o DNS sozinho.
+A landing e servida pelo proprio app, escolhida pelo cabecalho Host. Nao ha
+segundo servico, segunda conta nem segundo deploy: ela sobe no mesmo commit
+que o resto, e o preco escrito na pagina nao envelhece separado do preco
+cobrado no produto.
+
+Quem chega por `capta.` ve so a pagina de venda. As rotas de API, widget e
+webhook nao sao oferecidas nesse host, e o painel continua em `captapp.`.
+
+Dois passos, uma vez so:
+
+1. **Railway**, no servico do app: Settings, Networking, **Custom Domain**,
+   `capta.lojadoecommerce.com.br`. Ele devolve um destino CNAME.
+2. **Registro.br**, na zona do dominio: um CNAME `capta` apontando para esse
+   destino. Mesma coisa que foi feita para `captapp`.
+
+A variavel `HOST_LANDING` muda quais hosts recebem a landing, separados por
+virgula. Sem ela vale `capta.lojadoecommerce.com.br`.
 
 O video do topo entra pelo atributo `data-url` do bloco `#video`: cole o
 link de incorporacao do YouTube (`https://www.youtube.com/embed/ID`) ou do
-Vimeo. Vazio, o quadro fica como convite.
+Vimeo. Enquanto estiver vazio o bloco sai da pagina, porque um play que nao
+toca nada faz o visitante achar que o site esta quebrado.
 
 ## 4. Asaas
 
@@ -216,7 +230,7 @@ linha de log e a cobranca fica manual.
 
 Meta e Google recusam anuncio de pagina sem identificacao da empresa e sem
 politica de privacidade acessivel. As tres paginas ja existem em
-`landing/`, e sobem junto com a landing no Cloudflare Pages:
+`landing/`, e sobem junto com o app:
 
 | Endereco | Arquivo |
 |---|---|

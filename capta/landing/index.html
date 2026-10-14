@@ -361,21 +361,6 @@ p{max-width:62ch}
   </div>
 </footer>
 
-<script>
-(function () {
-  // O video entra por link em data-url. Vazio, o quadro fica como convite ate o link existir.
-  var caixa = document.getElementById('video');
-  var url = caixa.getAttribute('data-url');
-  caixa.querySelector('.play').addEventListener('click', function () {
-    if (!url) { alert('O vídeo entra aqui assim que o link for colado no atributo data-url.'); return; }
-    var iframe = document.createElement('iframe');
-    iframe.src = url + (url.indexOf('?') > -1 ? '&' : '?') + 'autoplay=1';
-    iframe.allow = 'autoplay; fullscreen; picture-in-picture';
-    iframe.title = 'Captapp na prática';
-    caixa.textContent = '';
-    caixa.appendChild(iframe);
-  });
-}());
-</script>
+<script src="/landing.js" defer></script>
 </body>
 </html>
