@@ -773,6 +773,8 @@
     topo.appendChild(publicar);
     caixa.appendChild(topo);
 
+    if (eu && eu.redator) caixa.appendChild(cartaoAssistente());
+
     var corpo = el('div', null, 'construtor-corpo');
     corpo.appendChild(el('div', null, 'quadro'));
     corpo.appendChild(el('aside', null, 'previa'));
@@ -781,6 +783,109 @@
 
     desenharQuadro();
     desenharPrevia();
+  }
+
+  /**
+   * O assistente que monta o quadro a partir da descricao da loja.
+   *
+   * A tela em branco e onde o lojista desiste: ele sabe o que vende, mas
+   * escrever tres perguntas de qualificacao com opcoes fechadas e trabalho de
+   * redator. Aqui ele conta o que vende, por escrito ou falando, e corrige o
+   * que voltou. Nada vai para a loja sem ele publicar.
+   */
+  function cartaoAssistente() {
+    var cartao = el('div', null, 'assistente');
+    cartao.appendChild(el('div', 'Monte com o assistente', 'rotulo'));
+    cartao.appendChild(el('p', 'Conte o que a loja vende, para quem, e a faixa de preço. Ele escreve as três perguntas e você corrige o que quiser antes de publicar.', 'legenda'));
+
+    var campo = el('textarea');
+    campo.rows = 3;
+    campo.maxLength = 1500;
+    campo.placeholder = 'Ex: vendo aliança de ouro e anel de noivado, ticket de dois a cinco mil, o cliente chega indeciso e quer ver no dedo antes.';
+    campo.addEventListener('click', function (e) { e.stopPropagation(); });
+    cartao.appendChild(campo);
+
+    var acoes = el('div', null, 'assistente-acoes');
+    var estado = el('span', '', 'hora');
+
+    var montar = el('button', 'Montar o chat');
+    montar.type = 'button';
+    montar.addEventListener('click', function () {
+      var descricao = campo.value.trim();
+      if (descricao.length < 12) { estado.textContent = 'Escreva uma frase a mais sobre a loja.'; return; }
+      montar.disabled = true;
+      estado.textContent = 'Montando...';
+      api('/conexoes/' + construtor.conexaoId + '/fluxo/sugerir', { method: 'POST', corpo: { descricao: descricao } })
+        .then(function (sugestao) {
+          var f = construtor.fluxo;
+          // So o conteudo. Cor, formato do botao e posicao sao escolha dele e
+          // nao tem nada a ver com o que a loja vende.
+          f.convite = sugestao.convite;
+          f.consentimento = sugestao.consentimento;
+          f.desconto = sugestao.desconto;
+          f.recompensa = sugestao.recompensa;
+          f.perguntas = sugestao.perguntas;
+          construtor.selecionado = 0;
+          montar.disabled = false;
+          estado.textContent = 'Pronto. Confira as perguntas e publique.';
+          marcarSujo(); desenharQuadro(); desenharPrevia();
+        })
+        .catch(function (e) {
+          montar.disabled = false;
+          estado.textContent = e.dados && e.dados.explicacao ? e.dados.explicacao : e.message;
+        });
+    });
+
+    /*
+     * O microfone e o do proprio navegador.
+     *
+     * Gravar o audio e mandar para um servico de transcricao custaria dinheiro
+     * e carregaria voz de gente no nosso servidor, que e dado pessoal que nao
+     * precisamos ter. O reconhecimento nativo roda na maquina dele e so o
+     * texto chega aqui. Onde nao existe, o botao nao aparece e o campo de
+     * texto continua.
+     */
+    var Reconhecimento = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (Reconhecimento) {
+      var ouvindo = null;
+      var falar = el('button', 'Falar', 'secundario');
+      falar.type = 'button';
+      falar.addEventListener('click', function () {
+        if (ouvindo) { ouvindo.stop(); return; }
+        var r = new Reconhecimento();
+        r.lang = 'pt-BR';
+        r.continuous = true;
+        r.interimResults = false;
+        r.addEventListener('result', function (evento) {
+          var novo = '';
+          for (var i = evento.resultIndex; i < evento.results.length; i += 1) {
+            novo += evento.results[i][0].transcript;
+          }
+          campo.value = (campo.value.trim() + ' ' + novo.trim()).trim();
+        });
+        r.addEventListener('error', function (evento) {
+          estado.textContent = evento.error === 'not-allowed'
+            ? 'O navegador bloqueou o microfone. Libere e tente de novo.'
+            : 'Não consegui ouvir. Pode escrever.';
+        });
+        r.addEventListener('end', function () {
+          ouvindo = null;
+          falar.textContent = 'Falar';
+          falar.classList.remove('ouvindo');
+        });
+        r.start();
+        ouvindo = r;
+        falar.textContent = 'Ouvindo, toque para parar';
+        falar.classList.add('ouvindo');
+        estado.textContent = '';
+      });
+      acoes.appendChild(falar);
+    }
+
+    acoes.appendChild(montar);
+    acoes.appendChild(estado);
+    cartao.appendChild(acoes);
+    return cartao;
   }
 
   function marcarSujo() {

@@ -14,6 +14,7 @@ import {
   precoDaImplantacao, FORMAS_IMPLANTACAO, PARCELAS_IMPLANTACAO, DESCONTO_AVISTA,
 } from './billing/planos.js';
 import { MODELOS } from './modelos.js';
+import { sugerirFluxo, temRedator } from './redator.js';
 import * as asaas from './billing/asaas.js';
 import * as kiwify from './billing/kiwify.js';
 import { agendar } from './tarefas.js';
@@ -546,6 +547,9 @@ app.get('/api/eu', async (req, res) => {
     // nao virar mural.
     aviso: avisoDeCobranca(req.acesso) || avisoDeCota(req.acesso) || avisoDeTeste(req.acesso),
     planos: PLANOS,
+    // O painel so desenha o assistente quando ele existe de verdade. Botao que
+    // responde "nao configurado" e pior que botao nenhum.
+    redator: temRedator(),
   });
 });
 
@@ -736,6 +740,56 @@ app.get('/api/conexoes/:id/fluxo', async (req, res) => {
   const conexao = await repo.buscarConexao(req.conta.id, req.params.id);
   if (!conexao) return res.status(404).json({ erro: 'nao encontrada' });
   res.json(await repo.fluxoDaConexao(req.conta.id, conexao.id));
+});
+
+/**
+ * Monta o fluxo a partir da descricao da loja.
+ *
+ * O lojista fala ou escreve o que vende, e o quadro volta preenchido para ele
+ * corrigir. Nao publica nada: a sugestao fica no construtor ate ele mandar
+ * publicar, igual a um modelo escolhido na lista.
+ *
+ * Teto de vinte por dia por conta. A chamada custa dinheiro nosso a cada
+ * clique, e sem teto um botao em tela vira conta aberta.
+ */
+app.post('/api/conexoes/:id/fluxo/sugerir', async (req, res) => {
+  const conexao = await repo.buscarConexao(req.conta.id, req.params.id);
+  if (!conexao) return res.status(404).json({ erro: 'nao encontrada' });
+  if (!temRedator()) {
+    return res.status(503).json({
+      erro: 'o assistente nao esta ligado nesta instalacao',
+      explicacao: 'Falta a chave da API no servidor. Monte o chat a mao ou use um modelo.',
+    });
+  }
+
+  const descricao = String((req.body || {}).descricao || '').trim().slice(0, 1500);
+  if (descricao.length < 12) {
+    return res.status(400).json({
+      erro: 'conte um pouco mais sobre a loja',
+      explicacao: 'Uma frase ja basta: o que voce vende, para quem, e qual a faixa de preco.',
+    });
+  }
+
+  const cabe = await repo.consumirLimite(`redator:${req.conta.id}`, 86400, 20);
+  if (!cabe) {
+    return res.status(429).json({
+      erro: 'voce ja montou o chat vinte vezes hoje',
+      explicacao: 'O limite volta amanha. Ate la da para editar o quadro a mao.',
+    });
+  }
+
+  try {
+    const fluxo = await sugerirFluxo({
+      loja: conexao.nome_loja, descricao, contaId: req.conta.id,
+    });
+    res.json(fluxo);
+  } catch (erro) {
+    log.aviso('redator.falhou', { conta_id: req.conta.id, motivo: erro.message });
+    res.status(502).json({
+      erro: 'nao consegui montar agora',
+      explicacao: 'Tente de novo em um minuto, ou escolha um modelo pronto.',
+    });
+  }
 });
 
 app.put('/api/conexoes/:id/fluxo', async (req, res) => {

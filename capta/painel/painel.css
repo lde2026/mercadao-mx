@@ -292,6 +292,18 @@ pre{background:var(--escuro);color:var(--superficie);padding:13px;border-radius:
 .construtor-topo select{width:auto;margin:0;padding:8px 32px 8px 12px;font-size:14px;font-weight:600}
 .construtor-topo strong{font-size:15px}
 .estado-publicacao{margin-left:auto}
+
+/* O assistente fica entre o topo e o quadro, com fundo de acento: ele e um
+   atalho para preencher o quadro, nao mais um campo do formulario. */
+.assistente{border:1px solid var(--linha);border-radius:14px;background:var(--acento-suave);
+  padding:16px 18px;margin-bottom:20px}
+.assistente .legenda{margin:4px 0 10px}
+.assistente textarea{width:100%;margin:0;resize:vertical;min-height:72px}
+.assistente-acoes{display:flex;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap}
+.assistente-acoes .hora{margin-left:4px}
+/* O botao de microfone muda de cor enquanto ouve: sem isso ninguem sabe se
+   parou de gravar, e a pessoa fica falando para um botao desligado. */
+.assistente-acoes .ouvindo{background:var(--ruim-fundo);border-color:var(--ruim);color:var(--ruim)}
 .construtor-corpo{display:block}
 
 /* O quadro ocupa a largura toda e os cartoes fluem para a direita e quebram
