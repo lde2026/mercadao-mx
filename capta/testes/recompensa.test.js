@@ -101,6 +101,29 @@ test('fluxo publicado sem formato nasce em popup', async () => {
   assert.equal(r.modo, 'chat');
 });
 
+test('o lojista pode ir ate seis perguntas, e a setima e recusada', async () => {
+  const entrada = await fetch(`${base}/api/login`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: 'pierre+r@lojadoecommerce.com.br', senha: 'senha-de-teste-123' }),
+  });
+  const cookie = entrada.headers.get('set-cookie').split(';')[0];
+  const montar = (n) => Array.from({ length: n }, (_, i) => ({
+    texto: `Pergunta ${i + 1}`, opcoes: ['Sim', 'Não'],
+  }));
+  const publicar = (perguntas) => fetch(`${base}/api/conexoes/${loja.id}/fluxo`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json', Cookie: cookie },
+    body: JSON.stringify({ consentimento: 'x', perguntas }),
+  });
+
+  // Loja de ticket alto qualifica mais, e o teto de tres perdia venda.
+  const seis = await publicar(montar(6));
+  assert.equal(seis.status, 200);
+  assert.equal((await seis.json()).perguntas, 6);
+
+  // O teto continua existindo: cada pergunta a mais derruba quem chega ao fim.
+  assert.equal((await publicar(montar(7))).status, 400);
+});
+
 test('o painel recusa formato e cor invalidos', async () => {
   const entrada = await fetch(`${base}/api/login`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },

@@ -392,13 +392,18 @@ export async function conexoesParaVarrer(minutos = 30) {
 
 // ----------------------------------------------------------------- fluxo ---
 
+/** Mesmo teto da rota que publica. Ver o porque em src/server.js. */
+export const TETO_PERGUNTAS = 6;
+
 export async function salvarFluxo(contaId, conexaoId, {
   convite, consentimento, desconto, perguntas, recompensa = 'cupom', modo = 'chat', abrirApos = 0, cor = null,
   botaoFormato = 'retangular', botaoPosicao = 'direita-inferior',
 }) {
-  if (perguntas.length > 3) {
-    // A quarta pergunta e a de contato, fixa. Tres configuraveis e o teto.
-    throw new Error('maximo de tres perguntas configuraveis antes da de contato');
+  if (perguntas.length > TETO_PERGUNTAS) {
+    // A de contato nao conta: ela vem sempre junto e nao se remove. O teto
+    // aqui e a ultima barreira, para nenhum caminho gravar fluxo maior que o
+    // que a rota aceita.
+    throw new Error(`maximo de ${TETO_PERGUNTAS} perguntas antes da de contato`);
   }
   return emTransacao(async (cliente) => {
     const { rows } = await cliente.query(

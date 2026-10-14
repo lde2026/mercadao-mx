@@ -180,17 +180,22 @@ alter table fluxos add column if not exists botao_posicao text not null default 
 
 create unique index if not exists fluxos_conexao_idx on fluxos(conexao_id);
 
--- Teto de quatro perguntas no banco, nao so na tela: a ultima e a de contato
--- e nao pode ser removida, entao ela nao vive nesta tabela.
+-- Teto de perguntas no banco, nao so na tela. A de contato nao vive nesta
+-- tabela: ela vem sempre junto e nao pode ser removida.
 create table if not exists perguntas (
   id        uuid primary key default gen_random_uuid(),
   fluxo_id  uuid not null references fluxos(id) on delete cascade,
-  ordem     integer not null check (ordem between 1 and 3),
+  ordem     integer not null check (ordem between 1 and 6),
   texto     text not null,
   opcoes    jsonb not null default '[]'::jsonb,
   criado_em timestamptz not null default now(),
   unique (fluxo_id, ordem)
 );
+-- O create table acima nao roda em banco que ja tem a tabela, e foi assim que
+-- a trava nasceu em tres. Em loja de ticket alto tres perguntas qualificavam
+-- de menos, e o teto novo precisa ser dito em separado.
+alter table perguntas drop constraint if exists perguntas_ordem_check;
+alter table perguntas add constraint perguntas_ordem_check check (ordem between 1 and 6);
 
 -- ----------------------------------------------------------------- leads ---
 

@@ -634,6 +634,10 @@
   var construtor = null;
   var modelos = null;
 
+  // Teto de perguntas do lojista. A de contato nao entra na conta: ela vem
+  // sempre junto e nao se remove.
+  var TETO_PERGUNTAS = 6;
+
   var FLUXO_VAZIO = {
     convite: 'Ganhe cupom',
     consentimento: '',
@@ -1068,12 +1072,20 @@
     });
 
     // Adicionar
-    if (f.perguntas.length < 3) {
+    if (f.perguntas.length < TETO_PERGUNTAS) {
       quadro.appendChild(ligacao());
       var adicionar = el('button', null, 'no adicionar');
       adicionar.type = 'button';
       adicionar.appendChild(el('strong', '+ Adicionar pergunta'));
-      adicionar.appendChild(el('span', f.perguntas.length + ' de 3', 'hora'));
+      /*
+       * O aviso aparece a partir da quarta porque ele e verdade medida: cada
+       * pergunta a mais derruba quantos chegam ao fim. O teto existe para o
+       * lojista nao montar um formulario de dez campos achando que esta
+       * qualificando melhor, mas quem quer mais pode ir ate seis.
+       */
+      adicionar.appendChild(el('span', f.perguntas.length >= 3
+        ? f.perguntas.length + ' de ' + TETO_PERGUNTAS + ', cada uma a mais derruba a taxa de resposta'
+        : f.perguntas.length + ' de ' + TETO_PERGUNTAS, 'hora'));
       adicionar.addEventListener('click', function () {
         f.perguntas.push({ texto: '', opcoes: [] });
         construtor.selecionado = f.perguntas.length - 1;

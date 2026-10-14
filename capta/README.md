@@ -1,7 +1,7 @@
 # Captapp
 
 Chat de captacao de leads para loja virtual. O visitante clica num botao
-flutuante, responde ate quatro perguntas, deixa contato e recebe um cupom
+flutuante, responde as perguntas da loja, deixa contato e recebe um cupom
 unico. O lojista ve o lead no painel, com o cupom vinculado, e mede quanto
 faturou por causa do chat.
 
@@ -95,7 +95,10 @@ lead, nunca no Financeiro.
 
 O cupom e sempre unico por pessoa, gerado pela API ou tirado de um lote.
 
-Maximo quatro perguntas, e a ultima e sempre a de contato.
+Ate seis perguntas do lojista, e a de contato vem sempre junto, sem contar no
+teto e sem poder ser removida. O teto existe porque cada pergunta a mais
+derruba quantos chegam ao fim; o painel avisa isso a partir da quarta, e a
+decisao fica com quem conhece o proprio cliente.
 
 O lead e gravado antes de tentar o cupom. Cupom quebrado vira chamado de
 suporte e se resolve. Lead perdido e dinheiro.

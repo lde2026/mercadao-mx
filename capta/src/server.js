@@ -807,10 +807,10 @@ app.put('/api/conexoes/:id/fluxo', async (req, res) => {
   if (!FORMATOS_BOTAO.has(botaoFormato)) return res.status(400).json({ erro: 'formato de botao invalido' });
   if (!POSICOES_BOTAO.has(botaoPosicao)) return res.status(400).json({ erro: 'posicao de botao invalida' });
   const segundos = Math.min(Math.max(Number(abrirApos) || 0, 0), 120);
-  if ((perguntas || []).length > 3) {
+  if ((perguntas || []).length > TETO_PERGUNTAS) {
     return res.status(400).json({
-      erro: 'maximo de tres perguntas antes da de contato',
-      explicacao: 'A quarta pergunta e sempre a de contato e nao pode ser removida.',
+      erro: `maximo de ${TETO_PERGUNTAS} perguntas antes da de contato`,
+      explicacao: 'A de contato vem sempre junto e nao conta neste teto.',
     });
   }
   const limpas = (perguntas || [])
@@ -837,6 +837,19 @@ app.put('/api/conexoes/:id/fluxo', async (req, res) => {
 });
 
 const SITUACOES = new Set(['a_contatar', 'contatados']);
+
+/**
+ * Quantas perguntas o lojista pode fazer antes da de contato.
+ *
+ * Eram tres. O numero existe porque cada pergunta a mais derruba quantos
+ * chegam ao fim do chat, e o lojista que monta um formulario de dez campos
+ * cancela culpando a ferramenta. Mas teto rigido tambem perde venda: loja de
+ * ticket alto qualifica mais, e quem pediu mais pergunta tinha motivo. Entao
+ * seis, com o painel avisando a partir da quarta.
+ *
+ * O repositorio repete o numero porque e a ultima barreira antes do banco.
+ */
+const { TETO_PERGUNTAS } = repo;
 const RECOMPENSAS = new Set(['cupom', 'frete_gratis', 'diagnostico', 'especialista', 'consultoria']);
 
 /**
