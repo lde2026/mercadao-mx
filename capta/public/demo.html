@@ -49,22 +49,38 @@ body{font:16px/1.6 var(--corpo);color:var(--tinta);background:var(--suave);-webk
   padding:16px 28px;background:#fff;border-bottom:1px solid #eee4d8;flex-wrap:wrap}
 .loja-marca{font-family:var(--display);font-weight:800;font-size:19px;letter-spacing:-.02em}
 .loja-menu{display:flex;gap:20px;font-size:14px;color:var(--cinza)}
-.vitrine{max-width:1000px;margin:0 auto;padding:34px 28px 60px;
-  display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:start}
+.aviso-frete{background:#2a2118;color:#f5ece2;text-align:center;font-size:12.5px;padding:7px 14px;letter-spacing:.02em}
+.banner{max-width:1040px;margin:26px auto 0;padding:0 28px}
+.banner-caixa{border-radius:20px;padding:30px 34px;background:linear-gradient(120deg,#f3e6dd,#e4cdbd);
+  border:1px solid #e3d2c4;display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap}
+.banner-caixa h1{font-family:var(--display);font-size:clamp(22px,3.2vw,32px);line-height:1.15;letter-spacing:-.02em;color:#2a2118;max-width:16ch}
+.banner-caixa p{color:#6d5b4c;font-size:14.5px;margin-top:6px}
+.banner-caixa .comprar{width:auto;margin:0;padding:13px 26px}
+/* A home mostra a loja inteira, nao um produto so: e assim que o visitante
+   chega de verdade, e e onde o chat precisa aparecer sem atrapalhar. */
+.grade-loja{max-width:1040px;margin:0 auto;padding:30px 28px 10px;
+  display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.cartao-prod{background:#fff;border:1px solid #ece0d4;border-radius:16px;overflow:hidden;
+  display:flex;flex-direction:column;transition:transform .15s,box-shadow .15s}
+.cartao-prod:hover{transform:translateY(-3px);box-shadow:0 18px 40px -22px rgba(42,33,24,.5)}
+.cartao-prod .foto{aspect-ratio:4/5;border-radius:0;border:0;border-bottom:1px solid #f0e6da}
+.cartao-prod .foto svg{width:74%;height:74%}
+.cartao-prod .info{padding:14px 16px 18px}
+.cartao-prod .nome{font-family:var(--display);font-size:15px;letter-spacing:-.01em;color:#2a2118}
+.cartao-prod .preco{font-size:19px;margin-top:6px}
+.cartao-prod .parcela{font-size:12.5px}
+.cartao-prod .comprar{margin-top:12px;padding:11px;font-size:14px}
+.cartao-prod.destaque{grid-column:span 1}
 .foto{aspect-ratio:1;border-radius:18px;background:linear-gradient(160deg,#fbf6f1,#efe2d8);
   border:1px solid #e8dace;position:relative;display:grid;place-items:center;overflow:hidden}
 .foto svg{width:78%;height:78%;display:block}
-.foto-nome{position:absolute;left:20px;bottom:18px;text-align:left}
-.foto-nome b{display:block;font-family:var(--display);font-size:26px;letter-spacing:-.02em;color:#2a2118}
-.foto-nome span{font-size:13px;color:#7a6a5c}
-.produto h1{font-family:var(--display);font-size:clamp(22px,3vw,30px);line-height:1.2;letter-spacing:-.02em}
 .preco{font-family:var(--display);font-size:28px;font-weight:700;margin-top:16px}
 .parcela{color:var(--cinza);font-size:14px;margin-top:2px}
 .comprar{display:block;width:100%;margin-top:22px;padding:15px;border:0;border-radius:12px;
   background:var(--laranja);color:#fff;font:700 16px var(--corpo);cursor:pointer}
 .comprar:hover{background:var(--laranja-escuro)}
-.ficha{margin-top:22px;color:var(--cinza);font-size:14px;line-height:1.8}
-.dica{max-width:1000px;margin:0 auto;padding:0 28px 50px;color:var(--cinza);font-size:14px}
+.dica{max-width:1040px;margin:0 auto;padding:22px 28px 60px;color:var(--cinza);font-size:14px}
+.dica b{color:#2a2118}
 
 /* ------------------------------------------------------- o painel */
 .painel{display:none;min-height:calc(100vh - 46px);background:var(--suave)}
@@ -136,7 +152,9 @@ body{font:16px/1.6 var(--corpo);color:var(--tinta);background:var(--suave);-webk
 @media (prefers-reduced-motion:reduce){.convite-mascara,.convite-caixa{animation:none}}
 
 @media(max-width:760px){
-  .vitrine{grid-template-columns:1fr;gap:24px;padding:24px 18px 50px}
+  .grade-loja{grid-template-columns:repeat(2,1fr);gap:14px;padding:22px 18px 6px}
+  .banner{padding:0 18px}
+  .banner-caixa{padding:22px}
   .loja-menu{display:none}
   .guia{font-size:13px;gap:10px}
 }
@@ -152,21 +170,24 @@ body{font:16px/1.6 var(--corpo);color:var(--tinta);background:var(--suave);-webk
 
 <!-- A loja ficticia. O widget entra sozinho no canto. -->
 <section class="loja" id="loja">
+  <div class="aviso-frete">Frete grátis nas compras acima de R$ 299</div>
   <div class="loja-topo">
     <div class="loja-marca">Aurora Boutique</div>
     <nav class="loja-menu"><span>Vestidos</span><span>Blusas</span><span>Calças</span><span>Acessórios</span></nav>
   </div>
-  <div class="vitrine">
-    <!--
-      O vestido e desenhado em SVG, nao e foto carregada de fora.
+  <div class="banner">
+    <div class="banner-caixa">
+      <div>
+        <h1>Coleção nova chegando toda semana</h1>
+        <p>Peças da estação com envio em até 2 dias úteis para todo o Brasil.</p>
+      </div>
+      <button type="button" class="comprar">Ver a coleção</button>
+    </div>
+  </div>
 
-      A pagina mora dentro do app, e o Content-Security-Policy dele so deixa
-      carregar o que vem do proprio servidor. Um SVG inline respeita isso,
-      aparece instantaneo e nao depende de nenhum servico de imagem continuar
-      no ar daqui a um ano.
-    -->
-    <div class="foto">
-      <svg viewBox="0 0 320 400" role="img" aria-label="Ilustração de um vestido midi floral">
+  <div class="grade-loja">
+    <article class="cartao-prod destaque">
+      <div class="foto"><svg viewBox="0 0 320 400" role="img" aria-label="Ilustração de um vestido midi floral">
         <defs>
           <linearGradient id="tecido" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0" stop-color="#f3e6dd"/>
@@ -199,22 +220,62 @@ body{font:16px/1.6 var(--corpo);color:var(--tinta);background:var(--suave);-webk
         </g>
         <!-- barra -->
         <path d="M74 352 Q160 376 246 352" stroke="#b59683" stroke-width="3" fill="none" opacity=".6"/>
-      </svg>
-      <div class="foto-nome"><b>Aurora</b><span>Vestido Midi Floral</span></div>
-    </div>
-    <div class="produto">
-      <h1>Vestido Midi Floral Aurora, tecido leve com forro</h1>
-      <div class="preco">R$ 189,90</div>
-      <div class="parcela">em até 3x de R$ 63,30 sem juros</div>
-      <button type="button" class="comprar">Comprar agora</button>
-      <div class="ficha">
-        Tamanhos PP ao Plus Size<br>
-        Viscose com forro, lavagem à mão<br>
-        Envio em até 2 dias úteis
+      </svg></div>
+      <div class="info">
+        <div class="nome">Vestido Midi Floral Aurora</div>
+        <div class="preco">R$ 189,90</div>
+        <div class="parcela">em até 3x de R$ 63,30</div>
+        <button type="button" class="comprar">Comprar</button>
       </div>
-    </div>
+    </article>
+    <article class="cartao-prod">
+      <div class="foto"><svg viewBox="0 0 320 400" role="img" aria-label="Blusa de seda"><path d="M112 86 L92 112 72 102 96 66 128 54 Q160 76 192 54 L224 66 248 102 228 112 208 86 214 330 Q160 344 106 330 Z" fill="#dfe6ee"/><path d="M128 54 Q160 92 192 54" fill="none" stroke="#b9c6d6" stroke-width="5"/><g stroke="#c3cedd" stroke-width="2" fill="none" opacity=".7"><path d="M140 150 Q138 240 136 320"/><path d="M180 150 Q182 240 184 320"/></g></svg></div>
+      <div class="info">
+        <div class="nome">Blusa de seda Olívia</div>
+        <div class="preco">R$ 129,90</div>
+        <div class="parcela">em até 3x de R$ 43,30</div>
+        <button type="button" class="comprar">Comprar</button>
+      </div>
+    </article>
+    <article class="cartao-prod">
+      <div class="foto"><svg viewBox="0 0 320 400" role="img" aria-label="Calça pantalona"><path d="M110 60 h100 l10 50-14 230h-46l-10-180-10 180h-46l-14-230z" fill="#55607a"/><rect x="108" y="58" width="104" height="18" rx="4" fill="#424c62"/><path d="M160 112v60" stroke="#3b4457" stroke-width="3"/></svg></div>
+      <div class="info">
+        <div class="nome">Calça pantalona Mia</div>
+        <div class="preco">R$ 219,90</div>
+        <div class="parcela">em até 4x de R$ 54,97</div>
+        <button type="button" class="comprar">Comprar</button>
+      </div>
+    </article>
+    <article class="cartao-prod">
+      <div class="foto"><svg viewBox="0 0 320 400" role="img" aria-label="Bolsa de couro"><path d="M86 160h148a14 14 0 0 1 14 13l10 122a18 18 0 0 1-18 19H80a18 18 0 0 1-18-19l10-122a14 14 0 0 1 14-13z" fill="#9a6a4a"/><path d="M116 160v-34a44 44 0 0 1 88 0v34" fill="none" stroke="#9a6a4a" stroke-width="13"/><rect x="142" y="212" width="36" height="24" rx="6" fill="#e8d6c6"/></svg></div>
+      <div class="info">
+        <div class="nome">Bolsa de couro Nina</div>
+        <div class="preco">R$ 459,00</div>
+        <div class="parcela">em até 6x de R$ 76,50</div>
+        <button type="button" class="comprar">Comprar</button>
+      </div>
+    </article>
+    <article class="cartao-prod">
+      <div class="foto"><svg viewBox="0 0 320 400" role="img" aria-label="Sandália de salto"><path d="M70 268c40-6 62-30 76-58 8-16 26-18 36-6l26 32 42 20c16 8 22 16 22 28v14H70z" fill="#c98a93"/><path d="M70 284h202v10a10 10 0 0 1-10 10H80a10 10 0 0 1-10-10z" fill="#a9636f"/><path d="M246 298l8 54h22l-10-54z" fill="#a9636f"/></svg></div>
+      <div class="info">
+        <div class="nome">Sandália de salto Lia</div>
+        <div class="preco">R$ 319,00</div>
+        <div class="parcela">em até 4x de R$ 79,75</div>
+        <button type="button" class="comprar">Comprar</button>
+      </div>
+    </article>
+    <article class="cartao-prod">
+      <div class="foto"><svg viewBox="0 0 320 400" role="img" aria-label="Brinco dourado"><circle cx="160" cy="130" r="12" fill="#d9ab52"/><path d="M160 142a58 58 0 1 0 .1 0z" fill="none" stroke="#d9ab52" stroke-width="12"/><circle cx="160" cy="258" r="18" fill="#f0d79a"/></svg></div>
+      <div class="info">
+        <div class="nome">Brinco banhado a ouro</div>
+        <div class="preco">R$ 89,90</div>
+        <div class="parcela">em até 2x de R$ 44,95</div>
+        <button type="button" class="comprar">Comprar</button>
+      </div>
+    </article>
   </div>
-  <p class="dica">Esta loja é de mentira, mas o chat é o mesmo que roda na loja dos clientes. Responda como se fosse comprar.</p>
+
+  <p class="dica"><b>Esta é a home de uma loja de mentira.</b> O chat que vai abrir é o mesmo que roda na loja dos nossos clientes. Responda como se você estivesse mesmo procurando uma peça, e no fim você vê o lead chegar do outro lado.</p>
 </section>
 
 <!-- O painel do lojista, com o lead que a pessoa acabou de preencher. -->

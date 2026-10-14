@@ -24,7 +24,11 @@ test('o fluxo da demonstracao sai pronto, sem precisar de conta', async () => {
   assert.equal(r.status, 200);
   const fluxo = await r.json();
   assert.equal(fluxo.loja, 'Aurora Boutique');
-  assert.equal(fluxo.perguntas.length, 3);
+  assert.equal(fluxo.perguntas.length, 4);
+  // A primeira pergunta o que a pessoa procura. Sem isso a demonstracao abre
+  // perguntando o tamanho, e quem esta avaliando o produto nao entende que o
+  // chat esta qualificando uma compra.
+  assert.match(fluxo.perguntas[0].texto, /procurando/i);
   assert.equal(fluxo.recompensa, 'cupom');
   // Rastreamento desligado: sem conta nao ha para onde mandar evento.
   assert.equal(fluxo.rastrear, false);

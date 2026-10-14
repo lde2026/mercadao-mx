@@ -23,7 +23,12 @@ export const CHAVE_DEMO = 'demo';
 export const LOJA_DEMO = 'Aurora Boutique';
 
 /**
- * As tres perguntas da demonstracao.
+ * As perguntas da demonstracao.
+ *
+ * A primeira pergunta o que a pessoa procura, e nao o tamanho dela. Quem abre
+ * a demonstracao precisa entender em um balao o que o produto faz, e "qual o
+ * seu tamanho?" sozinho parece formulario de cadastro: nao mostra que o chat
+ * esta qualificando uma compra.
  *
  * A ultima e a que mais vende o produto: ela mostra que o chat nao so
  * qualifica, ele separa quem quer ser atendido por gente de quem quer comprar
@@ -32,6 +37,10 @@ export const LOJA_DEMO = 'Aurora Boutique';
  * proxima hora.
  */
 const PERGUNTAS = [
+  {
+    texto: 'O que você está procurando hoje?',
+    opcoes: ['Vestido', 'Blusa', 'Calça', 'Bolsa ou acessório', 'Ainda não sei'],
+  },
   { texto: 'Qual o seu tamanho?', opcoes: ['PP', 'P', 'M', 'G', 'GG', 'Plus Size'] },
   {
     texto: 'Qual faixa de preço você costuma procurar?',

@@ -147,7 +147,12 @@
     botao.focus();
   }
 
-  document.querySelector('.comprar').addEventListener('click', function () {
-    alert('A loja é de mentira. O que funciona de verdade aqui é o chat.');
+  // A home tem varios botoes de comprar, um por produto e um no banner.
+  // Com querySelector so o primeiro respondia, e clicar nos outros parecia
+  // pagina travada.
+  Array.prototype.forEach.call(document.querySelectorAll('.comprar'), function (botao) {
+    botao.addEventListener('click', function () {
+      alert('A loja é de mentira. O que funciona de verdade aqui é o chat.');
+    });
   });
 }());
