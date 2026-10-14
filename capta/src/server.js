@@ -67,6 +67,39 @@ const URL_PUBLICA = process.env.URL_PUBLICA || 'http://localhost:3000';
 const PRODUCAO = process.env.NODE_ENV === 'production';
 
 /**
+ * Quem chega por http vai para https.
+ *
+ * O painel nunca precisou disto porque o Cloudflare esta na frente dele e ja
+ * redireciona. A landing foi apontada direto para o servidor, e sem o
+ * redirecionamento o navegador abria a pagina em http e carimbava "nao
+ * seguro" no endereco, com o certificado valido e tudo. Numa pagina de venda
+ * isso e o primeiro que o visitante le.
+ *
+ * O destino nunca sai do Host recebido sem conferencia: ele e escolhido pelo
+ * cliente, e redirecionar para o que vier transforma esta rota num
+ * encaminhador para qualquer site. So os hosts que a instalacao reconhece
+ * passam; qualquer outro segue sem redirecionar.
+ *
+ * Sem x-forwarded-proto nao ha redirecionamento: e assim que o Railway bate
+ * no /saude por dentro, em http, e nao pode levar 301 nessa checagem.
+ */
+function ehHostProprio(host) {
+  // Lido na chamada, nao na carga: HOST_LANDING e declarado mais abaixo, e
+  // montar o conjunto aqui em cima deixaria o arquivo sem subir.
+  const limpo = String(host || '').toLowerCase().split(':')[0];
+  if (!limpo) return false;
+  if (HOST_LANDING.includes(limpo)) return true;
+  try { return new URL(URL_PUBLICA).hostname.toLowerCase() === limpo; } catch { return false; }
+}
+
+app.use((req, res, proximo) => {
+  const protocolo = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim().toLowerCase();
+  if (!protocolo || protocolo === 'https') return proximo();
+  if (!ehHostProprio(req.headers.host)) return proximo();
+  return res.redirect(301, `https://${String(req.headers.host).toLowerCase()}${req.originalUrl}`);
+});
+
+/**
  * Cabecalhos de seguranca. O widget e o rastreador sao carregados dentro da
  * loja do cliente, entao eles ficam de fora do frame-ancestors; o painel
  * nunca deve abrir dentro de iframe de terceiro.

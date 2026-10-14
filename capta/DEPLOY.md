@@ -128,6 +128,15 @@ Dois passos, uma vez so:
 A variavel `HOST_LANDING` muda quais hosts recebem a landing, separados por
 virgula. Sem ela vale `capta.lojadoecommerce.com.br`.
 
+O servidor redireciona http para https sozinho, para os hosts que ele
+reconhece. O painel nunca precisou disso porque o Cloudflare esta na frente
+dele; a landing foi apontada direto para o Railway, e sem o redirecionamento
+o navegador abria em http e carimbava "nao seguro" no endereco, com o
+certificado valido e tudo.
+
+Se um dia a landing tambem passar pelo Cloudflare, ligue la **Always Use
+HTTPS**: um redirecionamento na borda poupa uma viagem ate o servidor.
+
 O video do topo entra pelo atributo `data-url` do bloco `#video`: cole o
 link de incorporacao do YouTube (`https://www.youtube.com/embed/ID`) ou do
 Vimeo. Enquanto estiver vazio o bloco sai da pagina, porque um play que nao

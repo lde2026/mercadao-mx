@@ -26,10 +26,10 @@ const porta = servidor.address().port;
  * node:http e nao fetch porque Host e cabecalho proibido no fetch: o undici
  * reescreve com o endereco real e o teste passaria a medir outra coisa.
  */
-function pedir(caminho, host) {
+function pedir(caminho, host, extras = {}) {
   return new Promise((ok, falhou) => {
     const pedido = http.request(
-      { host: '127.0.0.1', port: porta, path: caminho, headers: { Host: host } },
+      { host: '127.0.0.1', port: porta, path: caminho, headers: { Host: host, ...extras } },
       (resposta) => {
         let corpo = '';
         resposta.on('data', (p) => { corpo += p; });
@@ -89,6 +89,32 @@ test('o /saude responde nos dois dominios', async () => {
   const r = await pedir('/saude', 'capta.teste');
   assert.equal(r.status, 200);
   assert.equal(JSON.parse(r.corpo).ok, true);
+});
+
+/**
+ * O navegador carimba "nao seguro" numa pagina aberta em http, mesmo com o
+ * certificado valido, e numa pagina de venda isso e a primeira coisa que o
+ * visitante le. O painel nunca precisou disto porque o Cloudflare na frente
+ * dele ja redireciona; a landing foi apontada direto para o servidor.
+ */
+test('quem chega por http e mandado para https', async () => {
+  const r = await pedir('/', 'capta.teste', { 'x-forwarded-proto': 'http' });
+  assert.equal(r.status, 301);
+  assert.equal(r.cabecalhos.location, 'https://capta.teste/');
+});
+
+test('o redirecionamento nao leva para um host que o cliente inventou', async () => {
+  // Sem a conferencia, bastava mandar Host: site-do-golpe e esta rota viraria
+  // um encaminhador com o nome do Captapp na frente.
+  const r = await pedir('/', 'site-do-golpe.com', { 'x-forwarded-proto': 'http' });
+  assert.notEqual(r.status, 301);
+});
+
+test('a checagem de saude por dentro nao leva 301', async () => {
+  // O Railway bate no /saude sem x-forwarded-proto. Redirecionar ali faria o
+  // servico parecer fora do ar e derrubaria o deploy.
+  const r = await pedir('/saude', 'capta.teste');
+  assert.equal(r.status, 200);
 });
 
 test.after(async () => {
