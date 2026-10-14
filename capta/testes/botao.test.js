@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { prepararBanco, contaDeTeste, conexaoDeTeste } from './ajuda.js';
 
 process.env.NODE_ENV = 'test';
@@ -98,6 +99,33 @@ test('valor inventado volta 400 e nao chega ao banco', async () => {
   const fluxo = await fluxoDoWidget();
   assert.equal(fluxo.botaoFormato, 'redondo');
   assert.equal(fluxo.botaoPosicao, 'direita-superior');
+});
+
+/**
+ * O widget e codigo de navegador: nenhum teste daqui abre a loja. O que da
+ * para travar e o contrato entre ele e o servidor, e e onde ja escapou um
+ * defeito: o teto de perguntas subiu para seis no painel e o widget continuou
+ * cortando em tres. A loja publicava seis, o visitante respondia tres, e no
+ * painel estava tudo certo.
+ */
+test('o widget nao corta perguntas que o painel deixa publicar', async () => {
+  const fonte = await readFile(new URL('../public/widget.js', import.meta.url), 'utf8');
+  const corte = fonte.match(/fluxo\.perguntas \|\| \[\]\)\.slice\(0, (\d+)\)/);
+  assert.ok(corte, 'o corte das perguntas mudou de forma: confira o widget');
+  assert.ok(
+    Number(corte[1]) >= repo.TETO_PERGUNTAS,
+    `o widget corta em ${corte[1]} e o painel publica ate ${repo.TETO_PERGUNTAS}`,
+  );
+});
+
+/**
+ * No chat, o contato vinha depois de dois baloes de pergunta seguidos, e quem
+ * lia respondia o segundo achando que tinha errado o primeiro.
+ */
+test('o chat pede o nome numa frase so', async () => {
+  const fonte = await readFile(new URL('../public/widget.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(fonte, /await bot\('Primeiro, qual é o seu nome\?'\)/);
+  assert.match(fonte, /await bot\(textos\[3\]\)/);
 });
 
 test.after(async () => {

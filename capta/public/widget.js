@@ -85,13 +85,22 @@
       })
       .catch(function () { /* API fora do ar: a loja segue como se nada existisse */ });
 
-    // O que muda por beneficio: a pergunta de contato, o botao e a tela final.
+    /*
+     * O que muda por beneficio: o titulo da tela de contato, o botao, a tela
+     * final e a frase que abre o contato no chat.
+     *
+     * A quarta existe porque no chat o titulo nao cabe: ele e uma pergunta
+     * ("onde eu te mando o cupom?") e vinha seguido de outra pergunta ("qual
+     * e o seu nome?"), dois baloes de pergunta um atras do outro. Quem lia
+     * respondia o segundo achando que tinha errado o primeiro. No chat as
+     * duas viram uma frase so, com o motivo na frente do pedido.
+     */
     var TEXTOS = {
-      cupom: ['Onde eu te mando o cupom?', 'Quero meu cupom', 'Pronto! Use este cupom no carrinho:'],
-      frete_gratis: ['Onde eu te mando o cupom?', 'Quero frete grátis', 'Pronto! Use este cupom e o frete sai de graça:'],
-      diagnostico: ['Onde a gente fala com você?', 'Quero meu diagnóstico', 'Recebemos suas respostas. Em breve um especialista manda seu diagnóstico no WhatsApp.'],
-      especialista: ['Onde a gente fala com você?', 'Falar com especialista', 'Recebemos seus dados. Um especialista vai falar com você no WhatsApp em breve.'],
-      consultoria: ['Onde a gente fala com você?', 'Quero a consultoria', 'Recebemos suas respostas. Vamos combinar sua consultoria pelo WhatsApp em breve.'],
+      cupom: ['Onde eu te mando o cupom?', 'Quero meu cupom', 'Pronto! Use este cupom no carrinho:', 'Para eu te mandar o cupom, como é o seu nome?'],
+      frete_gratis: ['Onde eu te mando o cupom?', 'Quero frete grátis', 'Pronto! Use este cupom e o frete sai de graça:', 'Para eu te mandar o cupom, como é o seu nome?'],
+      diagnostico: ['Onde a gente fala com você?', 'Quero meu diagnóstico', 'Recebemos suas respostas. Em breve um especialista manda seu diagnóstico no WhatsApp.', 'Para a gente falar com você, como é o seu nome?'],
+      especialista: ['Onde a gente fala com você?', 'Falar com especialista', 'Recebemos seus dados. Um especialista vai falar com você no WhatsApp em breve.', 'Para a gente falar com você, como é o seu nome?'],
+      consultoria: ['Onde a gente fala com você?', 'Quero a consultoria', 'Recebemos suas respostas. Vamos combinar sua consultoria pelo WhatsApp em breve.', 'Para a gente falar com você, como é o seu nome?'],
     };
 
     var ESTILO = [
@@ -254,7 +263,10 @@
       raiz.appendChild(estilo);
       document.body.appendChild(hospedeiro);
 
-      var perguntas = (fluxo.perguntas || []).slice(0, 3);
+      // O teto do painel e seis. Cortar em tres aqui fazia a loja publicar
+      // seis perguntas e o visitante responder so as tres primeiras, sem
+      // ninguem perceber: no painel estava tudo certo.
+      var perguntas = (fluxo.perguntas || []).slice(0, 6);
       var comCupom = fluxo.recompensa === 'cupom' || fluxo.recompensa === 'frete_gratis';
 
       var convite = fluxo.convite || 'Ganhe benefícios';
@@ -567,9 +579,8 @@
             dados.respostas.push({ pergunta: perguntas[i].texto, resposta: resposta });
           }
 
-          // Mesma pergunta de contato do formato painel, palavra por palavra.
-          await bot(textos[0]);
-          await bot('Primeiro, qual é o seu nome?');
+          // Uma frase so, com o motivo na frente do pedido. Ver TEXTOS.
+          await bot(textos[3]);
           dados.nome = await perguntar({ dica: 'Seu nome' });
           consentir();
           var primeiro = dados.nome.split(' ')[0];
