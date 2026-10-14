@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Captapp">
+  <!-- Balao de conversa: e o que o produto e. O quadrado laranja e o ponto da
+       marca sao os mesmos do topo da pagina e do painel. -->
+  <rect width="64" height="64" rx="15" fill="#ff5a1f"/>
+  <path d="M15 19h34a5 5 0 0 1 5 5v15a5 5 0 0 1-5 5H29l-9 7v-7h-5a5 5 0 0 1-5-5V24a5 5 0 0 1 5-5z" fill="#fff"/>
+  <circle cx="24" cy="31.5" r="3.1" fill="#ff5a1f"/>
+  <circle cx="32" cy="31.5" r="3.1" fill="#ff5a1f"/>
+  <circle cx="40" cy="31.5" r="3.1" fill="#ff5a1f"/>
+</svg>
