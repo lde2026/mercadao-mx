@@ -10,7 +10,7 @@ import { concluirLead } from './fluxo-lead.js';
 import { registrarEvento, perfilDoLead, esquecerLead, mascararIp } from './eventos.js';
 import { calcularAcesso, avisoDeCobranca, avisoDeCota, avisoDeTeste } from './billing/acesso.js';
 import {
-  PLANOS, precoDoPlano, IMPLANTACAO, DESCONTO_ANUAL,
+  PLANOS, precoDoPlano, IMPLANTACAO, descontoAnualMaximo,
   precoDaImplantacao, FORMAS_IMPLANTACAO, PARCELAS_IMPLANTACAO, DESCONTO_AVISTA,
 } from './billing/planos.js';
 import { MODELOS } from './modelos.js';
@@ -1033,7 +1033,7 @@ app.get('/api/financeiro', async (req, res) => {
     assinatura,
     planos: PLANOS,
     precos,
-    descontoAnual: DESCONTO_ANUAL,
+    descontoAnual: descontoAnualMaximo(),
     implantacao: {
       valor: IMPLANTACAO,
       cobrada: implantacaoPaga,

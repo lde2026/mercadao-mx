@@ -102,11 +102,17 @@ test('o atraso conta pela fatura mais antiga em aberto, nao pela mais nova', () 
   assert.equal(acesso.widget, false);
 });
 
-test('rastreamento e do Crescimento para cima, mesmo com a conta em dia', () => {
+test('rastreamento entra nos dois planos, e so sai por atraso', () => {
+  // Era a cenoura do plano do meio. Sem plano do meio, segurar o rastreamento
+  // no de entrada so dava motivo para nao assinar.
   const emDia = { cobrancasAbertas: [], hoje: HOJE };
-  assert.equal(calcularAcesso({ assinatura: { status: 'ativa', plano: 'essencial' }, ...emDia }).rastreamento, false);
-  assert.equal(calcularAcesso({ assinatura: { status: 'ativa', plano: 'crescimento' }, ...emDia }).rastreamento, true);
-  assert.equal(calcularAcesso({ assinatura: { status: 'ativa', plano: 'escala' }, ...emDia }).rastreamento, true);
+  for (const plano of Object.keys(PLANOS)) {
+    assert.equal(
+      calcularAcesso({ assinatura: { status: 'ativa', plano }, ...emDia }).rastreamento,
+      true,
+      plano,
+    );
+  }
 });
 
 test('assinatura cancelada derruba widget mas nao apaga lead', () => {
@@ -136,18 +142,21 @@ test('o aviso muda antes de cada corte', () => {
   assert.match(avisoDeCobranca(acessoNoDia(12)).texto, /leads continuam guardados/);
 });
 
-test('o anual tem 20% de desconto sobre doze mensalidades', () => {
+test('o anual tem preco proprio, nao desconto percentual', () => {
   assert.equal(precoDoPlano('essencial'), 99);
   assert.equal(precoDoPlano('crescimento'), 199);
-  assert.equal(precoDoPlano('escala'), 299);
-  assert.equal(precoDoPlano('essencial', 'anual'), 950.4);
-  assert.equal(precoDoPlano('crescimento', 'anual'), 1910.4);
-  assert.equal(precoDoPlano('escala', 'anual'), 2870.4);
+  // Doze meses de R$ 59 e de R$ 99. O numero da pagina e este, cobrado de uma
+  // vez: anunciar mensal e cobrar outro valor e problema de consumidor.
+  assert.equal(precoDoPlano('essencial', 'anual'), 708);
+  assert.equal(precoDoPlano('crescimento', 'anual'), 1188);
+  assert.equal(precoDoPlano('essencial', 'anual') / 12, 59);
+  assert.equal(precoDoPlano('crescimento', 'anual') / 12, 99);
 });
 
-test('a diferenca entre os planos e a cota de leads no mes, e o Escala nao tem teto', () => {
-  assert.ok(PLANOS.essencial.leadsMes < PLANOS.crescimento.leadsMes);
-  assert.equal(PLANOS.escala.leadsMes, null);
+test('a diferenca entre os dois planos e a cota de leads, e o de cima nao tem teto', () => {
+  assert.equal(Object.keys(PLANOS).length, 2, 'dois planos: a escolha e uma pergunta so');
+  assert.equal(PLANOS.essencial.leadsMes, 500);
+  assert.equal(PLANOS.crescimento.leadsMes, null);
   assert.equal(calcularAcesso({ assinatura: { status: 'ativa', plano: 'essencial' }, hoje: HOJE }).cotaLeads, PLANOS.essencial.leadsMes);
 });
 

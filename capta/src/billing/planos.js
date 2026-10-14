@@ -1,30 +1,33 @@
 /**
- * Os planos se separam por tres coisas: quantos leads por mes, quantas lojas
- * conectadas e se o rastreamento de navegacao entra. O Escala nao tem teto de
- * leads. O anual tem 20% de desconto sobre doze mensalidades.
+ * Dois planos, e a diferenca entre eles e so o teto de leads.
  *
- * O teto de lojas tem teto de verdade em todos, inclusive no Escala: uma
- * conta e um cliente, e dez lojas ja e agencia. Passar disso e conversa de
- * contrato, nao botao no painel.
+ * Eram tres. Tres fazia o lojista comparar linhas de tabela em vez de decidir,
+ * e o do meio nao vendia: quem precisava de mais de cem leads ja precisava de
+ * mais de trezentos. Agora e uma pergunta so, "voce passa de 500 leads por
+ * mes", e quem nao sabe comeca embaixo e sobe num clique.
+ *
+ * O rastreamento de navegacao entra nos dois. Ele era a cenoura do plano do
+ * meio, e sem plano do meio virava motivo de nao assinar o de entrada: saber
+ * o que a pessoa olhou antes de responder e o que faz a vendedora abrir a
+ * conversa certa, e isso vale para a loja pequena tambem.
+ *
+ * O anual nao e desconto percentual, e preco proprio: R$ 59 e R$ 99 por mes.
+ * Doze meses pagos na frente valem mais que a conta de juros, e o numero
+ * redondo vende melhor que "20% off".
  */
 export const PLANOS = {
   essencial: {
     nome: 'Essencial',
     mensal: 99,
-    leadsMes: 100,
+    anualMensal: 59,
+    leadsMes: 500,
     lojas: 1,
-    rastreamento: false,
-  },
-  crescimento: {
-    nome: 'Crescimento',
-    mensal: 199,
-    leadsMes: 300,
-    lojas: 3,
     rastreamento: true,
   },
-  escala: {
-    nome: 'Escala',
-    mensal: 299,
+  crescimento: {
+    nome: 'Ilimitado',
+    mensal: 199,
+    anualMensal: 99,
     leadsMes: null,
     lojas: 10,
     rastreamento: true,
@@ -41,7 +44,6 @@ export const PLANOS = {
 export const PLANO_DE_ENTRADA = 'essencial';
 
 export const IMPLANTACAO = 990;
-export const DESCONTO_ANUAL = 0.2;
 
 /**
  * Implantacao: a vista com desconto, ou parcelado sem juros.
@@ -83,7 +85,19 @@ export function precoDoPlano(plano, ciclo = 'mensal') {
   const escolhido = PLANOS[plano];
   if (!escolhido) throw new Error(`plano desconhecido: ${plano}`);
   if (ciclo !== 'anual') return escolhido.mensal;
-  return Math.round(escolhido.mensal * 12 * (1 - DESCONTO_ANUAL) * 100) / 100;
+  // O anual e cobrado de uma vez, entao o que vale e o total do ano.
+  return Math.round(escolhido.anualMensal * 12 * 100) / 100;
+}
+
+/**
+ * Quanto o anual economiza, em fracao, no plano que economiza mais.
+ *
+ * E so para a etiqueta do seletor. Cada plano tem o seu, e mostrar o maior e
+ * honesto desde que o preco de cada um apareca ao lado, que e o que a tela
+ * faz.
+ */
+export function descontoAnualMaximo() {
+  return Math.max(...Object.values(PLANOS).map((p) => 1 - (p.anualMensal / p.mensal)));
 }
 
 export function planoTemRastreamento(plano) {

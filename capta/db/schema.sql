@@ -307,6 +307,8 @@ create index if not exists pedidos_lead_idx  on pedidos(lead_id);
 create table if not exists assinaturas (
   id          uuid primary key default gen_random_uuid(),
   conta_id    uuid not null references contas(id) on delete cascade,
+  -- 'escala' saiu da oferta quando os planos viraram dois. Continua aceito
+  -- aqui para nao invalidar assinatura antiga; nada novo e criado com ele.
   plano       text not null check (plano in ('essencial','crescimento','escala')),
   ciclo       text not null default 'mensal' check (ciclo in ('mensal','anual')),
   status      text not null default 'ativa'

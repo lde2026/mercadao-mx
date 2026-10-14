@@ -84,12 +84,16 @@ venda.
 
 ## Cobranca
 
-Implantacao de R$ 990, cobrada uma vez. Mensalidades de R$ 99, R$ 199 e
-R$ 299, e a diferenca entre elas e a cota de leads captados no mes; o de
-R$ 299 nao tem teto. Cota atingida tira o chat do ar na loja ate o dia 1 ou
-ate o upgrade. O anual tem 20% de desconto. O Financeiro do painel mostra so isso: o que a loja paga
-pelo Captapp. Faturamento atribuido ao chat aparece na fila e no perfil do
-lead, nunca no Financeiro.
+Implantacao de R$ 990, cobrada uma vez. Dois planos: R$ 99 por mes ate 500
+leads e uma loja, e R$ 199 por mes sem teto de leads e ate dez lojas. No
+anual eles caem para R$ 59 e R$ 99 por mes, cobrados de uma vez. O anual nao
+e desconto percentual, e preco proprio: mudar um exige mudar o outro a mao,
+de proposito.
+
+Cota atingida tira o chat do ar na loja ate o dia 1 ou ate o upgrade. O
+Financeiro do painel mostra so isso: o que a loja paga pelo Captapp.
+Faturamento atribuido ao chat aparece na fila e no perfil do lead, nunca no
+Financeiro.
 
 ## Decisoes que nao se mexe sem conversa
 
@@ -107,7 +111,9 @@ Atrasar pagamento nao apaga nada. Dia 7 o rastreamento desliga, dia 10 o
 widget sai do ar e o painel fica em leitura, dia 45 o script sai da loja. Os
 leads continuam guardados e quem paga volta no mesmo minuto.
 
-Rastreamento so do plano Crescimento para cima.
+Rastreamento de navegacao nos dois planos. Ele era a cenoura do plano do
+meio; sem plano do meio, segurar ele no de entrada so dava motivo para nao
+assinar.
 
 ## Seguranca
 

@@ -33,8 +33,7 @@ async function conectar(contaId, nomeLoja) {
 
 test('cada plano tem o teto que foi vendido', () => {
   assert.equal(PLANOS.essencial.lojas, 1);
-  assert.equal(PLANOS.crescimento.lojas, 3);
-  assert.equal(PLANOS.escala.lojas, 10);
+  assert.equal(PLANOS.crescimento.lojas, 10);
   // Sem plano vale o de entrada, nunca ilimitado.
   assert.equal(cotaDeLojas(null), 1);
   assert.equal(cotaDeLojas('inventado'), 1);
@@ -52,11 +51,12 @@ test('Essencial para na segunda loja', async () => {
   assert.equal(await repo.contarConexoes(c.id), 1);
 });
 
-test('Crescimento vai ate a terceira e para na quarta', async () => {
+test('Ilimitado vai ate a decima e para na decima primeira', async () => {
+  // Dez ja e agencia. Passar disso e conversa de contrato, nao botao no painel.
   const c = await conta('Casa Verde', 'crescimento');
-  for (const nome of ['Loja 1', 'Loja 2', 'Loja 3']) await conectar(c.id, nome);
-  await assert.rejects(() => conectar(c.id, 'Loja 4'), /3 loja/);
-  assert.equal(await repo.contarConexoes(c.id), 3);
+  for (let i = 0; i < 10; i += 1) await conectar(c.id, `Loja ${i + 1}`);
+  await assert.rejects(() => conectar(c.id, 'Loja 11'), /10 loja/);
+  assert.equal(await repo.contarConexoes(c.id), 10);
 });
 
 test('a rota responde 409 com o caminho da saida, nao 500', async () => {
@@ -80,26 +80,26 @@ test('a rota responde 409 com o caminho da saida, nao 500', async () => {
   const corpo = await segunda.json();
   assert.match(corpo.erro, /1 loja/);
   // Sem o caminho da saida a mensagem manda o lojista abrir chamado.
-  assert.match(corpo.explicacao, /Crescimento/);
+  assert.match(corpo.explicacao, /Ilimitado/);
 });
 
 test('quem ja passou do teto mantem as lojas e so nao conecta mais', async () => {
-  const c = await conta('Agência', 'escala');
-  for (let i = 0; i < 4; i += 1) await conectar(c.id, `Loja ${i + 1}`);
+  const c = await conta('Agência', 'crescimento');
+  for (let i = 0; i < 2; i += 1) await conectar(c.id, `Loja ${i + 1}`);
 
-  // Desce para um plano que comporta 3. As quatro continuam no ar.
-  await assinarPlano(c.id, 'crescimento');
-  assert.equal(await repo.contarConexoes(c.id), 4);
+  // Desce para o plano de uma loja. As duas continuam no ar.
+  await assinarPlano(c.id, 'essencial');
+  assert.equal(await repo.contarConexoes(c.id), 2);
   const lojas = await repo.listarConexoes(c.id);
-  assert.equal(lojas.filter((l) => l.status === 'ativa').length, 4);
+  assert.equal(lojas.filter((l) => l.status === 'ativa').length, 2);
 
   // O que ela perde e a proxima.
-  await assert.rejects(() => conectar(c.id, 'Loja 5'), /teto|3 loja/);
+  await assert.rejects(() => conectar(c.id, 'Loja 3'), /teto|1 loja/);
 });
 
 test('descer de plano com lojas demais e recusado com o numero exato', async () => {
   const c = await contaDeTeste('Multi', `desce-${Date.now()}@teste.com.br`);
-  await assinarPlano(c.id, 'escala');
+  await assinarPlano(c.id, 'crescimento');
   for (let i = 0; i < 5; i += 1) await conectar(c.id, `Loja ${i + 1}`);
   const cookie = await fetch(`${base}/api/login`, {
     method: 'POST',
@@ -117,7 +117,7 @@ test('descer de plano com lojas demais e recusado com o numero exato', async () 
   assert.match(corpo.explicacao, /Remova 4 loja/);
 
   // E o plano nao mudou pela metade.
-  assert.equal((await repo.assinaturaDaConta(c.id)).plano, 'escala');
+  assert.equal((await repo.assinaturaDaConta(c.id)).plano, 'crescimento');
 });
 
 test.after(async () => {

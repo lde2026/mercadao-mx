@@ -1939,7 +1939,14 @@
       lista.appendChild(el('li', p.lojas === 1 ? 'Uma loja ou site' : 'Até ' + p.lojas + ' lojas ou sites'));
       lista.appendChild(el('li', 'Chat com cupom único por pessoa'));
       lista.appendChild(el('li', 'Fila de leads e WhatsApp'));
-      lista.appendChild(el('li', p.rastreamento ? 'Rastreamento de navegação' : 'Sem rastreamento de navegação'));
+      if (p.rastreamento) {
+        lista.appendChild(el('li', 'Rastreamento de navegação'));
+        // O que o rastreamento entrega na pratica. "Rastreamento de navegação"
+        // sozinho e nome de funcionalidade, e ninguem compra funcionalidade.
+        lista.appendChild(el('li', 'Veja o que cada lead olhou antes de responder'));
+      } else {
+        lista.appendChild(el('li', 'Sem rastreamento de navegação'));
+      }
       col.appendChild(lista);
       var botao = el('button', atual ? 'Plano atual' : (a ? 'Mudar para este' : 'Escolher'), atual ? 'secundario' : '');
       botao.type = 'button';

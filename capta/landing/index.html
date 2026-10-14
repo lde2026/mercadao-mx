@@ -115,7 +115,10 @@ p{max-width:62ch}
 .lista-check li::before{content:"✓";flex:none;width:26px;height:26px;border-radius:50%;background:var(--laranja-suave);color:var(--laranja);display:grid;place-items:center;font-weight:800;font-size:14px}
 
 /* planos */
-.planos{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-top:36px}
+/* Dois planos lado a lado, com largura de cartao maior: com tres eles
+   espremiam, com dois ha espaco para o preco respirar. */
+.planos{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px;margin-top:28px;max-width:860px}
+.planos-sub{color:var(--cinza);font-size:17px;margin-top:10px}
 .plano{background:#fff;border:1.5px solid var(--linha);border-radius:22px;padding:28px;display:flex;flex-direction:column;gap:10px}
 .plano.destaque{border-color:var(--laranja);box-shadow:0 20px 60px rgba(255,90,31,.15);position:relative}
 .plano.destaque::before{content:"Mais escolhido";position:absolute;top:-13px;left:24px;background:var(--laranja);color:#fff;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:5px 12px;border-radius:999px}
@@ -297,28 +300,35 @@ p{max-width:62ch}
 <section class="secao" id="planos">
   <div class="faixa">
     <span class="eyebrow">Planos</span>
-    <h2>Simples: a diferença é quantos leads você capta por mês.</h2>
+    <h2>Dois planos. A diferença é quantos leads você capta por mês.</h2>
+    <p class="sub planos-sub">Anual cobrado de uma vez, e sai quase pela metade.</p>
     <div class="planos">
       <div class="plano">
         <h3>Essencial</h3>
         <div class="preco">R$ 99<small>/mês</small></div>
-        <div class="anual">ou R$ 950,40 por ano, 20% de desconto</div>
-        <ul><li>Até 100 leads por mês</li><li>Uma loja ou site</li><li>Chat com cupom único</li><li>Fila de leads e WhatsApp</li><li>Modelos por nicho</li></ul>
+        <div class="anual">ou <b>R$ 59 por mês</b> no anual, R$ 708 de uma vez</div>
+        <ul>
+          <li>Até 500 leads por mês</li>
+          <li>Uma loja ou site</li>
+          <li>Chat com cupom único por pessoa</li>
+          <li>Fila de leads e WhatsApp</li>
+          <li>Rastreamento de navegação</li>
+          <li>Veja o que cada lead olhou antes de responder</li>
+        </ul>
         <a class="botao claro" href="https://captapp.lojadoecommerce.com.br/">Começar</a>
       </div>
       <div class="plano destaque">
-        <h3>Crescimento</h3>
+        <h3>Ilimitado</h3>
         <div class="preco">R$ 199<small>/mês</small></div>
-        <div class="anual">ou R$ 1.910,40 por ano, 20% de desconto</div>
-        <ul><li>Até 300 leads por mês</li><li>Até 3 lojas ou sites</li><li>Tudo do Essencial</li><li>Rastreamento de navegação</li><li>Veja o que cada lead olhou antes de responder</li></ul>
+        <div class="anual">ou <b>R$ 99 por mês</b> no anual, R$ 1.188 de uma vez</div>
+        <ul>
+          <li>Leads ilimitados</li>
+          <li>Até 10 lojas ou sites</li>
+          <li>Tudo do Essencial</li>
+          <li>Para loja com muito tráfego</li>
+          <li>Uma conta para a operação inteira</li>
+        </ul>
         <a class="botao" href="https://captapp.lojadoecommerce.com.br/">Começar</a>
-      </div>
-      <div class="plano">
-        <h3>Escala</h3>
-        <div class="preco">R$ 299<small>/mês</small></div>
-        <div class="anual">ou R$ 2.870,40 por ano, 20% de desconto</div>
-        <ul><li>Leads ilimitados</li><li>Até 10 lojas ou sites</li><li>Tudo do Crescimento</li><li>Para loja com muito tráfego</li></ul>
-        <a class="botao claro" href="https://captapp.lojadoecommerce.com.br/">Começar</a>
       </div>
     </div>
     <div class="implantacao">
