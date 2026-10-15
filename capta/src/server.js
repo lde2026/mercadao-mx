@@ -444,7 +444,7 @@ app.post('/w/lead/:chave', liberarOrigem, limitar({ porChave: 120, porIp: 10 }),
   }
 });
 
-/** Rastreamento de navegacao. So do plano Crescimento para cima. */
+/** Rastreamento de navegacao. Entra nos dois planos, e so depois do aceite. */
 app.post('/e', liberarOrigem, limitar({ porChave: 3000, porIp: 240, chaveNoCorpo: true }), async (req, res) => {
   const { chave, anonimoId, tipo, url, titulo, dados } = req.body || {};
   if (!chave || !anonimoId) return res.status(204).end();

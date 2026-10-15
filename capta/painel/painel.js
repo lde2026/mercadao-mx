@@ -582,7 +582,7 @@
         navegacao.appendChild(tempo);
       } else {
         navegacao.appendChild(el('p',
-          'Sem navegação registrada. O rastreamento é do plano Crescimento para cima e depende do consentimento no chat.',
+          'Sem navegação registrada. O rastreamento está nos dois planos e só começa depois que a pessoa aceita a conversa no chat.',
           'vazio'));
       }
       alvo.appendChild(navegacao);
@@ -2381,7 +2381,7 @@
         document.getElementById('rotulo-plano').textContent = 'Plano ' + plano.nome;
         document.getElementById('texto-plano').textContent = plano.rastreamento
           ? 'Rastreamento de navegação ligado.'
-          : 'Rastreamento e do Crescimento para cima.';
+          : 'Rastreamento de navegação desligado no seu plano.';
         document.getElementById('cartao-plano').hidden = false;
       }
 

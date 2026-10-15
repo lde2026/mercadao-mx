@@ -153,6 +153,25 @@ p{max-width:62ch}
 .lead-mock .chips small{display:block;font-weight:500;color:var(--cinza);font-size:10.5px}
 .lead-mock .pe{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;color:var(--cinza)}
 .lead-mock .zap{background:#e7f8ef;color:var(--verde);font-weight:700;padding:8px 14px;border-radius:9px;font-size:13px}
+/* A trilha de navegacao do lead, do jeito que ela aparece no painel. */
+.trilha{background:#fff;border:1px solid var(--linha);border-radius:18px;padding:22px 24px;
+  box-shadow:0 26px 60px -36px rgba(11,11,15,.45)}
+.trilha .rot{font-family:var(--display);font-size:12px;font-weight:700;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--cinza);margin-bottom:10px}
+.trilha .rot + .rot{margin-top:22px}
+.trilha ol{list-style:none;display:grid;gap:0}
+/* O marcador e absoluto, nao coluna de grade: como grade, o texto de baixo
+   caía na coluna de 18px e quebrava uma palavra por linha. */
+.trilha li{position:relative;padding:0 0 15px 28px}
+.trilha li::before{content:"";position:absolute;left:0;top:5px;width:10px;height:10px;border-radius:50%;
+  background:#fff;border:2px solid var(--laranja);box-sizing:border-box}
+/* O fio que liga os passos para no ultimo, senao sobra uma linha solta. */
+.trilha li:not(:last-child)::after{content:"";position:absolute;left:4px;top:17px;bottom:0;width:2px;background:var(--linha)}
+.trilha li b{font-weight:600;font-size:15px}
+.trilha li .q{display:block;font-size:12.5px;color:var(--cinza);margin-top:1px}
+.trilha li.fecha::before{background:var(--laranja)}
+.trilha li.fecha b{color:var(--laranja)}
+.trilha .nota{margin-top:4px;font-size:13px;color:var(--cinza)}
 .lista-check{list-style:none;display:grid;gap:12px;margin-top:22px;font-size:17px}
 .lista-check li{display:flex;gap:12px;align-items:flex-start}
 .lista-check li::before{content:"✓";flex:none;width:26px;height:26px;border-radius:50%;background:var(--laranja-suave);color:var(--laranja);display:grid;place-items:center;font-weight:800;font-size:14px}
@@ -220,6 +239,7 @@ p{max-width:62ch}
     <nav class="nav">
       <a href="#como-funciona">Como funciona</a>
       <a href="#leads">Leads</a>
+      <a href="#navegacao">Rastreamento</a>
       <a href="#planos">Planos</a>
       <a href="#plataformas">Plataformas</a>
     </nav>
@@ -371,6 +391,40 @@ p{max-width:62ch}
       <div class="cartao"><div class="icone"><svg viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg></div><h3>Venda para quem já estava lá</h3><p>O tráfego que você paga vira conversa, e conversa vira pedido. Sem mídia nova.</p></div>
       <div class="cartao"><div class="icone"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div><h3>No mesmo dia</h3><p>O lead chega na hora, com o cupom. Quem liga no mesmo dia fecha mais.</p></div>
       <div class="cartao"><div class="icone"><svg viewBox="0 0 24 24"><path d="M12 3l8 4v6c0 5-3.5 7.5-8 8-4.5-.5-8-3-8-8V7z"/><path d="M9 12l2 2 4-4"/></svg></div><h3>Dentro da lei</h3><p>Consentimento antes do contato, cupom que não vaza, e o dado é seu. LGPD do começo ao fim.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="secao suave" id="navegacao">
+  <div class="faixa duas">
+    <div>
+      <span class="eyebrow">Histórico de navegação</span>
+      <h2>Você vê o que a pessoa olhou antes de responder o chat.</h2>
+      <p>No momento em que o visitante aceita conversar, tudo o que ele viu na sua loja passa a aparecer no perfil dele: os produtos que abriu, quantas vezes voltou em cada um, as páginas por onde passou e a ordem de tudo isso.</p>
+      <p>É a diferença entre ligar perguntando "em que posso ajudar?" e ligar dizendo "vi que você voltou três vezes no vestido midi floral".</p>
+      <ul class="lista-check">
+        <li>Os produtos que ele abriu, com link e quantas vezes voltou</li>
+        <li>A ordem da visita, do primeiro clique até o contato</li>
+        <li>Inclusive o que ele olhou antes de responder</li>
+        <li>Está nos dois planos, sem custo a mais</li>
+      </ul>
+    </div>
+    <div class="trilha" aria-hidden="true">
+      <div class="rot">Produtos que acessou (3)</div>
+      <ol>
+        <li><b>Vestido Midi Floral Aurora</b><span class="q">3 visitas · última há 12 min</span></li>
+        <li><b>Blusa de seda Olívia</b><span class="q">1 visita · há 18 min</span></li>
+        <li><b>Sandália de salto Lia</b><span class="q">1 visita · há 21 min</span></li>
+      </ol>
+      <div class="rot">Linha do tempo</div>
+      <ol>
+        <li><b>Home da loja</b><span class="q">há 24 min · página</span></li>
+        <li><b>Sandália de salto Lia</b><span class="q">há 21 min · produto</span></li>
+        <li><b>Vestido Midi Floral Aurora</b><span class="q">há 19 min · produto</span></li>
+        <li><b>Vestido Midi Floral Aurora</b><span class="q">há 12 min · produto</span></li>
+        <li class="fecha"><b>Deixou o contato no chat</b><span class="q">há 11 min</span></li>
+      </ol>
+      <p class="nota">O rastreamento só começa depois que a pessoa aceita a conversa, e o endereço de IP nunca é guardado inteiro.</p>
     </div>
   </div>
 </section>
