@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Marca Captapp</title>
+<!--
+  Fonte da marca, para gerar os arquivos de logo.
+
+  A marca e desenhada aqui, em HTML, e nao num editor: assim ela nasce do
+  mesmo laranja e da mesma fonte do site, e qualquer tamanho novo que um
+  marketplace pedir sai sem abrir programa nenhum. O ladrilho .quadro e
+  exatamente 1000 por 1000, que e o que a captura de tela recorta.
+-->
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@800&display=swap">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#fff}
+  .quadro{width:1000px;height:1000px;background:#fff;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:76px}
+  .icone{width:340px;height:340px;display:block}
+  .marca{font-family:"Sora",sans-serif;font-weight:800;font-size:150px;line-height:1;
+    letter-spacing:-.045em;color:#0b0b0f;display:flex;align-items:flex-end}
+  /* O ponto laranja e o mesmo do topo do site, na mesma proporcao: um terco
+     da altura da letra, encostado no fim da palavra. */
+  .marca i{width:50px;height:50px;border-radius:50%;background:#ff5a1f;margin-left:10px;margin-bottom:14px}
+</style>
+</head>
+<body>
+<div class="quadro" id="quadro">
+  <svg class="icone" viewBox="0 0 64 64" role="img" aria-label="Captapp">
+    <rect width="64" height="64" rx="15" fill="#ff5a1f"/>
+    <path d="M15 19h34a5 5 0 0 1 5 5v15a5 5 0 0 1-5 5H29l-9 7v-7h-5a5 5 0 0 1-5-5V24a5 5 0 0 1 5-5z" fill="#fff"/>
+    <circle cx="24" cy="31.5" r="3.1" fill="#ff5a1f"/>
+    <circle cx="32" cy="31.5" r="3.1" fill="#ff5a1f"/>
+    <circle cx="40" cy="31.5" r="3.1" fill="#ff5a1f"/>
+  </svg>
+  <div class="marca">captapp<i></i></div>
+</div>
+</body>
+</html>
