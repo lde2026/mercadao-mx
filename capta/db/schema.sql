@@ -197,6 +197,15 @@ create table if not exists perguntas (
 alter table perguntas drop constraint if exists perguntas_ordem_check;
 alter table perguntas add constraint perguntas_ordem_check check (ordem between 1 and 6);
 
+-- Relatorio semanal por e-mail.
+--
+-- relatorio_em guarda o ultimo envio, e e o que impede a enxurrada: a tarefa
+-- roda de hora em hora e so manda para quem nao recebe ha sete dias. Assim o
+-- relatorio cai sempre no mesmo dia da semana em que o primeiro caiu, sem
+-- precisar de fuso nem de agenda.
+alter table contas add column if not exists relatorio_em timestamptz;
+alter table contas add column if not exists relatorio_semanal boolean not null default true;
+
 -- ----------------------------------------------------------------- leads ---
 
 create table if not exists leads (
