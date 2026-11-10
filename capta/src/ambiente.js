@@ -53,6 +53,11 @@ export function conferirAmbiente({ producao = process.env.NODE_ENV === 'producti
   if (!process.env.EMAIL_PROVEDOR) {
     avisos.push('EMAIL_PROVEDOR vazio: nenhum e-mail sai. Cupom atrasado, aviso de lead, cobranca e recuperacao de senha viram linha de log.');
   }
+  if (!process.env.CHAVE_SERVICO) {
+    avisos.push('CHAVE_SERVICO vazio: a rota interna da base de conhecimento recusa tudo, e o agente de WhatsApp fica sem a base das lojas.');
+  } else if (process.env.CHAVE_SERVICO.length < 32) {
+    paradas.push('CHAVE_SERVICO curta demais: use pelo menos 32 caracteres aleatorios. Ela e a unica autorizacao da rota que entrega a base de conhecimento dos clientes.');
+  }
   if (!process.env.ASAAS_API_KEY) {
     avisos.push('ASAAS_API_KEY vazio: a cobranca fica manual, a troca de plano vale na hora mas nao gera fatura.');
   } else if (!process.env.ASAAS_WEBHOOK_TOKEN) {

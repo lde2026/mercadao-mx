@@ -27,8 +27,10 @@ import { exigirAmbiente } from './ambiente.js';
 import { ipDoCliente, SALTOS_CONFIAVEIS } from './rede.js';
 import {
   carregarConta, exigirConta, exigirOperador, ehOperador, aplicarRegua, entrar,
-  montarCookie, limparCookie,
+  exigirAtendimento, montarCookie, limparCookie,
 } from './auth.js';
+import * as atendimento from './atendimento.js';
+import { compararConstante } from './cripto.js';
 
 const aqui = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -495,6 +497,40 @@ registrarRotasOauth(app);
 
 // ------------------------------------------------------------ painel: api ---
 
+/**
+ * A base de conhecimento para o agente de WhatsApp.
+ *
+ * Esta e a unica rota do projeto em que um id na URL decide de quem e o dado,
+ * e a excecao e deliberada: aqui nao existe sessao para consultar. Quem
+ * chama e um servico nosso, nao um navegador, e a autorizacao e a chave de
+ * servico no cabecalho. Por isso ela fica fora de /api, que exige sessao, e
+ * por isso a comparacao da chave e em tempo constante.
+ *
+ * Sem CHAVE_SERVICO no ambiente a rota recusa tudo. O contrario, tratar a
+ * falta da chave como "sem exigencia", publicaria a base de conhecimento de
+ * todos os clientes para a internet no primeiro deploy sem a variavel.
+ */
+app.get('/interno/base/:contaId', limitarPor('base-interna', 60, 120), async (req, res) => {
+  const esperada = process.env.CHAVE_SERVICO;
+  const cabecalho = String(req.headers.authorization || '');
+  const oferecida = cabecalho.startsWith('Bearer ') ? cabecalho.slice(7) : '';
+
+  if (!esperada || !oferecida || !compararConstante(oferecida, esperada)) {
+    log.aviso('base.interna_negada', { conta_id: req.params.contaId });
+    return res.status(401).json({ erro: 'nao autorizado' });
+  }
+
+  const conta = await repo.buscarConta(req.params.contaId);
+  if (!conta || !conta.modulo_atendimento) return res.status(404).json({ erro: 'nao encontrada' });
+
+  const linha = await atendimento.base(conta.id);
+  res.set('Cache-Control', 'no-store').json({
+    conta: { id: conta.id, nome: conta.nome },
+    base: atendimento.conteudo(linha),
+    atualizadoEm: linha.atualizado_em,
+  });
+});
+
 app.use(carregarConta);
 
 /** Sem teto, o login e forca bruta livre. Dez por minuto por IP e folgado para gente e apertado para robo. */
@@ -639,7 +675,55 @@ app.get('/api/eu', async (req, res) => {
     // O painel so desenha o assistente quando ele existe de verdade. Botao que
     // responde "nao configurado" e pior que botao nenhum.
     redator: temRedator(),
+    // Modulos ligados nesta conta. O menu se monta a partir disto.
+    modulos: { atendimento: Boolean(req.conta.moduloAtendimento) },
   });
+});
+
+/**
+ * O modulo de atendimento no painel.
+ *
+ * A base e as versoes vem juntas numa chamada so: a tela mostra as duas ao
+ * mesmo tempo, e separar em duas rotas so faria a coluna da esquerda e o
+ * topo da pagina aparecerem em momentos diferentes.
+ */
+app.get('/api/atendimento', exigirAtendimento, async (req, res) => {
+  const [linha, historico] = await Promise.all([
+    atendimento.base(req.conta.id),
+    atendimento.versoes(req.conta.id),
+  ]);
+  res.json({
+    base: atendimento.conteudo(linha),
+    atualizadoEm: linha.atualizado_em,
+    versoes: historico.map((v) => ({
+      id: v.id, autor: v.autor_email, origem: v.origem, criadoEm: v.criado_em,
+    })),
+    campos: atendimento.CAMPOS,
+    estruturados: atendimento.ESTRUTURADOS,
+  });
+});
+
+app.put('/api/atendimento', exigirAtendimento, async (req, res) => {
+  // De quem e a base nao se discute: vem da sessao. O corpo so diz o que
+  // muda, e campo que nao existe some na normalizacao do modulo.
+  const linha = await atendimento.salvar(req.conta.id, req.body || {}, {
+    autorEmail: req.conta.email,
+    operadorId: req.operadorId,
+    origem: 'formulario',
+  });
+  if (!linha) return res.status(404).json({ erro: 'nao encontrada' });
+  res.json({ base: atendimento.conteudo(linha), atualizadoEm: linha.atualizado_em });
+});
+
+app.post('/api/atendimento/versoes/:id/restaurar', exigirAtendimento, async (req, res) => {
+  const linha = await atendimento.restaurar(req.conta.id, req.params.id, {
+    autorEmail: req.conta.email,
+    operadorId: req.operadorId,
+  });
+  // Versao de outra conta cai aqui, igual a qualquer outro recurso do painel:
+  // saber o id nao significa ser dono.
+  if (!linha) return res.status(404).json({ erro: 'versao nao encontrada' });
+  res.json({ base: atendimento.conteudo(linha), atualizadoEm: linha.atualizado_em });
 });
 
 app.get('/api/conta', async (req, res) => {

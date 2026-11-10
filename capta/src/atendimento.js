@@ -145,8 +145,30 @@ export async function salvar(contaId, campos, { autorEmail = null, operadorId = 
       `select id, ${COLUNAS} from bases_conhecimento where conta_id = $1 for update`,
       [contaId],
     );
-    const atual = atuais[0];
-    if (!atual) return null;
+    let atual = atuais[0];
+
+    if (!atual) {
+      /*
+       * Primeira gravacao antes da primeira leitura.
+       *
+       * Acontece de verdade: o chat propoe uma mudanca e o lojista confirma
+       * sem nunca ter aberto o formulario. A base nasce aqui, vazia, e a
+       * versao guardada logo abaixo registra esse estado vazio, que e
+       * exatamente o "antes" correto.
+       *
+       * A conta e conferida antes de inserir, e nao depois pelo erro de
+       * chave estrangeira: dentro de uma transacao, um insert recusado
+       * aborta tudo o que vier depois, e devolver null ali deixaria o commit
+       * estourando em outro lugar.
+       */
+      const { rows: donas } = await cliente.query('select 1 from contas where id = $1', [contaId]);
+      if (!donas[0]) return null;
+      const { rows: criadas } = await cliente.query(
+        `insert into bases_conhecimento (conta_id) values ($1) returning id, ${COLUNAS}`,
+        [contaId],
+      );
+      atual = criadas[0];
+    }
 
     await cliente.query(
       `insert into base_versoes (conta_id, base_id, conteudo, autor_email, autor_operador_id, origem)

@@ -61,6 +61,10 @@ export async function carregarConta(req, _res, proximo) {
     if (sessao) {
       req.conta = {
         id: sessao.conta_id, nome: sessao.nome, email: sessao.email, testeAte: sessao.teste_ate,
+        // Modulos ligados viajam junto da sessao, que ja e uma consulta por
+        // requisicao: assim nenhuma rota precisa de uma segunda ida ao banco
+        // so para descobrir se a conta pode entrar ali.
+        moduloAtendimento: Boolean(sessao.modulo_atendimento),
       };
       req.sessaoId = sessaoId;
       // Sessao de personificacao: quem investiga o log depois precisa saber
@@ -84,6 +88,20 @@ export function ehOperador(email) {
 export function exigirOperador(req, res, proximo) {
   if (!req.conta || !ehOperador(req.conta.email)) {
     return res.status(403).json({ erro: 'somente operador' });
+  }
+  proximo();
+}
+
+/**
+ * Modulo vendido a parte. Quem nao assina nao ve a tela e nao alcanca a rota.
+ *
+ * 404 e nao 403 de proposito: para quem nao tem o modulo, ele simplesmente
+ * nao existe. 403 contaria que existe uma base de conhecimento ali e que
+ * falta so uma permissao, que e informacao que ninguem de fora precisa.
+ */
+export function exigirAtendimento(req, res, proximo) {
+  if (!req.conta || !req.conta.moduloAtendimento) {
+    return res.status(404).json({ erro: 'nao encontrado' });
   }
   proximo();
 }

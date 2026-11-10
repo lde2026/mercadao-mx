@@ -82,7 +82,7 @@ export async function redefinirSenha(contaId, senha) {
 export async function buscarConta(contaId) {
   const { rows } = await consultar(
     `select id, nome, email, documento, cliente_externo, email_aviso, whatsapp, avisar_lead,
-            teste_ate, criado_em
+            teste_ate, modulo_atendimento, criado_em
        from contas where id = $1`,
     [contaId],
   );
@@ -224,7 +224,7 @@ export async function criarSessao(contaId, duracaoDias = 14, operadorId = null) 
 export async function buscarSessao(id) {
   if (!id) return null;
   const { rows } = await consultar(
-    `select s.conta_id, s.operador_id, c.nome, c.email, c.teste_ate
+    `select s.conta_id, s.operador_id, c.nome, c.email, c.teste_ate, c.modulo_atendimento
        from sessoes s join contas c on c.id = s.conta_id
       where s.id = $1 and s.expira_em > now()`,
     [id],

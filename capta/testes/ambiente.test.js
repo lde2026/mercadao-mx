@@ -33,12 +33,21 @@ const COMPLETO = {
   OPERADOR_EMAILS: 'contato@lojadoecommerce.com.br', EMAIL_PROVEDOR: 'resend',
 };
 
-test('ambiente completo nao para nem avisa', () => {
+test('ambiente completo nao para, e so avisa do que e escolha', () => {
   const { paradas, avisos } = conferir(COMPLETO);
   assert.deepEqual(paradas, []);
-  // Asaas ausente e escolha, nao defeito: a cobranca fica manual.
-  assert.equal(avisos.length, 1);
-  assert.match(avisos[0], /ASAAS_API_KEY/);
+  // Asaas e chave de servico ausentes sao escolha, nao defeito: um deixa a
+  // cobranca manual, o outro deixa o modulo de atendimento sem rota interna.
+  assert.equal(avisos.length, 2);
+  assert.ok(avisos.some((a) => /ASAAS_API_KEY/.test(a)));
+  assert.ok(avisos.some((a) => /CHAVE_SERVICO/.test(a)));
+});
+
+test('chave de servico curta para o boot', () => {
+  // Ela e a unica autorizacao da rota que entrega a base de conhecimento dos
+  // clientes: curta, vira um segredo que da para adivinhar.
+  const { paradas } = conferir({ ...COMPLETO, CHAVE_SERVICO: 'curta' });
+  assert.ok(paradas.some((p) => p.startsWith('CHAVE_SERVICO')));
 });
 
 test('sem o que cifra credencial ou assina sessao, o processo nao sobe', () => {
