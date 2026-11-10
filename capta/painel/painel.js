@@ -2253,6 +2253,264 @@
 
   // ------------------------------------------------------------- navegacao ---
 
+  // --------------------------------------------------------------- atendimento ---
+
+  /*
+   * A base de conhecimento do atendimento no WhatsApp.
+   *
+   * Quem responde o cliente final e um agente que roda fora do Capta; esta
+   * tela e a fonte que ele le. Entao cada campo aqui vira resposta dada a um
+   * cliente de verdade, e e por isso que a tela mostra quando foi a ultima
+   * mudanca e quem fez: numa informacao errada, a primeira pergunta e "quem
+   * mexeu nisso e quando".
+   */
+  var atendimento = null;
+
+  function verAtendimento() {
+    var alvo = pintar('Atendimento', 'A base que o atendimento no WhatsApp usa para responder os seus clientes.');
+    var corpo = el('div');
+    alvo.appendChild(corpo);
+    corpo.appendChild(el('p', 'Carregando...', 'vazio'));
+
+    api('/atendimento').then(function (dados) {
+      atendimento = dados;
+      desenharAtendimento(corpo);
+    }).catch(function (e) {
+      corpo.textContent = '';
+      corpo.appendChild(el('p', e.message, 'vazio'));
+    });
+  }
+
+  function desenharAtendimento(corpo) {
+    corpo.textContent = '';
+    corpo.appendChild(historicoDeVersoes(corpo));
+
+    var colunas = el('div', null, 'atendimento');
+    colunas.appendChild(formularioDaBase(corpo));
+    colunas.appendChild(chatDoAssistente());
+    corpo.appendChild(colunas);
+  }
+
+  /*
+   * O historico fica no topo, e nao escondido numa aba.
+   *
+   * Ele e o que tira o medo de editar: o lojista mexe sabendo que da para
+   * voltar. Escondido, ele so e descoberto depois do estrago.
+   */
+  function historicoDeVersoes(corpo) {
+    var caixa = el('div', null, 'versoes');
+    caixa.appendChild(el('div', 'Histórico', 'rotulo'));
+
+    if (!atendimento.versoes.length) {
+      caixa.appendChild(el('p', 'Nenhuma alteração ainda. A primeira gravação já cria um ponto de volta.', 'vazio'));
+      return caixa;
+    }
+
+    var escolha = el('select');
+    atendimento.versoes.forEach(function (v) {
+      var ORIGEM = { formulario: 'formulário', chat: 'assistente', restauracao: 'restauração' };
+      var rotulo = quando(v.criadoEm) + '  ·  ' + (ORIGEM[v.origem] || v.origem)
+        + (v.autor ? '  ·  ' + v.autor : '');
+      var op = el('option', rotulo);
+      op.value = v.id;
+      escolha.appendChild(op);
+    });
+    caixa.appendChild(escolha);
+
+    var restaurar = el('button', 'Restaurar', 'secundario');
+    restaurar.type = 'button';
+    var estado = el('span', '', 'hora');
+    restaurar.addEventListener('click', function () {
+      if (!confirm('Voltar a base para esta versão?\n\nO conteúdo de agora vira mais um ponto no histórico, então dá para desfazer.')) return;
+      restaurar.disabled = true;
+      estado.textContent = 'Restaurando...';
+      api('/atendimento/versoes/' + escolha.value + '/restaurar', { method: 'POST' })
+        .then(function () { return api('/atendimento'); })
+        .then(function (dados) {
+          atendimento = dados;
+          desenharAtendimento(corpo);
+        })
+        .catch(function (e) {
+          restaurar.disabled = false;
+          estado.textContent = e.message;
+        });
+    });
+    caixa.appendChild(restaurar);
+    caixa.appendChild(estado);
+    return caixa;
+  }
+
+  /*
+   * A base em blocos, nao num formulario corrido de onze campos.
+   *
+   * Os blocos seguem a cabeca de quem atende: a loja, a entrega, o dinheiro,
+   * as regras, e por fim como falar. Assim o lojista acha o campo pelo
+   * assunto, sem ler todos os rotulos de cima a baixo.
+   */
+  var BLOCOS = [
+    { titulo: 'A loja', legenda: 'O basico que o atendimento diz logo na primeira mensagem.',
+      campos: ['nomeLoja', 'segmento', 'linkSite', 'horarioAtendimento'] },
+    { titulo: 'Entrega', legenda: 'A pergunta que mais chega no WhatsApp.',
+      campos: ['prazosEntrega', 'freteGratisAcima'] },
+    { titulo: 'Pagamento e trocas', legenda: 'O que decide a compra e o que evita reclamacao depois.',
+      campos: ['formasPagamento', 'politicaTroca'] },
+    { titulo: 'Como o atendimento fala', legenda: 'Texto livre. O agente usa isto para escrever como a sua loja escreveria.',
+      campos: ['tomDeVoz', 'perguntasFrequentes', 'observacoes'] },
+  ];
+
+  function formularioDaBase(corpo) {
+    var area = el('div');
+    var base = atendimento.base;
+    // Cópia de trabalho: o que o lojista digita só vira a base de verdade
+    // quando ele salva, e descartar é fechar a tela.
+    var rascunho = JSON.parse(JSON.stringify(base));
+
+    BLOCOS.forEach(function (bloco) {
+      var caixa = el('div', null, 'bloco');
+      caixa.appendChild(el('div', bloco.titulo, 'rotulo'));
+      caixa.appendChild(el('p', bloco.legenda, 'legenda'));
+      bloco.campos.forEach(function (nome) {
+        caixa.appendChild(campoDaBase(nome, rascunho));
+      });
+      area.appendChild(caixa);
+    });
+
+    var acoes = el('div', null, 'acoes');
+    var salvar = el('button', 'Salvar');
+    salvar.type = 'button';
+    var estado = el('span', '', 'hora');
+    estado.style.marginLeft = '10px';
+    if (atendimento.atualizadoEm) {
+      estado.textContent = 'Última mudança em ' + quando(atendimento.atualizadoEm);
+    }
+    salvar.addEventListener('click', function () {
+      salvar.disabled = true;
+      estado.textContent = 'Salvando...';
+      api('/atendimento', { method: 'PUT', corpo: rascunho })
+        .then(function () { return api('/atendimento'); })
+        .then(function (dados) {
+          atendimento = dados;
+          desenharAtendimento(corpo);
+        })
+        .catch(function (e) {
+          salvar.disabled = false;
+          estado.textContent = e.dados && e.dados.explicacao ? e.dados.explicacao : e.message;
+        });
+    });
+    acoes.appendChild(salvar);
+    acoes.appendChild(estado);
+    area.appendChild(acoes);
+    return area;
+  }
+
+  function campoDaBase(nome, rascunho) {
+    var campo = atendimento.campos[nome];
+    if (!campo) return el('span');
+
+    if (campo.tipo === 'prazos') return campoDeLinhas(nome, rascunho, campo, true);
+    if (campo.tipo === 'lista') return campoDeLinhas(nome, rascunho, campo, false);
+
+    var rotulo = el('label', campo.rotulo);
+    var entrada;
+    if (campo.tipo === 'texto' && campo.teto > 300) {
+      entrada = el('textarea');
+    } else {
+      entrada = el('input');
+      entrada.type = campo.tipo === 'dinheiro' ? 'number' : 'text';
+      if (campo.tipo === 'dinheiro') { entrada.step = '0.01'; entrada.min = '0'; }
+    }
+    if (campo.teto) entrada.maxLength = campo.teto;
+    entrada.value = rascunho[nome] == null ? '' : rascunho[nome];
+    if (campo.tipo === 'dinheiro') {
+      entrada.placeholder = 'Deixe vazio se a loja não tem frete grátis';
+    }
+    entrada.addEventListener('input', function () {
+      // Vazio no campo de dinheiro e nulo, nao zero: um diz "nao tem frete
+      // gratis" e o outro diz "frete gratis em qualquer valor".
+      rascunho[nome] = campo.tipo === 'dinheiro'
+        ? (entrada.value === '' ? null : entrada.value)
+        : entrada.value;
+    });
+    rotulo.appendChild(entrada);
+    return rotulo;
+  }
+
+  /** Prazo por regiao e forma de pagamento: lista que cresce e encolhe. */
+  function campoDeLinhas(nome, rascunho, campo, comRegiao) {
+    var rotulo = el('label', campo.rotulo);
+    var lista = el('div', null, 'linhas');
+    rotulo.appendChild(lista);
+
+    function desenhar() {
+      lista.textContent = '';
+      var itens = rascunho[nome] || [];
+      itens.forEach(function (item, i) {
+        var linha = el('div', null, 'linha');
+        if (comRegiao) {
+          linha.appendChild(entradaDeLinha(item.regiao, 'Região', function (v) { itens[i].regiao = v; }));
+          linha.appendChild(entradaDeLinha(item.prazo, 'Prazo', function (v) { itens[i].prazo = v; }));
+        } else {
+          linha.appendChild(entradaDeLinha(item, 'Ex.: Pix', function (v) { itens[i] = v; }));
+        }
+        var tirar = el('button', '×', 'tirar');
+        tirar.type = 'button';
+        tirar.setAttribute('aria-label', 'Remover');
+        tirar.addEventListener('click', function () { itens.splice(i, 1); desenhar(); });
+        linha.appendChild(tirar);
+        lista.appendChild(linha);
+      });
+
+      var mais = el('button', '+ Adicionar', 'secundario');
+      mais.type = 'button';
+      mais.addEventListener('click', function () {
+        rascunho[nome] = itens.concat([comRegiao ? { regiao: '', prazo: '' } : '']);
+        desenhar();
+      });
+      lista.appendChild(mais);
+    }
+
+    desenhar();
+    return rotulo;
+  }
+
+  function entradaDeLinha(valor, dica, aoMudar) {
+    var i = el('input');
+    i.type = 'text';
+    i.value = valor || '';
+    i.placeholder = dica;
+    i.addEventListener('input', function () { aoMudar(i.value); });
+    return i;
+  }
+
+  /*
+   * A coluna do assistente. O comportamento entra na proxima etapa; por
+   * enquanto ela mostra o lugar e diz o que vai acontecer ali, em vez de
+   * fingir um campo que nao responde.
+   */
+  function chatDoAssistente() {
+    var caixa = el('div', null, 'assistente-chat');
+    var cab = el('div', null, 'cab');
+    cab.appendChild(el('div', 'Assistente', 'rotulo'));
+    cab.appendChild(el('div', 'Descreva a mudança e confirme antes de gravar.', 'hora'));
+    caixa.appendChild(cab);
+
+    var mensagens = el('div', null, 'ac-ms');
+    mensagens.appendChild(el('p', 'O assistente entra na próxima atualização. Por enquanto, edite pelo formulário ao lado.', 'ac-vazio'));
+    caixa.appendChild(mensagens);
+
+    var pe = el('div', null, 'ac-pe');
+    var campo = el('textarea');
+    campo.placeholder = 'Ex.: o prazo do Nordeste passou para 8 dias úteis';
+    campo.disabled = true;
+    var enviar = el('button', 'Enviar');
+    enviar.type = 'button';
+    enviar.disabled = true;
+    pe.appendChild(campo);
+    pe.appendChild(enviar);
+    caixa.appendChild(pe);
+    return caixa;
+  }
+
   // ---------------------------------------------------------- configuracoes ---
 
   function verConfiguracoes() {
@@ -2327,6 +2585,7 @@
     // antigo salvo nao pode cair numa tela em branco por causa de um rotulo.
     '#/resumo': verHoje, '#/hoje': verHoje, '#/leads': verLeads, '#/chat': verChat,
     '#/integracoes': verIntegracoes, '#/financeiro': verFinanceiro, '#/admin': verAdmin,
+    '#/atendimento': verAtendimento,
     '#/configuracoes': verConfiguracoes,
   };
 
@@ -2366,6 +2625,9 @@
       document.getElementById('nome-conta').textContent = dados.conta.nome;
       document.getElementById('avatar').textContent = iniciais(dados.conta.nome);
       document.getElementById('menu-admin').hidden = !dados.conta.operador;
+      // Modulo vendido a parte: quem nao assina nao ve o item no menu, e a
+      // rota responde 404 de qualquer jeito.
+      document.getElementById('menu-atendimento').hidden = !(dados.modulos && dados.modulos.atendimento);
 
       var faixa = document.getElementById('faixa');
       if (dados.aviso) {

@@ -447,3 +447,51 @@ pre{background:var(--escuro);color:var(--superficie);padding:13px;border-radius:
 .previa-botao,.previa-cab,.previa-enviar{background:var(--cor-widget)}
 .previa-cupom{border-color:var(--cor-widget)}
 .previa-barra i{background:var(--cor-widget)}
+
+/* ------------------------------------------------------- atendimento */
+/* Duas colunas: a base a esquerda, o assistente a direita. Abaixo de
+   1100px elas empilham, com a base em cima: quem abre no celular vai
+   conferir um prazo, nao reescrever a politica de troca. */
+.atendimento{display:grid;grid-template-columns:1fr 380px;gap:20px;align-items:start}
+@media(max-width:1100px){.atendimento{grid-template-columns:1fr}}
+
+.versoes{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:18px}
+.versoes .rotulo{margin:0}
+.versoes select{width:auto;min-width:260px;margin:0;padding:8px 32px 8px 12px;font-size:13.5px}
+.versoes .vazio{margin:0;font-size:13px}
+
+.bloco{border:1px solid var(--linha);border-radius:12px;padding:18px 20px;margin-bottom:14px;
+  background:var(--superficie)}
+.bloco > .rotulo{margin-bottom:4px}
+.bloco .legenda{margin-bottom:14px}
+.bloco label{display:block;margin-bottom:14px;font-size:13px;color:var(--fraco)}
+.bloco label:last-child{margin-bottom:0}
+.bloco input,.bloco textarea{margin-top:5px}
+.bloco textarea{min-height:92px;resize:vertical}
+
+/* Lista de linhas (prazo por regiao, forma de pagamento): cada item e uma
+   linha com o botao de remover no fim, e um campo vazio no pe para
+   acrescentar sem clicar em "adicionar" antes. */
+.linhas{display:grid;gap:8px}
+.linhas .linha{display:flex;gap:8px;align-items:center}
+.linhas .linha input{margin:0}
+.linhas .tirar{flex:none;width:34px;height:34px;padding:0;border-radius:9px;
+  background:var(--ruim-fundo);color:var(--ruim);border:1px solid transparent;font-size:16px;line-height:1}
+.linhas .tirar:hover{filter:brightness(.97)}
+
+.assistente-chat{border:1px solid var(--linha);border-radius:12px;background:var(--superficie);
+  display:flex;flex-direction:column;overflow:hidden;position:sticky;top:18px}
+.assistente-chat .cab{padding:14px 16px;border-bottom:1px solid var(--linha)}
+.assistente-chat .cab .rotulo{margin:0}
+.assistente-chat .cab .hora{margin-top:3px}
+.ac-ms{padding:16px;display:flex;flex-direction:column;gap:10px;min-height:320px;max-height:52vh;
+  overflow-y:auto;background:var(--fundo)}
+.ac-bb{max-width:88%;padding:9px 12px;border-radius:12px;font-size:13.5px;line-height:1.5}
+.ac-bb.assistente{background:var(--superficie);border:1px solid var(--linha);align-self:flex-start;
+  border-bottom-left-radius:4px}
+.ac-bb.lojista{background:var(--acento);color:var(--acento-tinta);align-self:flex-end;
+  border-bottom-right-radius:4px}
+.ac-vazio{margin:auto;text-align:center;font-size:13px;color:var(--fraco);max-width:30ch}
+.ac-pe{padding:12px 14px;border-top:1px solid var(--linha);display:flex;gap:8px;align-items:flex-end}
+.ac-pe textarea{margin:0;min-height:40px;max-height:120px;resize:none;font-size:13.5px}
+.ac-pe button{flex:none}
