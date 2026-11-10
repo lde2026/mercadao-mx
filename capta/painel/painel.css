@@ -495,3 +495,20 @@ pre{background:var(--escuro);color:var(--superficie);padding:13px;border-radius:
 .ac-pe{padding:12px 14px;border-top:1px solid var(--linha);display:flex;gap:8px;align-items:flex-end}
 .ac-pe textarea{margin:0;min-height:40px;max-height:120px;resize:none;font-size:13.5px}
 .ac-pe button{flex:none}
+
+/* O cartao da proposta: campo, valor de agora, valor novo. Tres colunas e
+   nao um texto corrido porque o lojista precisa bater o olho e comparar, e
+   e justamente nessa comparacao que ele pega o modelo tendo entendido
+   errado antes de a informacao chegar no cliente. */
+.ac-prop{align-self:stretch;background:var(--superficie);border:1px solid var(--linha);
+  border-radius:12px;padding:12px 14px;display:grid;gap:10px}
+.ac-prop.passada{opacity:.6}
+.ac-mud{display:grid;gap:3px}
+.ac-cp{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--fraco)}
+.ac-de{font-size:13px;color:var(--fraco);text-decoration:line-through}
+.ac-para{font-size:13.5px;font-weight:550;line-height:1.45}
+.ac-prop .hora{margin:0}
+.ac-acoes{display:flex;gap:8px;flex-wrap:wrap}
+.ac-acoes button{flex:1;min-width:120px;padding:9px 12px;font-size:13px}
+.ac-aviso{padding:10px 14px;border-top:1px solid var(--linha);font-size:12.5px;
+  color:var(--ruim);background:var(--ruim-fundo)}

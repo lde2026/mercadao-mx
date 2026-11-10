@@ -2287,7 +2287,7 @@
 
     var colunas = el('div', null, 'atendimento');
     colunas.appendChild(formularioDaBase(corpo));
-    colunas.appendChild(chatDoAssistente());
+    colunas.appendChild(chatDoAssistente(corpo));
     corpo.appendChild(colunas);
   }
 
@@ -2483,11 +2483,17 @@
   }
 
   /*
-   * A coluna do assistente. O comportamento entra na proxima etapa; por
-   * enquanto ela mostra o lugar e diz o que vai acontecer ali, em vez de
-   * fingir um campo que nao responde.
+   * A coluna do assistente.
+   *
+   * O lojista escreve o que quer mudar; o que volta e uma proposta, nunca uma
+   * gravacao. A proposta aparece campo por campo, com o valor de agora ao
+   * lado do valor novo, e precisa de um clique em confirmar para virar base.
+   *
+   * Mostrar o "de X para Y" nao e enfeite: e o unico momento em que o lojista
+   * consegue pegar o modelo entendendo "7 dias" como "7 meses" antes de o
+   * atendimento comecar a responder isso para cliente de verdade.
    */
-  function chatDoAssistente() {
+  function chatDoAssistente(corpo) {
     var caixa = el('div', null, 'assistente-chat');
     var cab = el('div', null, 'cab');
     cab.appendChild(el('div', 'Assistente', 'rotulo'));
@@ -2495,20 +2501,178 @@
     caixa.appendChild(cab);
 
     var mensagens = el('div', null, 'ac-ms');
-    mensagens.appendChild(el('p', 'O assistente entra na próxima atualização. Por enquanto, edite pelo formulário ao lado.', 'ac-vazio'));
     caixa.appendChild(mensagens);
 
     var pe = el('div', null, 'ac-pe');
     var campo = el('textarea');
     campo.placeholder = 'Ex.: o prazo do Nordeste passou para 8 dias úteis';
-    campo.disabled = true;
+    campo.maxLength = 1000;
     var enviar = el('button', 'Enviar');
     enviar.type = 'button';
-    enviar.disabled = true;
     pe.appendChild(campo);
     pe.appendChild(enviar);
     caixa.appendChild(pe);
+
+    if (!atendimento.assistente) {
+      // Sem chave no servidor o campo fica desligado e diz o porque, em vez
+      // de aceitar o texto e devolver erro depois de o lojista escrever.
+      mensagens.appendChild(el('p', 'O assistente não está ligado nesta instalação. Por enquanto, edite pelo formulário ao lado.', 'ac-vazio'));
+      campo.disabled = true;
+      enviar.disabled = true;
+      return caixa;
+    }
+
+    var aviso = el('div', '', 'ac-aviso');
+    aviso.hidden = true;
+    caixa.appendChild(aviso);
+
+    function falhou(e) {
+      aviso.hidden = false;
+      aviso.textContent = e.dados && e.dados.explicacao ? e.dados.explicacao : e.message;
+    }
+
+    function desenhar() {
+      mensagens.textContent = '';
+      var conversa = atendimento.conversa || [];
+      if (!conversa.length) {
+        mensagens.appendChild(el('p', 'Escreva o que mudou na loja. Eu monto a alteração e você confirma antes de gravar.', 'ac-vazio'));
+      }
+      conversa.forEach(function (m) {
+        mensagens.appendChild(el('div', m.texto, 'ac-bb ' + m.papel));
+        if (m.proposta && m.proposta.mudancas) mensagens.appendChild(cartaoDaProposta(m));
+      });
+      mensagens.scrollTop = mensagens.scrollHeight;
+    }
+
+    /** A proposta: os campos que mudam, o valor de agora e o valor novo. */
+    function cartaoDaProposta(m) {
+      var cartao = el('div', null, 'ac-prop' + (m.estado === 'pendente' ? '' : ' passada'));
+      Object.keys(m.proposta.mudancas).forEach(function (nome) {
+        var campoDef = atendimento.campos[nome];
+        var linha = el('div', null, 'ac-mud');
+        linha.appendChild(el('div', campoDef ? campoDef.rotulo : nome, 'ac-cp'));
+        linha.appendChild(el('div', valorLegivel(nome, (m.proposta.antes || {})[nome]), 'ac-de'));
+        linha.appendChild(el('div', valorLegivel(nome, m.proposta.mudancas[nome]), 'ac-para'));
+        cartao.appendChild(linha);
+      });
+
+      if (m.estado === 'confirmada') {
+        cartao.appendChild(el('div', 'Aplicada em ' + quando(m.criadoEm), 'hora'));
+        return cartao;
+      }
+      if (m.estado !== 'pendente') {
+        cartao.appendChild(el('div', 'Descartada. A conversa seguiu depois dela.', 'hora'));
+        return cartao;
+      }
+
+      var acoes = el('div', null, 'ac-acoes');
+      var confirmar = el('button', 'Confirmar e gravar');
+      confirmar.type = 'button';
+      var descartar = el('button', 'Descartar', 'secundario');
+      descartar.type = 'button';
+
+      confirmar.addEventListener('click', function () {
+        confirmar.disabled = true;
+        descartar.disabled = true;
+        aviso.hidden = true;
+        api('/atendimento/chat/' + m.id + '/confirmar', { method: 'POST' })
+          .then(function () { return api('/atendimento'); })
+          .then(function (dados) {
+            // Recarrega a tela toda: a base mudou, e com ela o formulario e o
+            // historico de versoes, nao so a bolha do chat.
+            atendimento = dados;
+            desenharAtendimento(corpo);
+          })
+          .catch(function (e) {
+            confirmar.disabled = false;
+            descartar.disabled = false;
+            falhou(e);
+          });
+      });
+
+      descartar.addEventListener('click', function () {
+        confirmar.disabled = true;
+        descartar.disabled = true;
+        api('/atendimento/chat/' + m.id + '/descartar', { method: 'POST' })
+          .then(function () { m.estado = 'descartada'; desenhar(); })
+          .catch(function (e) {
+            confirmar.disabled = false;
+            descartar.disabled = false;
+            falhou(e);
+          });
+      });
+
+      acoes.appendChild(confirmar);
+      acoes.appendChild(descartar);
+      cartao.appendChild(acoes);
+      return cartao;
+    }
+
+    function mandar() {
+      var texto = campo.value.trim();
+      if (texto.length < 3) return;
+      campo.disabled = true;
+      enviar.disabled = true;
+      aviso.hidden = true;
+
+      // A proposta anterior morre no servidor assim que chega outro pedido. A
+      // tela acompanha isso na hora para o lojista nao ficar olhando um botao
+      // de confirmar que ja nao vale.
+      (atendimento.conversa || []).forEach(function (m) {
+        if (m.estado === 'pendente') m.estado = 'descartada';
+      });
+      atendimento.conversa = (atendimento.conversa || []).concat([
+        { id: 'enviando', papel: 'lojista', texto: texto, estado: 'conversa' },
+      ]);
+      campo.value = '';
+      desenhar();
+
+      api('/atendimento/chat', { method: 'POST', corpo: { texto: texto } })
+        .then(function (dados) {
+          atendimento.conversa = atendimento.conversa
+            .filter(function (m) { return m.id !== 'enviando'; })
+            .concat([dados.minha, dados.resposta]);
+          campo.disabled = false;
+          enviar.disabled = false;
+          desenhar();
+          campo.focus();
+        })
+        .catch(function (e) {
+          atendimento.conversa = atendimento.conversa.filter(function (m) { return m.id !== 'enviando'; });
+          campo.value = texto;
+          campo.disabled = false;
+          enviar.disabled = false;
+          desenhar();
+          falhou(e);
+        });
+    }
+
+    enviar.addEventListener('click', mandar);
+    campo.addEventListener('keydown', function (ev) {
+      // Enter manda, Shift+Enter quebra linha: e o que a mao do lojista ja faz
+      // em qualquer outro chat.
+      if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); mandar(); }
+    });
+
+    desenhar();
     return caixa;
+  }
+
+  /** O valor de um campo escrito como gente le, para o "de X para Y". */
+  function valorLegivel(nome, valor) {
+    var campoDef = atendimento.campos[nome] || {};
+    if (campoDef.tipo === 'prazos') {
+      var prazos = (valor || []).map(function (p) { return (p.regiao || '?') + ': ' + (p.prazo || '?'); });
+      return prazos.length ? prazos.join('  ·  ') : 'vazio';
+    }
+    if (campoDef.tipo === 'lista') {
+      return (valor || []).length ? (valor || []).join(', ') : 'vazio';
+    }
+    if (valor == null || valor === '') return 'vazio';
+    if (campoDef.tipo === 'dinheiro') {
+      return 'R$ ' + Number(valor).toFixed(2).replace('.', ',');
+    }
+    return String(valor);
   }
 
   // ---------------------------------------------------------- configuracoes ---

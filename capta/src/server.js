@@ -30,6 +30,7 @@ import {
   exigirAtendimento, montarCookie, limparCookie,
 } from './auth.js';
 import * as atendimento from './atendimento.js';
+import { interpretar, temAssistente } from './atendente.js';
 import { compararConstante } from './cripto.js';
 
 const aqui = path.dirname(fileURLToPath(import.meta.url));
@@ -687,10 +688,19 @@ app.get('/api/eu', async (req, res) => {
  * mesmo tempo, e separar em duas rotas so faria a coluna da esquerda e o
  * topo da pagina aparecerem em momentos diferentes.
  */
+/** A mensagem como a tela le: mesmo nome de campo que o resto do painel. */
+function mensagemParaTela(m) {
+  return {
+    id: m.id, papel: m.papel, texto: m.texto,
+    proposta: m.proposta, estado: m.estado, criadoEm: m.criado_em,
+  };
+}
+
 app.get('/api/atendimento', exigirAtendimento, async (req, res) => {
-  const [linha, historico] = await Promise.all([
+  const [linha, historico, conversa] = await Promise.all([
     atendimento.base(req.conta.id),
     atendimento.versoes(req.conta.id),
+    atendimento.mensagens(req.conta.id),
   ]);
   res.json({
     base: atendimento.conteudo(linha),
@@ -700,6 +710,8 @@ app.get('/api/atendimento', exigirAtendimento, async (req, res) => {
     })),
     campos: atendimento.CAMPOS,
     estruturados: atendimento.ESTRUTURADOS,
+    conversa: conversa.map(mensagemParaTela),
+    assistente: temAssistente(),
   });
 });
 
@@ -713,6 +725,107 @@ app.put('/api/atendimento', exigirAtendimento, async (req, res) => {
   });
   if (!linha) return res.status(404).json({ erro: 'nao encontrada' });
   res.json({ base: atendimento.conteudo(linha), atualizadoEm: linha.atualizado_em });
+});
+
+/**
+ * O chat de comando da base.
+ *
+ * Nada aqui grava na base. O que a rota faz e guardar o pedido, pedir a
+ * leitura ao assistente e guardar a resposta: se for proposta, ela fica
+ * pendente esperando o clique em confirmar, que e outra rota.
+ *
+ * A proposta anterior morre no primeiro passo, antes mesmo da chamada ao
+ * modelo. E a regra que o lojista espera sem saber que espera: ele pediu uma
+ * coisa, leu a proposta, nao gostou e escreveu outra. Se a primeira
+ * continuasse valendo, um clique distraido aplicaria o que ele abandonou.
+ */
+app.post('/api/atendimento/chat', exigirAtendimento, async (req, res) => {
+  if (!temAssistente()) {
+    return res.status(503).json({
+      erro: 'o assistente nao esta ligado nesta instalacao',
+      explicacao: 'Falta a chave da API no servidor. Edite pelo formulário ao lado.',
+    });
+  }
+
+  const pedido = String((req.body || {}).texto || '').trim().slice(0, 1000);
+  if (pedido.length < 3) return res.status(400).json({ erro: 'escreva o que voce quer mudar' });
+
+  const cabe = await repo.consumirLimite(`atendente:${req.conta.id}`, 86400, 20);
+  if (!cabe) {
+    return res.status(429).json({
+      erro: 'voce ja usou o assistente vinte vezes hoje',
+      explicacao: 'O limite volta amanhã. Até lá dá para editar pelo formulário.',
+    });
+  }
+
+  await atendimento.descartarPendentes(req.conta.id);
+  const minha = await atendimento.registrarMensagem(req.conta.id, {
+    papel: 'lojista', texto: pedido, autorEmail: req.conta.email,
+  });
+
+  const atual = atendimento.conteudo(await atendimento.base(req.conta.id));
+  let leitura;
+  try {
+    leitura = await interpretar({
+      pedido,
+      base: atual,
+      conversa: await atendimento.mensagens(req.conta.id, 12),
+      contaId: req.conta.id,
+    });
+  } catch (erro) {
+    log.aviso('assistente.falhou', { conta_id: req.conta.id, motivo: erro.message });
+    return res.status(502).json({
+      erro: 'nao consegui ler o pedido agora',
+      explicacao: 'Tente de novo em um minuto, ou edite pelo formulário.',
+    });
+  }
+
+  const resposta = await atendimento.registrarMensagem(req.conta.id, {
+    papel: 'assistente',
+    texto: leitura.texto,
+    proposta: leitura.tipo === 'proposta'
+      ? { mudancas: leitura.mudancas, antes: leitura.antes }
+      : null,
+    estado: leitura.tipo === 'proposta' ? 'pendente' : 'conversa',
+  });
+
+  res.json({ minha: mensagemParaTela(minha), resposta: mensagemParaTela(resposta) });
+});
+
+app.post('/api/atendimento/chat/:id/confirmar', exigirAtendimento, async (req, res) => {
+  const saida = await atendimento.confirmar(req.conta.id, req.params.id, {
+    autorEmail: req.conta.email,
+    operadorId: req.operadorId,
+  });
+
+  if (saida.erro === 'sem_proposta') {
+    return res.status(404).json({ erro: 'essa proposta nao esta mais valendo' });
+  }
+  if (saida.erro === 'proposta_vencida') {
+    return res.status(409).json({
+      erro: 'essa proposta foi substituida por outra',
+      explicacao: 'A conversa seguiu depois dela. Peça de novo o que você quer mudar.',
+    });
+  }
+  if (saida.erro === 'base_mudou') {
+    // Alguem salvou pelo formulario entre a proposta e o clique. O "de X para
+    // Y" que ele leu na tela ja nao descreve o que aconteceria.
+    return res.status(409).json({
+      erro: 'a base mudou depois desta proposta',
+      explicacao: 'Alguém editou o formulário no meio do caminho. Peça a alteração de novo para eu comparar com o valor de agora.',
+    });
+  }
+
+  res.json({
+    base: atendimento.conteudo(saida.base),
+    atualizadoEm: saida.base.atualizado_em,
+  });
+});
+
+app.post('/api/atendimento/chat/:id/descartar', exigirAtendimento, async (req, res) => {
+  const ok = await atendimento.descartar(req.conta.id, req.params.id);
+  if (!ok) return res.status(404).json({ erro: 'proposta nao encontrada' });
+  res.json({ ok: true });
 });
 
 app.post('/api/atendimento/versoes/:id/restaurar', exigirAtendimento, async (req, res) => {

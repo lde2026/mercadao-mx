@@ -236,3 +236,119 @@ export async function restaurar(contaId, versaoId, { autorEmail = null, operador
   log.info('base.restaurada', { conta_id: contaId, versao_id: versaoId });
   return salva;
 }
+
+// ----------------------------------------------------------- conversa ---
+
+/**
+ * A conversa do chat de comando.
+ *
+ * A proposta vive no banco e nao na memoria do servidor por dois motivos:
+ * ela precisa sobreviver a um F5 entre o "proponho isto" e o "confirmo", e
+ * precisa de rastro. Mudanca na base vira resposta dada a cliente de
+ * verdade, entao "quem mandou mudar isso" tem que ter resposta depois.
+ */
+export async function mensagens(contaId, limite = 40) {
+  const { rows } = await consultar(
+    `select id, papel, texto, proposta, estado, autor_email, criado_em
+       from base_mensagens
+      where conta_id = $1
+      order by criado_em desc
+      limit $2`,
+    [contaId, Math.min(Math.max(Number(limite) || 40, 1), 100)],
+  );
+  return rows.reverse();
+}
+
+export async function registrarMensagem(contaId, {
+  papel, texto, proposta = null, estado = 'conversa', autorEmail = null,
+}) {
+  const { rows } = await consultar(
+    `insert into base_mensagens (conta_id, papel, texto, proposta, estado, autor_email)
+     values ($1, $2, $3, $4, $5, $6)
+     returning id, papel, texto, proposta, estado, autor_email, criado_em`,
+    [contaId, papel, texto, proposta ? JSON.stringify(proposta) : null, estado, autorEmail],
+  );
+  return rows[0];
+}
+
+/**
+ * Proposta pendente morre quando a conversa segue.
+ *
+ * E a regra que o lojista espera sem saber que espera: ele pediu uma coisa,
+ * leu a proposta, nao gostou e escreveu outra. Se a primeira continuasse
+ * valendo, um clique distraido em "confirmar" aplicaria a mudanca que ele ja
+ * tinha abandonado.
+ */
+export async function descartarPendentes(contaId) {
+  const { rowCount } = await consultar(
+    `update base_mensagens set estado = 'descartada'
+      where conta_id = $1 and estado = 'pendente'`,
+    [contaId],
+  );
+  return rowCount;
+}
+
+export async function propostaPendente(contaId) {
+  const { rows } = await consultar(
+    `select id, texto, proposta, criado_em
+       from base_mensagens
+      where conta_id = $1 and estado = 'pendente'
+      order by criado_em desc
+      limit 1`,
+    [contaId],
+  );
+  return rows[0] || null;
+}
+
+/**
+ * Confirma e grava, numa transacao so.
+ *
+ * Tres travas antes de escrever, e cada uma existe por um jeito diferente de
+ * gravar o que ninguem pediu:
+ *
+ * A proposta tem que ser a pendente mais recente da conta, senao um botao
+ * velho aberto noutra aba aplicaria a mudanca de meia hora atras.
+ *
+ * O valor atual de cada campo tem que ser o mesmo de quando a proposta foi
+ * montada. Se alguem salvou pelo formulario no meio do caminho, o "de X para
+ * Y" que o lojista leu na tela ja nao descreve o que aconteceria, e
+ * confirmar as cegas apagaria a edicao do outro.
+ *
+ * E a gravacao passa por salvar(), que normaliza de novo e cria a versao: o
+ * historico precisa registrar a mudanca do chat igual a do formulario.
+ */
+export async function confirmar(contaId, mensagemId, { autorEmail = null, operadorId = null } = {}) {
+  const pendente = await propostaPendente(contaId);
+  if (!pendente) return { erro: 'sem_proposta' };
+  if (pendente.id !== mensagemId) return { erro: 'proposta_vencida' };
+
+  const mudancas = (pendente.proposta && pendente.proposta.mudancas) || {};
+  const antes = (pendente.proposta && pendente.proposta.antes) || {};
+  const nomes = Object.keys(mudancas);
+  if (!nomes.length) return { erro: 'sem_proposta' };
+
+  const atual = conteudo(await base(contaId));
+  const mudouPorFora = nomes.filter(
+    (nome) => JSON.stringify(atual[nome] ?? null) !== JSON.stringify(antes[nome] ?? null),
+  );
+  if (mudouPorFora.length) return { erro: 'base_mudou', campos: mudouPorFora };
+
+  const salva = await salvar(contaId, mudancas, { autorEmail, operadorId, origem: 'chat' });
+  if (!salva) return { erro: 'sem_proposta' };
+
+  await consultar(
+    `update base_mensagens set estado = 'confirmada' where id = $1 and conta_id = $2`,
+    [mensagemId, contaId],
+  );
+  log.info('base.confirmada_pelo_chat', { conta_id: contaId, campos: nomes.length });
+  return { base: salva };
+}
+
+export async function descartar(contaId, mensagemId) {
+  const { rowCount } = await consultar(
+    `update base_mensagens set estado = 'descartada'
+      where id = $1 and conta_id = $2 and estado = 'pendente'`,
+    [mensagemId, contaId],
+  );
+  return rowCount > 0;
+}
