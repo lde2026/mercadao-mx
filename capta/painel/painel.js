@@ -2505,7 +2505,7 @@
 
     var pe = el('div', null, 'ac-pe');
     var campo = el('textarea');
-    campo.placeholder = 'Ex.: o prazo do Nordeste passou para 8 dias úteis';
+    campo.placeholder = 'Cole o link da sua loja, ou diga o que mudou';
     campo.maxLength = 1000;
     var enviar = el('button', 'Enviar');
     enviar.type = 'button';
@@ -2535,7 +2535,7 @@
       mensagens.textContent = '';
       var conversa = atendimento.conversa || [];
       if (!conversa.length) {
-        mensagens.appendChild(el('p', 'Escreva o que mudou na loja. Eu monto a alteração e você confirma antes de gravar.', 'ac-vazio'));
+        mensagens.appendChild(el('p', 'Cole o link da sua loja e eu leio o site para adiantar o que der. Ou escreva o que mudou. Você confirma antes de gravar.', 'ac-vazio'));
       }
       conversa.forEach(function (m) {
         mensagens.appendChild(el('div', m.texto, 'ac-bb ' + m.papel));

@@ -31,6 +31,7 @@ import {
 } from './auth.js';
 import * as atendimento from './atendimento.js';
 import { interpretar, temAssistente } from './atendente.js';
+import { acharLink, lerPagina } from './pagina.js';
 import { compararConstante } from './cripto.js';
 
 const aqui = path.dirname(fileURLToPath(import.meta.url));
@@ -750,18 +751,54 @@ app.post('/api/atendimento/chat', exigirAtendimento, async (req, res) => {
   const pedido = String((req.body || {}).texto || '').trim().slice(0, 1000);
   if (pedido.length < 3) return res.status(400).json({ erro: 'escreva o que voce quer mudar' });
 
-  const cabe = await repo.consumirLimite(`atendente:${req.conta.id}`, 86400, 20);
-  if (!cabe) {
-    return res.status(429).json({
-      erro: 'voce ja usou o assistente vinte vezes hoje',
-      explicacao: 'O limite volta amanhã. Até lá dá para editar pelo formulário.',
-    });
+  /*
+   * O link da loja, quando ele cola um.
+   *
+   * Isso acontece antes do limite do assistente de proposito: pagina que nao
+   * abre e respondida aqui mesmo, sem chamada ao modelo, e nao faz sentido
+   * descontar uma das vinte do dia por um link torto. A busca tem limite
+   * proprio porque ela sai do nosso servidor para um endereco que quem esta
+   * do outro lado escolheu, e isso se mede separado.
+   */
+  const link = acharLink(pedido);
+  let pagina = null;
+  let recado = null;
+  if (link) {
+    const cabePagina = await repo.consumirLimite(`pagina:${req.conta.id}`, 86400, 10);
+    if (!cabePagina) {
+      recado = 'Já abri dez páginas por aqui hoje. Me conte o que mudou e eu monto a alteração.';
+    } else {
+      const lida = await lerPagina(link, { contaId: req.conta.id });
+      if (lida.erro) {
+        recado = `Não consegui ler ${link}: ${lida.erro}.`
+          + ' Me conte aqui o que mudou e eu monto a alteração.';
+      } else {
+        pagina = lida;
+      }
+    }
+  }
+
+  if (!recado) {
+    const cabe = await repo.consumirLimite(`atendente:${req.conta.id}`, 86400, 20);
+    if (!cabe) {
+      return res.status(429).json({
+        erro: 'voce ja usou o assistente vinte vezes hoje',
+        explicacao: 'O limite volta amanhã. Até lá dá para editar pelo formulário.',
+      });
+    }
   }
 
   await atendimento.descartarPendentes(req.conta.id);
   const minha = await atendimento.registrarMensagem(req.conta.id, {
     papel: 'lojista', texto: pedido, autorEmail: req.conta.email,
   });
+
+  if (recado) {
+    const aviso = await atendimento.registrarMensagem(req.conta.id, {
+      papel: 'assistente', texto: recado, estado: 'conversa',
+    });
+    return res.json({ minha: mensagemParaTela(minha), resposta: mensagemParaTela(aviso) });
+  }
 
   const atual = atendimento.conteudo(await atendimento.base(req.conta.id));
   let leitura;
@@ -771,6 +808,7 @@ app.post('/api/atendimento/chat', exigirAtendimento, async (req, res) => {
       base: atual,
       conversa: await atendimento.mensagens(req.conta.id, 12),
       contaId: req.conta.id,
+      pagina,
     });
   } catch (erro) {
     log.aviso('assistente.falhou', { conta_id: req.conta.id, motivo: erro.message });
