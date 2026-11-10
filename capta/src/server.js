@@ -88,11 +88,12 @@ const PRODUCAO = process.env.NODE_ENV === 'production';
  * no /saude por dentro, em http, e nao pode levar 301 nessa checagem.
  */
 function ehHostProprio(host) {
-  // Lido na chamada, nao na carga: HOST_LANDING e declarado mais abaixo, e
-  // montar o conjunto aqui em cima deixaria o arquivo sem subir.
+  // Lido na chamada, nao na carga: as listas de host sao declaradas mais
+  // abaixo, e montar o conjunto aqui em cima deixaria o arquivo sem subir.
   const limpo = String(host || '').toLowerCase().split(':')[0];
   if (!limpo) return false;
   if (HOST_LANDING.includes(limpo)) return true;
+  if (HOST_ATENDEAI.includes(limpo)) return true;
   try { return new URL(URL_PUBLICA).hostname.toLowerCase() === limpo; } catch { return false; }
 }
 
@@ -112,7 +113,7 @@ app.use((req, res, proximo) => {
   res.set('X-Content-Type-Options', 'nosniff');
   res.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   if (PRODUCAO) res.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-  if (ehLanding(req)) {
+  if (ehLanding(req) || ehVitrineAtendeAi(req)) {
     // A landing usa fonte do Google. Ela nao tem sessao, nao tem formulario e
     // nao toca em dado de ninguem, entao abrir a folha de estilo e a fonte
     // nao aumenta o que um atacante alcanca. O script continua so do proprio
@@ -178,6 +179,69 @@ app.use((req, res, proximo) => {
   // Endereco errado numa pagina de venda nao merece tela de erro: leva de
   // volta para a oferta.
   return estaticoLanding(req, res, () => res.redirect(302, '/'));
+});
+
+/**
+ * O Atende Ai: mesma aplicacao, outro Host, outro nome.
+ *
+ * O modulo de atendimento e vendido separado e tem nome proprio, entao ele
+ * ganha o endereco dele. Nao e um segundo servico: e o mesmo processo, o
+ * mesmo banco e o mesmo deploy, respondendo diferente conforme o dominio pelo
+ * qual o navegador chegou. Dois deploys separados seria duas contas, dois
+ * commits e dois lugares onde a mesma informacao envelhece.
+ *
+ * A raiz e a pagina de venda; /app e o painel de sempre. Os arquivos do
+ * painel sao pedidos pela raiz (/painel.js), entao eles continuam valendo
+ * aqui, e /api tambem, senao o painel carregaria sem conseguir falar com o
+ * servidor.
+ */
+const HOST_ATENDEAI = String(process.env.HOST_ATENDEAI || 'atendeai.lojadoecommerce.com.br')
+  .split(',').map((h) => h.trim().toLowerCase()).filter(Boolean);
+
+const PASTA_ATENDEAI = path.join(aqui, '..', 'atendeai');
+const PASTA_PAINEL = path.join(aqui, '..', 'painel');
+const estaticoAtendeAi = express.static(PASTA_ATENDEAI, { maxAge: '5m' });
+const estaticoPainel = express.static(PASTA_PAINEL, { index: false });
+
+function ehAtendeAi(req) {
+  const host = String(req.headers.host || '').toLowerCase().split(':')[0];
+  return HOST_ATENDEAI.includes(host);
+}
+
+/**
+ * Neste dominio, tudo que nao e o painel nem a API e pagina de venda.
+ *
+ * A distincao decide o cabecalho de seguranca: a vitrine carrega fonte do
+ * Google e ganha a CSP mais frouxa da landing, enquanto o painel continua com
+ * a regra fechada de sempre. Sem isso, ou a pagina abre sem tipografia, ou o
+ * painel afrouxa junto, e e o painel que tem sessao e dado de cliente.
+ */
+function ehVitrineAtendeAi(req) {
+  if (!ehAtendeAi(req)) return false;
+  return !(req.path === '/app' || req.path.startsWith('/app/')
+    || req.path.startsWith('/api/') || req.path === '/painel.js' || req.path === '/painel.css');
+}
+
+app.use((req, res, proximo) => {
+  if (!ehAtendeAi(req)) return proximo();
+
+  // O que a aplicacao precisa que continue existindo neste host.
+  if (req.path === '/saude' || req.path.startsWith('/api/')) return proximo();
+  if (req.path === '/painel.js' || req.path === '/painel.css') {
+    return estaticoPainel(req, res, () => res.status(404).end());
+  }
+
+  // Sem a barra o painel nao acharia os proprios arquivos, e quem entrou pelo
+  // Atende Ai quer a base, nao o resumo de leads.
+  if (req.path === '/app') return res.redirect(302, '/app/#/atendimento');
+  if (req.path.startsWith('/app/')) return res.sendFile(path.join(PASTA_PAINEL, 'index.html'));
+
+  const caminho = req.path.replace(/\/+$/, '') || '/';
+  // Termos e privacidade sao os mesmos da casa, e nao copia que desencontra.
+  const juridica = PAGINAS_LANDING[caminho];
+  if (juridica && caminho !== '/') return res.sendFile(path.join(PASTA_LANDING, juridica));
+
+  return estaticoAtendeAi(req, res, () => estaticoLanding(req, res, () => res.redirect(302, '/')));
 });
 
 /** Para o Railway e para o monitoramento. Confere o banco, nao so o processo. */
@@ -1587,7 +1651,7 @@ app.use(express.static(path.join(aqui, '..', 'public'), {
     res.set('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
   },
 }));
-app.use(express.static(path.join(aqui, '..', 'painel')));
+app.use(express.static(PASTA_PAINEL));
 
 app.use((erro, req, res, _proximo) => {
   log.erro('rota.falhou', {

@@ -9,6 +9,23 @@
 (function () {
   'use strict';
 
+  /*
+   * A marca do painel depende da porta de entrada.
+   *
+   * O modulo de atendimento e vendido com nome proprio, e quem assina so ele
+   * entra por atendeai.lojadoecommerce.com.br/app. Esse lojista nao comprou
+   * Captapp e nao deve ler Captapp no topo da tela. E o mesmo painel; o que
+   * muda e o nome na porta, e o servidor so serve o painel em /app nesse
+   * dominio.
+   */
+  var MARCA = window.location.pathname.indexOf('/app/') === 0 ? 'atende aí' : 'captapp';
+
+  function vestirMarca() {
+    var marcas = document.querySelectorAll('.marca-grande, .marca');
+    for (var i = 0; i < marcas.length; i += 1) marcas[i].textContent = MARCA;
+    document.title = MARCA === 'captapp' ? 'Captapp' : 'Atende Aí';
+  }
+
   var eu = null;
   var cacheLeads = null;
   var abaLeads = 'a_contatar';
@@ -2267,7 +2284,7 @@
   var atendimento = null;
 
   function verAtendimento() {
-    var alvo = pintar('Atendimento', 'A base que o atendimento no WhatsApp usa para responder os seus clientes.');
+    var alvo = pintar('Atende Aí', 'A base que o Atende Aí usa para responder os seus clientes no WhatsApp.');
     var corpo = el('div');
     alvo.appendChild(corpo);
     corpo.appendChild(el('p', 'Carregando...', 'vazio'));
@@ -2821,5 +2838,6 @@
     }).catch(function () { /* mostrarEntrada ja foi chamado no 401 */ });
   }
 
+  vestirMarca();
   iniciar();
 }());

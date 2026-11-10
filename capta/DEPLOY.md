@@ -137,6 +137,31 @@ certificado valido e tudo.
 Se um dia a landing tambem passar pelo Cloudflare, ligue la **Always Use
 HTTPS**: um redirecionamento na borda poupa uma viagem ate o servidor.
 
+## Atende Ai
+
+O modulo de atendimento e vendido separado e tem nome proprio, entao ele tem
+o endereco dele: `atendeai.lojadoecommerce.com.br`. Nao e um segundo servico.
+E o mesmo processo, o mesmo banco e o mesmo deploy, respondendo diferente
+conforme o Host pelo qual o navegador chegou.
+
+- A raiz e a pagina de venda do Atende Ai, em `atendeai/`.
+- `/app` e o painel de sempre, abrindo direto na tela da base.
+- `/termos` e `/privacidade` sao os mesmos arquivos da landing, nao copia.
+- No painel servido em `/app`, a marca no topo e "atende ai" e nao "captapp":
+  quem assina so o modulo nao comprou Captapp e nao deve ler Captapp na tela.
+
+Os mesmos dois passos da landing, uma vez so:
+
+1. **Railway**, no servico do app: Settings, Networking, **Custom Domain**,
+   `atendeai.lojadoecommerce.com.br`. Ele devolve um destino CNAME.
+2. **Registro.br**, na zona do dominio: um CNAME `atendeai` apontando para
+   esse destino.
+
+A variavel `HOST_ATENDEAI` muda quais hosts recebem o Atende Ai, separados
+por virgula. Sem ela vale `atendeai.lojadoecommerce.com.br`. O redirecionamento
+de http para https ja vale para esse host, que e o que evita o "nao seguro"
+no endereco com o certificado valido.
+
 O video do topo entra pelo atributo `data-url` do bloco `#video`: cole o
 link de incorporacao do YouTube (`https://www.youtube.com/embed/ID`) ou do
 Vimeo. Enquanto estiver vazio o bloco sai da pagina, porque um play que nao

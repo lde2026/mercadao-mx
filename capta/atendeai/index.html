@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Atendimento no WhatsApp que responde com as regras da sua loja: prazo, frete, pagamento e troca. Você mantém as respostas sozinho, por um chat, e nada entra no ar sem a sua confirmação.">
+<title>Atende Aí</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/favicon.svg">
+<meta name="theme-color" content="#11a37a">
+<meta property="og:title" content="Atende Aí">
+<meta property="og:description" content="O atendimento da sua loja responde no WhatsApp com as regras que você escreveu.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Manrope:wght@400;500;600;700&display=swap">
+<style>
+:root{
+  --fundo:#ffffff; --suave:#f4f7f6; --tinta:#0c1512; --cinza:#56635e; --linha:#e3e9e7;
+  --verde:#11a37a; --verde-escuro:#0b8463; --verde-suave:#e8f6f1;
+  --teal:#41bfbb; --escuro:#0d1b17;
+  --display:"Sora",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --corpo:"Manrope",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+/*
+ * Mesma receita de luz da landing do Captapp: dois clarões presos ao topo,
+ * um verde do lado da marca e um frio do outro, sem arquivo de imagem.
+ * Pagina de venda toda branca parece rascunho, e foto de banco de imagem
+ * envelhece, pesa e nao e nossa.
+ */
+body{font:16px/1.6 var(--corpo);color:var(--tinta);-webkit-font-smoothing:antialiased;
+  background:
+    radial-gradient(980px 560px at 84% -12%, rgba(17,163,122,.14), transparent 62%),
+    radial-gradient(820px 520px at 2% 0%, rgba(65,191,187,.12), transparent 64%),
+    var(--fundo);
+  background-attachment:fixed}
+img{max-width:100%}
+a{color:inherit}
+.faixa{width:min(1120px,100% - 40px);margin-inline:auto}
+h1,h2,h3{font-family:var(--display);letter-spacing:-.02em;line-height:1.1;text-wrap:balance}
+h1{font-size:clamp(34px,5.2vw,58px);font-weight:800}
+h2{font-size:clamp(27px,3.8vw,42px);font-weight:800}
+h3{font-size:19px;font-weight:700}
+p{max-width:62ch}
+.eyebrow{display:inline-block;font-family:var(--display);font-size:12px;font-weight:700;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--verde);margin-bottom:14px}
+
+/* ------------------------------------------------------------------ topo -- */
+.topo{position:sticky;top:0;z-index:20;backdrop-filter:saturate(180%) blur(12px);
+  background:rgba(255,255,255,.82);border-bottom:1px solid var(--linha)}
+.topo .faixa{display:flex;align-items:center;gap:26px;height:64px}
+.marca{font-family:var(--display);font-weight:800;font-size:19px;letter-spacing:-.03em;
+  text-decoration:none}
+.marca b{color:var(--verde);font-weight:800}
+.nav{display:flex;gap:22px;margin-left:auto;font-size:14.5px;font-weight:600;color:var(--cinza)}
+.nav a{text-decoration:none}
+.nav a:hover{color:var(--tinta)}
+.botao{display:inline-flex;align-items:center;justify-content:center;gap:9px;
+  font-family:var(--display);font-weight:700;font-size:15px;text-decoration:none;
+  padding:13px 22px;border-radius:12px;border:1px solid transparent;cursor:pointer;
+  transition:transform .14s ease, box-shadow .14s ease, background .14s ease}
+.botao.cheio{background:var(--verde);color:#fff;box-shadow:0 10px 26px -12px rgba(17,163,122,.75)}
+.botao.cheio:hover{background:var(--verde-escuro);transform:translateY(-1px)}
+.botao.vazio{border-color:var(--linha);background:#fff;color:var(--tinta)}
+.botao.vazio:hover{border-color:#c9d4d0;transform:translateY(-1px)}
+.botao.pequeno{padding:9px 16px;font-size:14px;border-radius:10px}
+.topo .botao{margin-left:4px}
+
+/* ------------------------------------------------------------------ hero -- */
+.hero{padding:74px 0 20px}
+.hero .faixa{display:grid;grid-template-columns:1.05fr .95fr;gap:52px;align-items:center}
+.hero p.chamada{font-size:18.5px;color:var(--cinza);margin-top:20px}
+.acoes{display:flex;gap:12px;flex-wrap:wrap;margin-top:30px}
+.selos{display:flex;gap:18px;flex-wrap:wrap;margin-top:26px;font-size:13.5px;color:var(--cinza)}
+.selos span{display:inline-flex;align-items:center;gap:7px}
+.selos i{width:16px;height:16px;border-radius:50%;background:var(--verde-suave);
+  display:inline-grid;place-items:center;color:var(--verde);font-style:normal;font-size:10px;font-weight:800}
+
+/* A conversa: o produto e isso, entao ele aparece antes de qualquer texto
+   explicando o produto. */
+.celular{justify-self:center;width:min(330px,100%);border-radius:30px;padding:12px;
+  background:linear-gradient(180deg,#19332b,#0d1b17);
+  box-shadow:0 36px 70px -34px rgba(12,21,18,.6), 0 0 0 1px rgba(255,255,255,.06) inset}
+.tela{background:#eceee9;border-radius:21px;overflow:hidden;display:flex;flex-direction:column;
+  min-height:470px}
+.tela .barra{background:#0f3d31;color:#fff;padding:11px 14px;display:flex;align-items:center;gap:10px}
+.tela .av{width:30px;height:30px;border-radius:50%;background:var(--teal);display:grid;
+  place-items:center;font-family:var(--display);font-weight:800;font-size:12px;color:#06241d}
+.tela .quem{font-size:13.5px;font-weight:700;line-height:1.25}
+.tela .quem small{display:block;font-weight:500;font-size:11px;opacity:.75}
+.msgs{padding:14px;display:flex;flex-direction:column;gap:9px;flex:1;justify-content:flex-end}
+.bb{max-width:84%;padding:8px 11px;border-radius:13px;font-size:13.4px;line-height:1.45;
+  box-shadow:0 1px 1px rgba(12,21,18,.08);animation:sobe .36s ease both}
+.bb.cliente{background:#fff;align-self:flex-start;border-bottom-left-radius:4px}
+.bb.loja{background:#d6f3e4;align-self:flex-end;border-bottom-right-radius:4px}
+.bb .hora{display:block;text-align:right;font-size:10px;color:#6d7a74;margin-top:2px}
+.digitando{align-self:flex-end;background:#d6f3e4;border-radius:13px;padding:11px 13px;
+  display:flex;gap:4px;animation:sobe .3s ease both}
+.digitando i{width:6px;height:6px;border-radius:50%;background:#4b7b68;display:block;
+  animation:pisca 1.3s infinite}
+.digitando i:nth-child(2){animation-delay:.18s}
+.digitando i:nth-child(3){animation-delay:.36s}
+@keyframes sobe{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes pisca{0%,60%,100%{opacity:.3}30%{opacity:1}}
+
+/* --------------------------------------------------------------- secoes --- */
+.secao{padding:78px 0}
+.secao.suave{background:var(--suave);border-block:1px solid var(--linha)}
+.cabeca{max-width:64ch;margin-bottom:38px}
+.cabeca p{color:var(--cinza);font-size:17px;margin-top:14px}
+
+.tres{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.cartao{background:#fff;border:1px solid var(--linha);border-radius:16px;padding:24px}
+.cartao h3{margin-bottom:8px}
+.cartao p{font-size:14.5px;color:var(--cinza)}
+.cartao .num{width:30px;height:30px;border-radius:9px;background:var(--verde-suave);color:var(--verde);
+  font-family:var(--display);font-weight:800;font-size:14px;display:grid;place-items:center;margin-bottom:14px}
+
+.campos{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.campo{display:flex;gap:12px;align-items:flex-start;background:#fff;border:1px solid var(--linha);
+  border-radius:13px;padding:16px 18px}
+.campo svg{flex:none;width:19px;height:19px;stroke:var(--verde);stroke-width:1.9;fill:none;margin-top:2px}
+.campo b{display:block;font-size:14.5px}
+.campo span{font-size:13.5px;color:var(--cinza)}
+
+.duas{display:grid;grid-template-columns:1fr 1fr;gap:46px;align-items:center}
+.lista{display:grid;gap:14px;margin-top:22px}
+.lista li{list-style:none;display:flex;gap:11px;font-size:15.5px;color:var(--cinza)}
+.lista li b{color:var(--tinta);font-weight:650}
+.lista svg{flex:none;width:19px;height:19px;stroke:var(--verde);stroke-width:2.2;fill:none;margin-top:3px}
+
+/* O cartao de proposta, igual ao que ele ve no painel. Mostrar a tela de
+   verdade vale mais que descrever o que ela faz. */
+.proposta{background:#fff;border:1px solid var(--linha);border-radius:16px;padding:20px;
+  box-shadow:0 24px 50px -32px rgba(12,21,18,.4)}
+.proposta .pedido{background:var(--verde);color:#fff;border-radius:12px;border-bottom-right-radius:4px;
+  padding:9px 12px;font-size:13.5px;margin-left:auto;max-width:86%;width:fit-content}
+.proposta .fala{background:var(--suave);border:1px solid var(--linha);border-radius:12px;
+  border-bottom-left-radius:4px;padding:9px 12px;font-size:13.5px;margin:9px 0 14px;max-width:88%}
+.mud{border-top:1px solid var(--linha);padding-top:12px;margin-top:12px}
+.mud:first-of-type{border-top:0;margin-top:0}
+.mud .cp{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--cinza)}
+.mud .de{font-size:13px;color:var(--cinza);text-decoration:line-through}
+.mud .para{font-size:14px;font-weight:600}
+.proposta .acoes{margin-top:16px;gap:8px}
+.proposta .acoes .botao{flex:1}
+
+.fecho{text-align:center;padding:84px 0}
+.fecho p{margin:16px auto 0;color:var(--cinza);font-size:17px}
+.fecho .acoes{justify-content:center}
+
+.rodape{background:var(--escuro);color:#b9c6c0;padding:40px 0;font-size:13.5px}
+.rodape .faixa{display:grid;gap:8px}
+.rodape .empresa{font-weight:600;color:#fff}
+.rodape a{text-decoration:none}
+.rodape .legais{margin-top:6px}
+
+@media(max-width:940px){
+  .hero .faixa{grid-template-columns:1fr;gap:40px}
+  .tres{grid-template-columns:1fr}
+  .campos{grid-template-columns:1fr}
+  .duas{grid-template-columns:1fr;gap:34px}
+  .nav{display:none}
+}
+@media(prefers-reduced-motion:reduce){
+  .bb,.digitando{animation:none}
+  .botao{transition:none}
+}
+</style>
+</head>
+<body>
+
+<header class="topo">
+  <div class="faixa">
+    <a class="marca" href="/">atende <b>aí</b>.</a>
+    <nav class="nav">
+      <a href="#como">Como funciona</a>
+      <a href="#responde">O que ele responde</a>
+      <a href="#controle">Quem manda é você</a>
+    </nav>
+    <a class="botao cheio pequeno" href="/app">Entrar</a>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="faixa">
+    <div>
+      <span class="eyebrow">Atendimento no WhatsApp</span>
+      <h1>A sua loja responde no WhatsApp, com as regras que você escreveu.</h1>
+      <p class="chamada">
+        Prazo por região, frete grátis, forma de pagamento, política de troca. O Atende Aí
+        responde o seu cliente na hora, com a informação certa da sua loja, e não com o que
+        um robô achou que era.
+      </p>
+      <div class="acoes">
+        <a class="botao cheio" href="/app">Entrar no painel</a>
+        <a class="botao vazio" href="#como">Ver como funciona</a>
+      </div>
+      <div class="selos">
+        <span><i>✓</i> Responde fora do horário comercial</span>
+        <span><i>✓</i> Você atualiza sozinho, sem chamar ninguém</span>
+      </div>
+    </div>
+
+    <div class="celular" aria-hidden="true">
+      <div class="tela">
+        <div class="barra">
+          <div class="av">BM</div>
+          <div class="quem">Bella Moda<small>online</small></div>
+        </div>
+        <div class="msgs" id="conversa"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="secao suave" id="como">
+  <div class="faixa">
+    <div class="cabeca">
+      <span class="eyebrow">Como funciona</span>
+      <h2>Três passos, e nenhum deles é abrir chamado.</h2>
+      <p>
+        O trabalho de manter o atendimento em dia é seu, e é rápido. Quem responde o cliente
+        é o Atende Aí, com o que está escrito na sua base.
+      </p>
+    </div>
+    <div class="tres">
+      <div class="cartao">
+        <div class="num">1</div>
+        <h3>Cole o link da sua loja</h3>
+        <p>
+          Ele lê o seu site e já preenche o que achou: nome, segmento, frete grátis, formas
+          de pagamento, política de troca. O que faltar, ele pergunta.
+        </p>
+      </div>
+      <div class="cartao">
+        <div class="num">2</div>
+        <h3>Ele atende no WhatsApp</h3>
+        <p>
+          O cliente pergunta o prazo do Nordeste às onze da noite e recebe a resposta na hora,
+          com o prazo que você cadastrou. Sem você olhar o celular.
+        </p>
+      </div>
+      <div class="cartao">
+        <div class="num">3</div>
+        <h3>Mudou? Escreve e confirma</h3>
+        <p>
+          "O frete grátis agora é acima de 199." Ele monta a alteração, mostra o que vai mudar,
+          e só grava quando você clica em confirmar.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="secao" id="responde">
+  <div class="faixa">
+    <div class="cabeca">
+      <span class="eyebrow">O que ele responde</span>
+      <h2>As perguntas que chegam todo dia, já respondidas.</h2>
+      <p>
+        Não é um robô genérico tentando adivinhar. É a sua loja, escrita por você, em campos
+        que o atendimento consulta antes de responder.
+      </p>
+    </div>
+    <div class="campos">
+      <div class="campo">
+        <svg viewBox="0 0 24 24"><path d="M3 7h13v8H3z"/><path d="M16 10h3l2 3v2h-5z"/><circle cx="7" cy="18" r="2"/><circle cx="17.5" cy="18" r="2"/></svg>
+        <div><b>Prazo de entrega por região</b><span>Sul, Sudeste, Nordeste. Cada um com o seu prazo.</span></div>
+      </div>
+      <div class="campo">
+        <svg viewBox="0 0 24 24"><path d="M12 2v20"/><path d="M17 6.5c0-2-2.2-3-5-3s-5 1-5 3 2.2 2.7 5 3.3 5 1.3 5 3.4-2.2 3.3-5 3.3-5-1.2-5-3.2"/></svg>
+        <div><b>Frete grátis a partir de</b><span>Ou a informação honesta de que a loja não tem.</span></div>
+      </div>
+      <div class="campo">
+        <svg viewBox="0 0 24 24"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 10h19"/></svg>
+        <div><b>Formas de pagamento</b><span>Pix, cartão, quantas vezes, boleto.</span></div>
+      </div>
+      <div class="campo">
+        <svg viewBox="0 0 24 24"><path d="M3 10a9 9 0 0 1 15-4l3 3"/><path d="M21 14a9 9 0 0 1-15 4l-3-3"/></svg>
+        <div><b>Política de troca e devolução</b><span>O prazo, a condição, quem paga o frete de volta.</span></div>
+      </div>
+      <div class="campo">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
+        <div><b>Horário de atendimento</b><span>Para ele saber quando prometer resposta humana.</span></div>
+      </div>
+      <div class="campo">
+        <svg viewBox="0 0 24 24"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9 9 0 0 1-3.9-.9L3 20.5l1.5-4.4A8.4 8.4 0 0 1 12 3.1a8.4 8.4 0 0 1 9 8.4z"/></svg>
+        <div><b>Como a sua loja fala</b><span>O tom, as perguntas frequentes, o que nunca prometer.</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="secao suave" id="controle">
+  <div class="faixa duas">
+    <div>
+      <span class="eyebrow">Quem manda é você</span>
+      <h2>Nada entra no ar sem você confirmar.</h2>
+      <p style="color:var(--cinza);font-size:17px;margin-top:14px">
+        Cada campo da base vira resposta dada a um cliente de verdade. Por isso o assistente
+        propõe e você decide, em vez de ele gravar e você descobrir depois.
+      </p>
+      <ul class="lista">
+        <li><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
+          <span><b>Você vê o antes e o depois</b> de cada campo, lado a lado, antes de gravar.</span></li>
+        <li><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
+          <span><b>Mudou de ideia no meio?</b> A proposta anterior cai sozinha. Nenhum clique distraído aplica o que você abandonou.</span></li>
+        <li><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
+          <span><b>Histórico com quem e quando.</b> Deu ruim numa informação, dá para voltar a base em um clique.</span></li>
+      </ul>
+    </div>
+
+    <div class="proposta" aria-hidden="true">
+      <div class="pedido">o frete grátis agora é acima de 199</div>
+      <div class="fala">Certo. Vou alterar o frete grátis. Confere antes de eu gravar:</div>
+      <div class="mud">
+        <div class="cp">Frete grátis a partir de</div>
+        <div class="de">R$ 299,00</div>
+        <div class="para">R$ 199,00</div>
+      </div>
+      <div class="acoes" style="display:flex">
+        <span class="botao cheio pequeno">Confirmar e gravar</span>
+        <span class="botao vazio pequeno">Descartar</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="fecho">
+  <div class="faixa">
+    <h2>Pronto para parar de responder prazo às onze da noite?</h2>
+    <p>Fale com a gente e a gente liga o Atende Aí na sua loja.</p>
+    <div class="acoes">
+      <a class="botao cheio" href="https://www.lojadoecommerce.com.br/">Falar com a gente</a>
+      <a class="botao vazio" href="/app">Já sou cliente, entrar</a>
+    </div>
+  </div>
+</section>
+
+<footer class="rodape">
+  <div class="faixa">
+    <span class="empresa">Atende Aí é um produto da <a href="https://www.lojadoecommerce.com.br/">Loja do E-commerce</a>.</span>
+    <span>COMERCIO E-COMMERCE LTDA · CNPJ 46.415.209/0001-17 · Curitiba, PR</span>
+    <span class="legais"><a href="/termos">Termos de Uso</a> · <a href="/privacidade">Política de Privacidade</a> · <a href="/app">Entrar no app</a></span>
+  </div>
+</footer>
+
+<script src="/atendeai.js" defer></script>
+</body>
+</html>
