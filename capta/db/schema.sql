@@ -379,3 +379,80 @@ create table if not exists limites (
   contagem  integer not null default 0,
   primary key (chave, janela)
 );
+
+-- --------------------------------------------------------- atendimento ----
+
+-- Base de conhecimento do atendimento no WhatsApp.
+--
+-- O agente que responde o cliente final nao vive aqui: ele e servico
+-- separado e le esta base por uma rota interna. O que o Capta guarda e a
+-- fonte, e quem edita passa a ser o proprio lojista, em vez de alguem da
+-- nossa equipe mexendo na mao.
+--
+-- Uma base por conta, e a unicidade esta no banco: duas bases para a mesma
+-- loja significa o agente respondendo por uma enquanto o lojista edita a
+-- outra, sem ninguem perceber qual esta no ar.
+create table if not exists bases_conhecimento (
+  id                    uuid primary key default gen_random_uuid(),
+  conta_id              uuid not null unique references contas(id) on delete cascade,
+  nome_loja             text not null default '',
+  segmento              text not null default '',
+  -- Lista de {regiao, prazo}: prazo de entrega nao e um numero so, muda de
+  -- Sudeste para Norte, e e a pergunta que mais chega no atendimento.
+  prazos_entrega        jsonb not null default '[]'::jsonb,
+  formas_pagamento      jsonb not null default '[]'::jsonb,
+  politica_troca        text not null default '',
+  horario_atendimento   text not null default '',
+  link_site             text not null default '',
+  -- Nulo quer dizer que a loja nao tem frete gratis, que e diferente de
+  -- zero, que seria frete gratis em qualquer valor.
+  frete_gratis_acima    numeric(12,2),
+  tom_de_voz            text not null default '',
+  perguntas_frequentes  text not null default '',
+  observacoes           text not null default '',
+  atualizado_em         timestamptz not null default now(),
+  criado_em             timestamptz not null default now()
+);
+
+-- Historico. Cada gravacao guarda o conteudo ANTERIOR inteiro, nao o diff:
+-- restaurar precisa funcionar daqui a um ano, com campo novo que ainda nao
+-- existe hoje, e remontar estado a partir de uma pilha de diffs e onde esse
+-- tipo de funcionalidade costuma quebrar.
+--
+-- conta_id repetido de proposito, mesmo dando para chegar nele pela base: e
+-- o que deixa toda consulta filtrar por conta sem depender de join, que e a
+-- regra do projeto inteiro.
+create table if not exists base_versoes (
+  id                uuid primary key default gen_random_uuid(),
+  conta_id          uuid not null references contas(id) on delete cascade,
+  base_id           uuid not null references bases_conhecimento(id) on delete cascade,
+  conteudo          jsonb not null,
+  autor_email       text,
+  autor_operador_id uuid,
+  origem            text not null check (origem in ('formulario','chat','restauracao')),
+  criado_em         timestamptz not null default now()
+);
+create index if not exists base_versoes_conta_idx on base_versoes(conta_id, criado_em desc);
+
+-- Conversa do chat de comando, por conta.
+--
+-- A proposta do assistente mora aqui, nao na memoria do servidor: ela precisa
+-- sobreviver a um F5 e a um restart entre o "proponho isto" e o "confirmo".
+-- Estado pendente e o unico que pode virar gravacao, e so o mais recente da
+-- conta, para um confirmar atrasado nao aplicar uma proposta velha.
+create table if not exists base_mensagens (
+  id          uuid primary key default gen_random_uuid(),
+  conta_id    uuid not null references contas(id) on delete cascade,
+  papel       text not null check (papel in ('lojista','assistente')),
+  texto       text not null,
+  proposta    jsonb,
+  estado      text not null default 'conversa'
+              check (estado in ('conversa','pendente','confirmada','descartada')),
+  autor_email text,
+  criado_em   timestamptz not null default now()
+);
+create index if not exists base_mensagens_conta_idx on base_mensagens(conta_id, criado_em);
+
+-- Quem enxerga o modulo. Desligado por padrao: o atendimento e vendido a
+-- parte, e modulo vazio na barra de quem nao assina vira chamado de suporte.
+alter table contas add column if not exists modulo_atendimento boolean not null default false;
