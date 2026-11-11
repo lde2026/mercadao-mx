@@ -7,6 +7,7 @@ process.env.NODE_ENV = 'test';
 // Lidos na carga do servidor, entao antes do import.
 process.env.HOST_LANDING = 'capta.teste';
 process.env.HOST_ATENDEAI = 'atendeai.teste';
+process.env.MARCA_ATENDEAI = 'segredo-que-so-o-cloudflare-sabe';
 
 const { pool } = await import('../src/db.js');
 await prepararBanco();
@@ -28,15 +29,16 @@ const porta = servidor.address().port;
  * node:http e nao fetch porque Host e cabecalho proibido no fetch: o undici
  * reescreve com o endereco real e o teste passaria a medir outra coisa.
  */
-function pedir(caminho, host) {
+function pedir(caminho, host, extras = {}) {
   return new Promise((ok, falhou) => {
     const pedido = http.request(
-      { host: '127.0.0.1', port: porta, path: caminho, headers: { Host: host } },
+      { host: '127.0.0.1', port: porta, path: caminho, headers: { Host: host, ...extras } },
       (resposta) => {
         let corpo = '';
         resposta.on('data', (p) => { corpo += p; });
         resposta.on('end', () => ok({
-          status: resposta.statusCode, destino: resposta.headers.location, corpo,
+          status: resposta.statusCode, destino: resposta.headers.location,
+          vary: resposta.headers.vary, corpo,
         }));
       },
     );
@@ -124,6 +126,39 @@ test('http neste dominio vira https antes de qualquer coisa', async () => {
   });
   assert.equal(r.status, 301);
   assert.equal(r.destino, 'https://atendeai.teste/');
+});
+
+/*
+ * O Railway so aceita dois dominios proprios e os dois ja estao ocupados,
+ * entao o atendeai entra pelo Cloudflare com o Host reescrito para um que o
+ * Railway conhece. Com o Host trocado, quem conta por onde o visitante entrou
+ * e o cabecalho, e e esse caminho que estes testes cobrem.
+ */
+test('o cabecalho do Cloudflare vale quando o Host chegou reescrito', async () => {
+  const r = await pedir('/', 'captapp.teste', { 'X-Capta-Marca': 'segredo-que-so-o-cloudflare-sabe' });
+  assert.equal(r.status, 200);
+  assert.match(r.corpo, /<title>Atende Aí<\/title>/);
+  // Sem o Vary, um cache guarda a resposta de um dominio e entrega no outro.
+  assert.match(String(r.vary || ''), /x-capta-marca/i);
+});
+
+test('o painel continua atras do /app mesmo com o Host reescrito', async () => {
+  const marca = { 'X-Capta-Marca': 'segredo-que-so-o-cloudflare-sabe' };
+  const app = await pedir('/app/', 'captapp.teste', marca);
+  assert.equal(app.status, 200);
+  assert.match(app.corpo, /painel\.js/);
+
+  const api = await pedir('/api/eu', 'captapp.teste', marca);
+  assert.equal(api.status, 401);
+});
+
+test('cabecalho sem o segredo certo nao troca o produto da tela', async () => {
+  for (const valor of ['atendeai', 'true', 'segredo-errado', '']) {
+    const r = await pedir('/', 'captapp.teste', { 'X-Capta-Marca': valor });
+    assert.equal(r.status, 200, valor);
+    assert.match(r.corpo, /painel\.js/, `"${valor}" nao deveria valer`);
+    assert.doesNotMatch(r.corpo, /<title>Atende Aí<\/title>/);
+  }
 });
 
 test('os outros dominios nao mudaram de lado', async () => {

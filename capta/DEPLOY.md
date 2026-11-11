@@ -51,6 +51,10 @@ todo visitante de toda loja cliente.
    | `NUVEMSHOP_CLIENT_ID`, `NUVEMSHOP_CLIENT_SECRET` | quando o app da Nuvemshop existir; redirecionamento `https://captapp.lojadoecommerce.com.br/nuvemshop/callback` |
    | `OPERADOR_EMAILS` | e-mails de quem administra o Captapp, separados por virgula. So eles veem a tela Admin |
    | `OPERADOR_EMAIL`, `OPERADOR_SENHA_INICIAL` | a conta do operador e criada na primeira subida com esses valores. Troque a senha no painel depois e apague a variavel |
+   | `ANTHROPIC_API_KEY` | chave da Anthropic. Sem ela o assistente do Atende Ai fica desligado e o formulario continua funcionando |
+   | `CHAVE_SERVICO` | segredo longo. E a unica autorizacao da rota `/interno/base/:contaId`, por onde o agente de WhatsApp le a base. Sem ela a rota recusa tudo |
+   | `MARCA_ATENDEAI` | segredo longo, quando o Atende Ai entrar pelo Cloudflare em vez de Custom Domain. Ver secao 2.2 |
+   | `HOST_LANDING`, `HOST_ATENDEAI` | so para mudar quais hosts recebem a landing e o Atende Ai. Cada um tem padrao |
 
 5. Deploy. O container roda `migrar` e depois sobe o servidor; o Railway
    considera saudavel quando `/saude` responder 200, e `/saude` so responde
@@ -150,17 +154,51 @@ conforme o Host pelo qual o navegador chegou.
 - No painel servido em `/app`, a marca no topo e "atende ai" e nao "captapp":
   quem assina so o modulo nao comprou Captapp e nao deve ler Captapp na tela.
 
-Os mesmos dois passos da landing, uma vez so:
+### Por que ele nao entra como Custom Domain
 
-1. **Railway**, no servico do app: Settings, Networking, **Custom Domain**,
-   `atendeai.lojadoecommerce.com.br`. Ele devolve um destino CNAME.
-2. **Registro.br**, na zona do dominio: um CNAME `atendeai` apontando para
-   esse destino.
+O plano do Railway aceita dois dominios proprios, e os dois estao ocupados
+pelo `capta` e pelo `captapp`. O botao Custom Domain fica travado no terceiro.
 
-A variavel `HOST_ATENDEAI` muda quais hosts recebem o Atende Ai, separados
-por virgula. Sem ela vale `atendeai.lojadoecommerce.com.br`. O redirecionamento
-de http para https ja vale para esse host, que e o que evita o "nao seguro"
-no endereco com o certificado valido.
+Entao o `atendeai` entra pelo Cloudflare, que troca o Host por um que o
+Railway conhece antes de encostar na origem, e conta por cabecalho de onde o
+visitante veio. O Railway nem fica sabendo do terceiro dominio.
+
+Se um dia o plano subir, basta cadastrar o dominio como Custom Domain: o
+servidor reconhece pelo Host sozinho, e as regras do Cloudflare podem sair
+sem mexer em codigo.
+
+### Os passos, uma vez so
+
+1. **Railway**, no servico do app, Variables: `MARCA_ATENDEAI` com um segredo
+   longo que voce inventa. Sem ele o cabecalho nao vale nada e o dominio
+   abriria o painel do Captapp.
+2. **Cloudflare**, DNS da zona `lojadoecommerce.com.br`: CNAME `atendeai`
+   apontando para o mesmo alvo do `captapp`, com **proxy ligado** (nuvem
+   laranja). Sem o proxy nao ha regra nenhuma no caminho, e o Railway
+   responde 404.
+3. **Cloudflare**, Rules, **Origin Rules**: se o hostname e
+   `atendeai.lojadoecommerce.com.br`, **Host Header** para
+   `captapp.lojadoecommerce.com.br`. E isto que faz o Railway aceitar.
+4. **Cloudflare**, Rules, **Transform Rules**, aba Modify Request Header: na
+   mesma condicao, **Set static** `X-Capta-Marca` com o valor do passo 1.
+5. Em **SSL/TLS**, confira **Full (strict)**, que ja vale para a zona. O
+   certificado que o Railway apresenta e o do `captapp`, e e o Host que foi
+   mandado, entao bate.
+
+A ordem importa: o passo 4 sem o 3 da 404, e o 3 sem o 4 abre o painel do
+Captapp no endereco do Atende Ai.
+
+### Conferindo
+
+- `https://atendeai.lojadoecommerce.com.br` abre a pagina de venda, e nao a
+  tela de login. Se abrir login, o cabecalho do passo 4 nao chegou ou o
+  segredo nao bate com o do passo 1.
+- `https://atendeai.lojadoecommerce.com.br/app` cai em `/app/#/atendimento`.
+- 404 do Railway no lugar da pagina: o passo 3 nao esta valendo.
+
+A variavel `HOST_ATENDEAI` muda quais hosts recebem o Atende Ai pelo proprio
+Host, separados por virgula. Sem ela vale `atendeai.lojadoecommerce.com.br`,
+que e o caminho de quando o dominio for cadastrado de verdade no Railway.
 
 O video do topo entra pelo atributo `data-url` do bloco `#video`: cole o
 link de incorporacao do YouTube (`https://www.youtube.com/embed/ID`) ou do

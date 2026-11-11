@@ -203,9 +203,32 @@ const PASTA_PAINEL = path.join(aqui, '..', 'painel');
 const estaticoAtendeAi = express.static(PASTA_ATENDEAI, { maxAge: '5m' });
 const estaticoPainel = express.static(PASTA_PAINEL, { index: false });
 
+/*
+ * A marca tambem pode chegar por cabecalho, e nao so pelo Host.
+ *
+ * O plano do Railway so aceita dois dominios proprios, e os dois ja estao
+ * ocupados pelo capta e pelo captapp. Entao o atendeai entra pelo Cloudflare,
+ * que troca o Host por um que o Railway conhece antes de encostar aqui. Com o
+ * Host reescrito, o unico jeito de saber por onde o visitante entrou e o
+ * Cloudflare contar, e e isso que este cabecalho faz.
+ *
+ * Ele carrega um segredo, e nao um "sim": cabecalho que qualquer um pode
+ * mandar e qualquer um escolhendo qual produto a tela mostra. O estrago seria
+ * pequeno, porque o que muda e so qual pagina publica a propria pessoa ve,
+ * mas o segredo custa uma variavel de ambiente e tira a duvida.
+ *
+ * Sem MARCA_ATENDEAI no ambiente o cabecalho nao vale nada, e so o Host
+ * decide. E o que mantem a instalacao de quem nao usa Cloudflare igual.
+ */
+const MARCA_ATENDEAI = String(process.env.MARCA_ATENDEAI || '');
+const CABECALHO_MARCA = 'x-capta-marca';
+
 function ehAtendeAi(req) {
   const host = String(req.headers.host || '').toLowerCase().split(':')[0];
-  return HOST_ATENDEAI.includes(host);
+  if (HOST_ATENDEAI.includes(host)) return true;
+  const marca = String(req.headers[CABECALHO_MARCA] || '');
+  return Boolean(MARCA_ATENDEAI) && Boolean(marca)
+    && compararConstante(marca, MARCA_ATENDEAI);
 }
 
 /**
@@ -224,6 +247,9 @@ function ehVitrineAtendeAi(req) {
 
 app.use((req, res, proximo) => {
   if (!ehAtendeAi(req)) return proximo();
+  // A resposta depende do cabecalho, e nao so do endereco: cache que guardar
+  // uma e servir na outra entrega o produto errado.
+  res.set('Vary', CABECALHO_MARCA);
 
   // O que a aplicacao precisa que continue existindo neste host.
   if (req.path === '/saude' || req.path.startsWith('/api/')) return proximo();
