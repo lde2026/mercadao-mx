@@ -38,7 +38,7 @@ function pedir(caminho, host, extras = {}) {
         resposta.on('data', (p) => { corpo += p; });
         resposta.on('end', () => ok({
           status: resposta.statusCode, destino: resposta.headers.location,
-          vary: resposta.headers.vary, corpo,
+          vary: resposta.headers.vary, csp: resposta.headers['content-security-policy'], corpo,
         }));
       },
     );
@@ -108,7 +108,7 @@ test('o painel entrado pelo Atende Ai nao se apresenta como Captapp', async () =
   // O lojista que assina so o modulo entra por aqui. Ele nao comprou Captapp
   // e nao deve ler Captapp no topo da tela: e o mesmo painel, outra porta.
   const js = await pedir('/painel.js', 'atendeai.teste');
-  assert.match(js.corpo, /\/app\/'\) === 0 \? 'atende aí'/);
+  assert.match(js.corpo, /'atende aí'/);
   assert.match(js.corpo, /vestirMarca\(\);/);
 });
 
@@ -159,6 +159,76 @@ test('cabecalho sem o segredo certo nao troca o produto da tela', async () => {
     assert.match(r.corpo, /painel\.js/, `"${valor}" nao deveria valer`);
     assert.doesNotMatch(r.corpo, /<title>Atende Aí<\/title>/);
   }
+});
+
+/*
+ * Ate o endereco proprio existir, o Atende Ai atende embaixo do /atendeai no
+ * dominio do painel. O que se testa aqui e que a mesma pagina serve nos dois
+ * lugares: e o mesmo arquivo, e manter duas versoes seria manter uma delas
+ * desatualizada sem ninguem ver.
+ */
+test('o Atende Ai tambem atende por caminho no dominio do painel', async () => {
+  const semBarra = await pedir('/atendeai', 'captapp.teste');
+  assert.equal(semBarra.status, 302);
+  assert.equal(semBarra.destino, '/atendeai/');
+
+  const pagina = await pedir('/atendeai/', 'captapp.teste');
+  assert.equal(pagina.status, 200);
+  assert.match(pagina.corpo, /<title>Atende Aí<\/title>/);
+
+  for (const arquivo of ['/atendeai/atendeai.js', '/atendeai/favicon.svg']) {
+    const r = await pedir(arquivo, 'captapp.teste');
+    assert.equal(r.status, 200, arquivo);
+  }
+});
+
+test('o painel do Atende Ai abre embaixo do caminho', async () => {
+  const semBarra = await pedir('/atendeai/app', 'captapp.teste');
+  assert.equal(semBarra.status, 302);
+  assert.equal(semBarra.destino, '/atendeai/app/#/atendimento');
+
+  const comBarra = await pedir('/atendeai/app/', 'captapp.teste');
+  assert.equal(comBarra.status, 200);
+  assert.match(comBarra.corpo, /painel\.js/);
+
+  // Rota interna recarregada na mao continua devolvendo o painel.
+  const fundo = await pedir('/atendeai/app/seja-la-o-que-for', 'captapp.teste');
+  assert.equal(fundo.status, 200);
+  assert.match(fundo.corpo, /painel\.js/);
+});
+
+test('a pagina usa endereco relativo, senao ela so serve num lugar', async () => {
+  const pagina = await pedir('/atendeai/', 'captapp.teste');
+  // href="/app" levaria para o painel do Captapp quando a pagina esta
+  // embaixo do /atendeai, e src="/atendeai.js" daria 404 no dominio proprio.
+  assert.doesNotMatch(pagina.corpo, /(href|src)="\/(app|atendeai\.js|favicon\.svg)/);
+  assert.match(pagina.corpo, /href="app"/);
+  assert.match(pagina.corpo, /src="atendeai\.js"/);
+});
+
+test('o painel embaixo do caminho tambem troca a marca', async () => {
+  const js = await pedir('/painel.js', 'captapp.teste');
+  assert.match(js.corpo, /'\/atendeai\/'/);
+});
+
+test('a vitrine carrega a fonte, e o painel continua fechado', async () => {
+  // A pagina de venda usa fonte do Google e precisa da regra mais frouxa da
+  // landing. O painel tem sessao e dado de cliente, e nao afrouxa junto.
+  const pagina = await pedir('/atendeai/', 'captapp.teste');
+  assert.match(pagina.csp, /fonts\.googleapis\.com/);
+
+  for (const caminho of ['/atendeai/app/', '/painel.js', '/']) {
+    const r = await pedir(caminho, 'captapp.teste');
+    assert.doesNotMatch(r.csp, /fonts\.googleapis\.com/, caminho);
+  }
+});
+
+test('o dominio da landing nao serve o Atende Ai', async () => {
+  // Quem chega por capta veio pela propaganda do Captapp. Endereco errado
+  // ali volta para a oferta, como qualquer outro.
+  const r = await pedir('/atendeai/', 'capta.teste');
+  assert.equal(r.status, 302);
+  assert.equal(r.destino, '/');
 });
 
 test('os outros dominios nao mudaram de lado', async () => {

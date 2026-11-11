@@ -87,6 +87,16 @@ Em qualquer um dos dois, a secao 5 continua valendo: backup e a sua parte.
 
 ## 2. Dominio e Cloudflare
 
+> **Confira antes de seguir esta secao.** Em 11/11/2026 a conta do Cloudflare
+> estava sem dominio nenhum, e o dominio e registrado no Registro.br. Ou seja:
+> a zona nao esta no Cloudflare, e o que vale hoje e o CNAME no Registro.br
+> apontando direto para o Railway. Nesse cenario, `CONFIAR_CLOUDFLARE` tem que
+> ficar **vazia** e `PROXY_SALTOS` em **2**. Com `CONFIAR_CLOUDFLARE=1` e sem
+> Cloudflare na frente, qualquer um manda `CF-Connecting-IP` com o IP que
+> quiser e os limites por IP param de valer. Ver secao 9.1.
+>
+> O resto desta secao vale se a zona for para o Cloudflare um dia.
+
 As duas entradas de DNS, no painel do Cloudflare, na zona
 `lojadoecommerce.com.br`:
 
@@ -143,67 +153,84 @@ HTTPS**: um redirecionamento na borda poupa uma viagem ate o servidor.
 
 ## Atende Ai
 
-O modulo de atendimento e vendido separado e tem nome proprio, entao ele tem
-o endereco dele: `atendeai.lojadoecommerce.com.br`. Nao e um segundo servico.
-E o mesmo processo, o mesmo banco e o mesmo deploy, respondendo diferente
-conforme o Host pelo qual o navegador chegou.
+O modulo de atendimento e vendido separado e tem nome proprio. Ele e a mesma
+aplicacao: o mesmo processo, o mesmo banco e o mesmo deploy, mudando so a
+porta de entrada.
 
-- A raiz e a pagina de venda do Atende Ai, em `atendeai/`.
-- `/app` e o painel de sempre, abrindo direto na tela da base.
-- `/termos` e `/privacidade` sao os mesmos arquivos da landing, nao copia.
-- No painel servido em `/app`, a marca no topo e "atende ai" e nao "captapp":
-  quem assina so o modulo nao comprou Captapp e nao deve ler Captapp na tela.
+Sao duas portas, e o codigo atende as duas:
 
-### Por que ele nao entra como Custom Domain
+| Porta | Pagina de venda | Painel |
+|---|---|---|
+| Caminho, **o que vale hoje** | `captapp.lojadoecommerce.com.br/atendeai` | `/atendeai/app` |
+| Dominio proprio, quando existir | `atendeai.lojadoecommerce.com.br` | `/app` |
 
-O plano do Railway aceita dois dominios proprios, e os dois estao ocupados
-pelo `capta` e pelo `captapp`. O botao Custom Domain fica travado no terceiro.
+Em qualquer uma delas o painel abre direto na tela da base, e a marca no topo
+e "atende ai" e nao "captapp": quem assina so o modulo nao comprou Captapp e
+nao deve ler Captapp na tela.
 
-Entao o `atendeai` entra pelo Cloudflare, que troca o Host por um que o
-Railway conhece antes de encostar na origem, e conta por cabecalho de onde o
-visitante veio. O Railway nem fica sabendo do terceiro dominio.
+Os enderecos dentro da pagina de venda sao **relativos** de proposito. E o que
+faz o mesmo arquivo servir nas duas portas sem duas versoes para manter em
+dia, que e como uma delas envelhece sem ninguem ver. Quem mexer na pagina
+precisa manter assim: `href="app"`, e nunca `href="/app"`.
 
-Se um dia o plano subir, basta cadastrar o dominio como Custom Domain: o
-servidor reconhece pelo Host sozinho, e as regras do Cloudflare podem sair
-sem mexer em codigo.
+### Pelo caminho: nao tem o que fazer
 
-### Os passos, uma vez so
+Ja esta no ar com o deploy. Nao ha DNS, variavel nem passo manual.
 
-1. **Railway**, no servico do app, Variables: `MARCA_ATENDEAI` com um segredo
-   longo que voce inventa. Sem ele o cabecalho nao vale nada e o dominio
-   abriria o painel do Captapp.
-2. **Cloudflare**, DNS da zona `lojadoecommerce.com.br`: CNAME `atendeai`
-   apontando para o mesmo alvo do `captapp`, com **proxy ligado** (nuvem
-   laranja). Sem o proxy nao ha regra nenhuma no caminho, e o Railway
-   responde 404.
-3. **Cloudflare**, Rules, **Origin Rules**: se o hostname e
-   `atendeai.lojadoecommerce.com.br`, **Host Header** para
-   `captapp.lojadoecommerce.com.br`. E isto que faz o Railway aceitar.
-4. **Cloudflare**, Rules, **Transform Rules**, aba Modify Request Header: na
-   mesma condicao, **Set static** `X-Capta-Marca` com o valor do passo 1.
-5. Em **SSL/TLS**, confira **Full (strict)**, que ja vale para a zona. O
-   certificado que o Railway apresenta e o do `captapp`, e e o Host que foi
-   mandado, entao bate.
+### Pelo dominio proprio: duas saidas
+
+O plano do Railway aceita dois dominios proprios e os dois estao ocupados pelo
+`capta` e pelo `captapp`. O botao Custom Domain fica travado no terceiro.
+
+**Saida 1, subir o plano do Railway.** Cadastre
+`atendeai.lojadoecommerce.com.br` em Settings, Networking, Custom Domain, e
+crie no Registro.br um CNAME `atendeai` apontando para o alvo que ele devolve.
+O servidor reconhece pelo Host sozinho, sem mexer em codigo.
+
+**Saida 2, Cloudflare na frente.** So vale com a zona delegada para o
+Cloudflare, o que hoje nao e o caso. O Cloudflare troca o Host por um que o
+Railway conhece e conta por cabecalho de onde o visitante veio:
+
+1. No Railway, Variables: `MARCA_ATENDEAI` com um segredo longo.
+2. No Cloudflare, DNS: CNAME `atendeai` para o mesmo alvo do `captapp`, com
+   proxy ligado.
+3. Rules, Origin Rules: se o hostname e `atendeai.lojadoecommerce.com.br`,
+   Host Header para `captapp.lojadoecommerce.com.br`.
+4. Rules, Transform Rules, Modify Request Header: na mesma condicao, Set
+   static `X-Capta-Marca` com o valor do passo 1.
 
 A ordem importa: o passo 4 sem o 3 da 404, e o 3 sem o 4 abre o painel do
-Captapp no endereco do Atende Ai.
-
-### Conferindo
-
-- `https://atendeai.lojadoecommerce.com.br` abre a pagina de venda, e nao a
-  tela de login. Se abrir login, o cabecalho do passo 4 nao chegou ou o
-  segredo nao bate com o do passo 1.
-- `https://atendeai.lojadoecommerce.com.br/app` cai em `/app/#/atendimento`.
-- 404 do Railway no lugar da pagina: o passo 3 nao esta valendo.
+Captapp no endereco do Atende Ai. Sem `MARCA_ATENDEAI` no ambiente o cabecalho
+nao vale nada, que e o que mantem a instalacao de quem nao usa Cloudflare
+igual.
 
 A variavel `HOST_ATENDEAI` muda quais hosts recebem o Atende Ai pelo proprio
-Host, separados por virgula. Sem ela vale `atendeai.lojadoecommerce.com.br`,
-que e o caminho de quando o dominio for cadastrado de verdade no Railway.
+Host, separados por virgula. Sem ela vale `atendeai.lojadoecommerce.com.br`.
 
-O video do topo entra pelo atributo `data-url` do bloco `#video`: cole o
-link de incorporacao do YouTube (`https://www.youtube.com/embed/ID`) ou do
-Vimeo. Enquanto estiver vazio o bloco sai da pagina, porque um play que nao
-toca nada faz o visitante achar que o site esta quebrado.
+### Ligar o modulo numa conta
+
+O menu so aparece para quem tem o modulo, e hoje isso e SQL no Postgres:
+
+```sql
+update contas set modulo_atendimento = true where email = 'o-email-do-cliente';
+select id, nome, email from contas where modulo_atendimento = true;
+```
+
+Depois disso o lojista precisa sair e entrar de novo: o modulo e lido na
+sessao. O `id` da consulta e o que o agente de WhatsApp usa na rota interna.
+
+### O agente de WhatsApp lendo a base
+
+```
+GET /interno/base/<id-da-conta>
+Authorization: Bearer <CHAVE_SERVICO>
+```
+
+Devolve a base em JSON e o `atualizadoEm`. Conta sem o modulo responde 404 e
+chave errada responde 401. O teto e 120 chamadas por minuto. Sem
+`CHAVE_SERVICO` no ambiente a rota recusa tudo, e e de proposito: tratar a
+falta da chave como "sem exigencia" publicaria a base de todos os clientes na
+internet no primeiro deploy sem a variavel.
 
 ## 4. Asaas
 

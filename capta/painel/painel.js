@@ -13,12 +13,14 @@
    * A marca do painel depende da porta de entrada.
    *
    * O modulo de atendimento e vendido com nome proprio, e quem assina so ele
-   * entra por atendeai.lojadoecommerce.com.br/app. Esse lojista nao comprou
-   * Captapp e nao deve ler Captapp no topo da tela. E o mesmo painel; o que
-   * muda e o nome na porta, e o servidor so serve o painel em /app nesse
-   * dominio.
+   * entra pelo Atende Ai: em /atendeai/app enquanto o produto mora dentro do
+   * dominio do painel, e em /app quando ele tiver endereco proprio. Esse
+   * lojista nao comprou Captapp e nao deve ler Captapp no topo da tela. E o
+   * mesmo painel; o que muda e o nome na porta.
    */
-  var MARCA = window.location.pathname.indexOf('/app/') === 0 ? 'atende aí' : 'captapp';
+  var CAMINHO = window.location.pathname;
+  var MARCA = (CAMINHO.indexOf('/app/') === 0 || CAMINHO.indexOf('/atendeai/') === 0)
+    ? 'atende aí' : 'captapp';
 
   function vestirMarca() {
     var marcas = document.querySelectorAll('.marca-grande, .marca');

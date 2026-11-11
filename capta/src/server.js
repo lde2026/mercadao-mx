@@ -240,6 +240,13 @@ function ehAtendeAi(req) {
  * painel afrouxa junto, e e o painel que tem sessao e dado de cliente.
  */
 function ehVitrineAtendeAi(req) {
+  // Pela porta do caminho, a vitrine e tudo embaixo de /atendeai menos o
+  // painel. Os arquivos do painel sao pedidos pela raiz, entao eles nem
+  // passam por aqui.
+  if (req.path === PREFIXO_ATENDEAI || req.path.startsWith(`${PREFIXO_ATENDEAI}/`)) {
+    return !(req.path === `${PREFIXO_ATENDEAI}/app`
+      || req.path.startsWith(`${PREFIXO_ATENDEAI}/app/`));
+  }
   if (!ehAtendeAi(req)) return false;
   return !(req.path === '/app' || req.path.startsWith('/app/')
     || req.path.startsWith('/api/') || req.path === '/painel.js' || req.path === '/painel.css');
@@ -269,6 +276,41 @@ app.use((req, res, proximo) => {
 
   return estaticoAtendeAi(req, res, () => estaticoLanding(req, res, () => res.redirect(302, '/')));
 });
+
+/**
+ * O Atende Ai tambem atende por caminho, e nao so por dominio.
+ *
+ * O plano do Railway nao tem vaga para um terceiro dominio proprio, e a zona
+ * de DNS nao esta num lugar que permita reescrever o Host. Entao, ate o
+ * endereco proprio existir, o produto atende em /atendeai no dominio do
+ * painel. E a mesma pagina e o mesmo painel: muda o lugar, nao o conteudo.
+ *
+ * Por isso os enderecos dentro da pagina sao relativos. O mesmo arquivo serve
+ * na raiz do dominio proprio e embaixo do /atendeai, e nao ha duas versoes
+ * para manter em dia, que e como uma delas envelhece sem ninguem ver.
+ */
+const PREFIXO_ATENDEAI = '/atendeai';
+
+/*
+ * Os dois primeiros sao expressao regular, e nao texto, porque o Express
+ * casa "/atendeai" com "/atendeai/" tambem: com texto, o redirecionamento
+ * que acrescenta a barra cairia nele mesmo, para sempre.
+ *
+ * A barra importa: sem ela o navegador resolve "app" contra a raiz do
+ * dominio e o lojista cai no painel do Captapp.
+ */
+app.get(/^\/atendeai$/, (_req, res) => res.redirect(302, `${PREFIXO_ATENDEAI}/`));
+
+app.get(/^\/atendeai\/app$/, (_req, res) => (
+  res.redirect(302, `${PREFIXO_ATENDEAI}/app/#/atendimento`)
+));
+app.get(/^\/atendeai\/app\//, (_req, res) => (
+  res.sendFile(path.join(PASTA_PAINEL, 'index.html'))
+));
+
+// O painel pede /painel.js e /api pela raiz, e neste dominio e dali mesmo que
+// eles saem: nao ha nada a reescrever.
+app.use(PREFIXO_ATENDEAI, estaticoAtendeAi);
 
 /** Para o Railway e para o monitoramento. Confere o banco, nao so o processo. */
 app.get('/saude', async (_req, res) => {
