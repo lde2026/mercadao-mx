@@ -2217,7 +2217,7 @@
       var lista = el('div', null, 'cartao');
       lista.appendChild(el('div', 'Contas', 'rotulo'));
       lista.appendChild(tabela(
-        ['Conta', 'Plano', 'Leads no mês', 'Total', 'Último lead', 'Lojas', 'Atraso', ''],
+        ['Conta', 'Plano', 'Leads no mês', 'Total', 'Último lead', 'Lojas', 'Atraso', 'Atende Aí', ''],
         contas.map(function (c) {
           var entrar = el('button', 'Entrar como', 'secundario');
           entrar.type = 'button';
@@ -2245,6 +2245,30 @@
               .then(function () { senha.disabled = false; });
           });
 
+          // Modulo vendido a parte. O botao mostra o estado e troca ele, em
+          // vez de abrir o banco para rodar um update na mao.
+          var modulo = el('button', c.modulo_atendimento ? 'Ligado' : 'Desligado', 'secundario');
+          modulo.type = 'button';
+          modulo.style.padding = '6px 10px';
+          if (c.modulo_atendimento) modulo.style.borderColor = 'var(--acento)';
+          modulo.addEventListener('click', function (e) {
+            e.stopPropagation();
+            var ligar = !c.modulo_atendimento;
+            var aviso = ligar
+              ? 'Ligar o Atende Aí para ' + c.nome + '?\n\nEle passa a ver a tela na hora.'
+              : 'Desligar o Atende Aí de ' + c.nome + '?\n\nA tela some na hora. A base fica guardada.';
+            if (!confirm(aviso)) return;
+            modulo.disabled = true;
+            api('/admin/contas/' + c.id + '/modulo', { method: 'POST', corpo: { ligado: ligar } })
+              .then(function (r) {
+                c.modulo_atendimento = r.atendimento;
+                modulo.textContent = r.atendimento ? 'Ligado' : 'Desligado';
+                modulo.style.borderColor = r.atendimento ? 'var(--acento)' : '';
+              })
+              .catch(function (erro) { alert(erro.message); })
+              .then(function () { modulo.disabled = false; });
+          });
+
           var acoesConta = el('div');
           acoesConta.style.display = 'flex';
           acoesConta.style.gap = '6px';
@@ -2260,6 +2284,7 @@
             c.ultimo_lead ? tempoRelativo(c.ultimo_lead) : 'nunca',
             c.conexoes,
             c.diasAtraso ? selo(c.diasAtraso + ' dias', 'falhou') : selo('em dia', 'criado'),
+            modulo,
             acoesConta,
           ] };
         }),

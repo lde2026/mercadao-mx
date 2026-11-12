@@ -1686,6 +1686,19 @@ app.post('/api/admin/contas/:id/senha', exigirOperador, async (req, res) => {
   res.json({ conta: { id: alvo.id, nome: alvo.nome, email: alvo.email }, senhaNova: senha });
 });
 
+/**
+ * O Atende Ai e vendido separado, entao ele precisa de um lugar para ser
+ * ligado. Sem isto a venda de um cliente novo termina num update escrito na
+ * mao dentro do banco de producao.
+ */
+app.post('/api/admin/contas/:id/modulo', exigirOperador, async (req, res) => {
+  const ligado = Boolean((req.body || {}).ligado);
+  const agora = await repo.definirModuloAtendimento(req.params.id, ligado);
+  if (agora === null) return res.status(404).json({ erro: 'conta nao encontrada' });
+  log.info('admin.atendimento', { conta_id: req.params.id, ligado: agora });
+  res.json({ atendimento: agora });
+});
+
 app.post('/api/admin/contas/:id/entrar', exigirOperador, async (req, res) => {
   const alvo = await repo.buscarConta(req.params.id);
   if (!alvo) return res.status(404).json({ erro: 'conta nao encontrada' });

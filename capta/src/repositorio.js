@@ -221,6 +221,27 @@ export async function criarSessao(contaId, duracaoDias = 14, operadorId = null) 
   return id;
 }
 
+/**
+ * Liga e desliga o Atende Ai numa conta.
+ *
+ * Nao e campo de assinatura, e a chave do modulo: o Atende Ai e vendido a
+ * parte e so existe para quem assinou. Antes disso, vender para um cliente
+ * novo era abrir o banco e rodar um update na mao, que e exatamente o passo
+ * que ninguem lembra de desfazer quando o cliente cancela.
+ *
+ * Nao derruba sessao nenhuma de proposito: buscarSessao le este campo do
+ * banco a cada requisicao, entao ligar e desligar valem na hora.
+ */
+export async function definirModuloAtendimento(contaId, ligado) {
+  const { rows } = await consultar(
+    `update contas set modulo_atendimento = $2, atualizado_em = now()
+      where id = $1
+      returning modulo_atendimento`,
+    [contaId, Boolean(ligado)],
+  );
+  return rows.length ? rows[0].modulo_atendimento : null;
+}
+
 export async function buscarSessao(id) {
   if (!id) return null;
   const { rows } = await consultar(
@@ -897,7 +918,7 @@ export async function resumoGeral() {
 
 export async function listarContas() {
   const { rows } = await consultar(
-    `select c.id, c.nome, c.email, c.criado_em,
+    `select c.id, c.nome, c.email, c.criado_em, c.modulo_atendimento,
             a.plano, a.ciclo, a.origem,
             (select count(*)::int from leads l where l.conta_id = c.id
                and l.criado_em >= date_trunc('month', now())) as leads_mes,

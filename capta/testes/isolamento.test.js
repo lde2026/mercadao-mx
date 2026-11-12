@@ -225,12 +225,56 @@ test('o endpoint publico corta por limite de requisicoes', async () => {
 test('lojista comum nao alcanca as rotas do operador', async () => {
   for (const [caminho, metodo] of [['/api/admin/resumo', 'GET'], ['/api/admin/contas', 'GET'],
     ['/api/admin/rede', 'GET'], [`/api/admin/contas/${contaA.id}/entrar`, 'POST'],
-    [`/api/admin/contas/${contaA.id}/senha`, 'POST']]) {
+    [`/api/admin/contas/${contaA.id}/senha`, 'POST'],
+    [`/api/admin/contas/${contaA.id}/modulo`, 'POST']]) {
     const r = await pedir(caminho, { metodo, cookie: contaB.cookie });
     assert.equal(r.status, 403, `${metodo} ${caminho} tinha que ser 403 para lojista`);
   }
   const eu = await pedir('/api/eu', { cookie: contaB.cookie });
   assert.equal(eu.json.conta.operador, false);
+});
+
+/*
+ * O Atende Ai e vendido a parte, e ligar um modulo pago e exatamente o tipo
+ * de poder que nao pode vazar para quem nao e operador. A prova acima ja
+ * cobre quem nao alcanca; esta cobre o que acontece quando quem pode liga.
+ */
+test('o operador liga e desliga o Atende Ai, e a conta sente na hora', async () => {
+  const antes = await pedir('/api/eu', { cookie: contaA.cookie });
+  assert.equal(antes.json.modulos.atendimento, false);
+  const fechado = await pedir('/api/atendimento', { cookie: contaA.cookie });
+  assert.equal(fechado.status, 404, 'sem o modulo a rota nem admite existir');
+
+  const ligou = await pedir(`/api/admin/contas/${contaA.id}/modulo`, {
+    metodo: 'POST', cookie: operador.cookie, corpo: { ligado: true },
+  });
+  assert.equal(ligou.status, 200);
+  assert.equal(ligou.json.atendimento, true);
+
+  // Sem relogin: a sessao le o modulo do banco a cada requisicao, entao o
+  // lojista que estava com o painel aberto passa a ver a tela.
+  const depois = await pedir('/api/eu', { cookie: contaA.cookie });
+  assert.equal(depois.json.modulos.atendimento, true);
+  const aberto = await pedir('/api/atendimento', { cookie: contaA.cookie });
+  assert.equal(aberto.status, 200);
+
+  const desligou = await pedir(`/api/admin/contas/${contaA.id}/modulo`, {
+    metodo: 'POST', cookie: operador.cookie, corpo: { ligado: false },
+  });
+  assert.equal(desligou.json.atendimento, false);
+  const trancado = await pedir('/api/atendimento', { cookie: contaA.cookie });
+  assert.equal(trancado.status, 404);
+
+  // E a vizinha nao foi junto em nenhum dos dois sentidos.
+  const vizinha = await pedir('/api/eu', { cookie: contaB.cookie });
+  assert.equal(vizinha.json.modulos.atendimento, false);
+});
+
+test('ligar modulo de conta que nao existe nao inventa conta', async () => {
+  const r = await pedir('/api/admin/contas/00000000-0000-0000-0000-000000000000/modulo', {
+    metodo: 'POST', cookie: operador.cookie, corpo: { ligado: true },
+  });
+  assert.equal(r.status, 404);
 });
 
 test('o operador ve o Captapp inteiro e entra na conta de um cliente', async () => {
