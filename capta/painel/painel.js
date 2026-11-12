@@ -2327,12 +2327,35 @@
 
   function desenharAtendimento(corpo) {
     corpo.textContent = '';
+    corpo.appendChild(consumoDoMes());
     corpo.appendChild(historicoDeVersoes(corpo));
 
     var colunas = el('div', null, 'atendimento');
     colunas.appendChild(formularioDaBase(corpo));
     colunas.appendChild(chatDoAssistente(corpo));
     corpo.appendChild(colunas);
+  }
+
+  /*
+   * Quantas mensagens o atendimento mandou no mes.
+   *
+   * Quem conta e o agente, que roda fora do Capta. Enquanto ele nao reportar,
+   * o numero e zero, e dizer "0 mensagens" seria mentir por omissao: parece
+   * atendimento parado quando na verdade e medidor desligado. Por isso o
+   * texto muda em vez do numero.
+   */
+  function consumoDoMes() {
+    var caixa = el('div', null, 'consumo');
+    var n = (atendimento.consumo && atendimento.consumo.enviadas) || 0;
+
+    if (!atendimento.consumo || !atendimento.consumo.atualizadoEm) {
+      caixa.appendChild(el('span', 'Ainda não recebi contagem do atendimento este mês.', 'hora'));
+      return caixa;
+    }
+    caixa.appendChild(el('strong', String(n)));
+    caixa.appendChild(el('span', n === 1 ? 'mensagem enviada este mês' : 'mensagens enviadas este mês', 'hora'));
+    caixa.appendChild(el('span', 'última em ' + quando(atendimento.consumo.atualizadoEm), 'hora'));
+    return caixa;
   }
 
   /*

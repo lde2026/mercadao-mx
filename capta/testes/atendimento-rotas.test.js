@@ -191,6 +191,101 @@ test('sem CHAVE_SERVICO no ambiente a rota recusa tudo', async () => {
   }
 });
 
+/*
+ * O medidor.
+ *
+ * Quem conta e o agente, que fala com o cliente final e roda fora do Capta.
+ * Entao a rota de contagem carrega a mesma responsabilidade da que entrega a
+ * base: um id na URL e uma chave de servico decidindo de quem e o numero.
+ * Contagem que cai na conta errada vira fatura errada.
+ */
+test('o agente conta as mensagens pela rota interna', async () => {
+  const chave = { Authorization: `Bearer ${process.env.CHAVE_SERVICO}` };
+
+  const vazio = await pedir('/api/atendimento', { cookie: contaA.cookie });
+  assert.equal(vazio.json.consumo.enviadas, 0);
+  assert.equal(vazio.json.consumo.atualizadoEm, null, 'sem contagem o painel sabe que e silencio');
+
+  const uma = await pedir(`/interno/base/${contaA.id}/consumo`, {
+    metodo: 'POST', cabecalhos: chave, corpo: { enviadas: 1 },
+  });
+  assert.equal(uma.status, 200);
+  assert.equal(uma.json.enviadas, 1);
+
+  // Lote, porque chamada por mensagem numa instalacao com dezenas de lojas
+  // vira transito que nao precisa existir.
+  const lote = await pedir(`/interno/base/${contaA.id}/consumo`, {
+    metodo: 'POST', cabecalhos: chave, corpo: { enviadas: 40 },
+  });
+  assert.equal(lote.json.enviadas, 41, 'soma, nao substitui');
+
+  const tela = await pedir('/api/atendimento', { cookie: contaA.cookie });
+  assert.equal(tela.json.consumo.enviadas, 41);
+  assert.ok(tela.json.consumo.atualizadoEm, 'agora o painel tem o que mostrar');
+});
+
+test('a contagem de uma conta nao encosta na outra', async () => {
+  const chave = { Authorization: `Bearer ${process.env.CHAVE_SERVICO}` };
+  await pedir(`/interno/base/${contaB.id}/consumo`, {
+    metodo: 'POST', cabecalhos: chave, corpo: { enviadas: 7 },
+  });
+
+  const b = await pedir('/api/atendimento', { cookie: contaB.cookie });
+  assert.equal(b.json.consumo.enviadas, 7);
+
+  const a = await pedir('/api/atendimento', { cookie: contaA.cookie });
+  assert.equal(a.json.consumo.enviadas, 41, 'a conta A nao mexeu');
+});
+
+test('contar exige a chave de servico, e o lojista nao conta por si', async () => {
+  const semChave = await pedir(`/interno/base/${contaA.id}/consumo`, {
+    metodo: 'POST', corpo: { enviadas: 100 },
+  });
+  assert.equal(semChave.status, 401);
+
+  const chaveErrada = await pedir(`/interno/base/${contaA.id}/consumo`, {
+    metodo: 'POST', cabecalhos: { Authorization: 'Bearer chave-que-nao-e-a-nossa' },
+    corpo: { enviadas: 100 },
+  });
+  assert.equal(chaveErrada.status, 401);
+
+  // O cookie do dono da conta tambem nao serve: a rota e de servico, e
+  // deixar o lojista mexer no proprio medidor e deixar ele escolher a fatura.
+  const comCookie = await pedir(`/interno/base/${contaA.id}/consumo`, {
+    metodo: 'POST', cookie: contaA.cookie, corpo: { enviadas: 100 },
+  });
+  assert.equal(comCookie.status, 401);
+
+  const tela = await pedir('/api/atendimento', { cookie: contaA.cookie });
+  assert.equal(tela.json.consumo.enviadas, 41, 'nenhuma das tres contou');
+});
+
+test('conta sem o modulo nao acumula consumo', async () => {
+  const r = await pedir(`/interno/base/${semModulo.id}/consumo`, {
+    metodo: 'POST', cabecalhos: { Authorization: `Bearer ${process.env.CHAVE_SERVICO}` },
+    corpo: { enviadas: 3 },
+  });
+  assert.equal(r.status, 404);
+});
+
+test('lote fora do limite e aparado, nao recusado', async () => {
+  const chave = { Authorization: `Bearer ${process.env.CHAVE_SERVICO}` };
+  const antes = (await pedir('/api/atendimento', { cookie: contaB.cookie })).json.consumo.enviadas;
+
+  // Agente com defeito mandando um numero absurdo nao pode inflar a fatura
+  // nem derrubar a rota: entra o teto.
+  const r = await pedir(`/interno/base/${contaB.id}/consumo`, {
+    metodo: 'POST', cabecalhos: chave, corpo: { enviadas: 999999 },
+  });
+  assert.equal(r.status, 200);
+  assert.equal(r.json.enviadas, antes + 500);
+
+  const zero = await pedir(`/interno/base/${contaB.id}/consumo`, {
+    metodo: 'POST', cabecalhos: chave, corpo: { enviadas: 0 },
+  });
+  assert.equal(zero.json.enviadas, antes + 501, 'sem numero, conta uma');
+});
+
 test.after(async () => {
   servidor.close();
   await pool.end();

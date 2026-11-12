@@ -352,3 +352,44 @@ export async function descartar(contaId, mensagemId) {
   );
   return rowCount > 0;
 }
+
+/* ------------------------------------------------------------- o medidor ---
+ *
+ * Quem conta e o agente, porque e ele que fala com o cliente final: o Capta
+ * guarda a base e nao ve a conversa. A cada resposta enviada ele soma aqui, e
+ * o lojista passa a ver no painel quanto usou no mes.
+ *
+ * A competencia sai do banco, com date_trunc, e nao do relogio do servidor
+ * que chamou: fuso diferente na virada do mes jogaria mensagem de marco
+ * dentro de fevereiro, e a fatura sairia errada uma vez por mes, sempre.
+ *
+ * Nao ha protecao contra contar duas vezes, e e escolha. O numero decide em
+ * que faixa a conta esta, nao o valor de cada mensagem, e uma reentrega do
+ * agente nao muda de faixa ninguem. No dia em que a cobranca for por mensagem
+ * excedente, entra chave de idempotencia; hoje seria tabela a mais para um
+ * problema que nao existe.
+ */
+
+export async function somarConsumo(contaId, enviadas = 1) {
+  const n = Math.min(Math.max(Math.trunc(Number(enviadas) || 0), 1), 500);
+  const { rows } = await consultar(
+    `insert into consumo_atendimento (conta_id, competencia, enviadas)
+     values ($1, date_trunc('month', now())::date, $2)
+     on conflict (conta_id, competencia)
+       do update set enviadas = consumo_atendimento.enviadas + excluded.enviadas,
+                     atualizado_em = now()
+     returning enviadas, competencia`,
+    [contaId, n],
+  );
+  return rows[0];
+}
+
+export async function consumoDoMes(contaId) {
+  const { rows } = await consultar(
+    `select enviadas, competencia, atualizado_em
+       from consumo_atendimento
+      where conta_id = $1 and competencia = date_trunc('month', now())::date`,
+    [contaId],
+  );
+  return rows[0] || { enviadas: 0, competencia: null, atualizado_em: null };
+}

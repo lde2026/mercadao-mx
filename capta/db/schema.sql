@@ -456,3 +456,17 @@ create index if not exists base_mensagens_conta_idx on base_mensagens(conta_id, 
 -- Quem enxerga o modulo. Desligado por padrao: o atendimento e vendido a
 -- parte, e modulo vazio na barra de quem nao assina vira chamado de suporte.
 alter table contas add column if not exists modulo_atendimento boolean not null default false;
+
+-- O medidor do Atende Ai.
+--
+-- Uma linha por conta e por mes, e nao uma linha por mensagem: o que a fatura
+-- precisa saber e quantas o agente mandou na competencia, nao quais. Guardar
+-- cada mensagem seria guardar conversa de cliente final dentro do Capta sem
+-- precisar, e isso e dado pessoal que nao e nosso.
+create table if not exists consumo_atendimento (
+  conta_id uuid not null references contas(id) on delete cascade,
+  competencia date not null,
+  enviadas integer not null default 0,
+  atualizado_em timestamptz not null default now(),
+  primary key (conta_id, competencia)
+);

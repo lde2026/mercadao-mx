@@ -665,6 +665,36 @@ app.get('/interno/base/:contaId', limitarPor('base-interna', 60, 120), async (re
   });
 });
 
+/**
+ * O agente conta aqui quantas mensagens mandou.
+ *
+ * Mesma porta e mesma chave da rota que entrega a base: para o agente e uma
+ * integracao so. Aceita lote em "enviadas" porque chamada por mensagem, numa
+ * instalacao com dezenas de lojas, vira transito que nao precisa existir.
+ *
+ * O teto por minuto e alto de proposito: aqui todos os agentes das lojas
+ * chegam pelo mesmo endereco, entao apertar isto seria apertar o cliente
+ * grande por causa do vizinho.
+ */
+app.post('/interno/base/:contaId/consumo', limitarPor('consumo-interno', 60, 1200), async (req, res) => {
+  const esperada = process.env.CHAVE_SERVICO;
+  const cabecalho = String(req.headers.authorization || '');
+  const oferecida = cabecalho.startsWith('Bearer ') ? cabecalho.slice(7) : '';
+
+  if (!esperada || !oferecida || !compararConstante(oferecida, esperada)) {
+    log.aviso('consumo.negado', { conta_id: req.params.contaId });
+    return res.status(401).json({ erro: 'nao autorizado' });
+  }
+
+  const conta = await repo.buscarConta(req.params.contaId);
+  if (!conta || !conta.modulo_atendimento) return res.status(404).json({ erro: 'nao encontrada' });
+
+  const marca = await atendimento.somarConsumo(conta.id, (req.body || {}).enviadas);
+  res.set('Cache-Control', 'no-store').json({
+    competencia: marca.competencia, enviadas: marca.enviadas,
+  });
+});
+
 app.use(carregarConta);
 
 /** Sem teto, o login e forca bruta livre. Dez por minuto por IP e folgado para gente e apertado para robo. */
@@ -830,10 +860,11 @@ function mensagemParaTela(m) {
 }
 
 app.get('/api/atendimento', exigirAtendimento, async (req, res) => {
-  const [linha, historico, conversa] = await Promise.all([
+  const [linha, historico, conversa, consumo] = await Promise.all([
     atendimento.base(req.conta.id),
     atendimento.versoes(req.conta.id),
     atendimento.mensagens(req.conta.id),
+    atendimento.consumoDoMes(req.conta.id),
   ]);
   res.json({
     base: atendimento.conteudo(linha),
@@ -844,6 +875,7 @@ app.get('/api/atendimento', exigirAtendimento, async (req, res) => {
     campos: atendimento.CAMPOS,
     estruturados: atendimento.ESTRUTURADOS,
     conversa: conversa.map(mensagemParaTela),
+    consumo: { enviadas: consumo.enviadas, atualizadoEm: consumo.atualizado_em },
     assistente: temAssistente(),
   });
 });
