@@ -30,6 +30,7 @@ import {
   exigirAtendimento, montarCookie, limparCookie,
 } from './auth.js';
 import * as atendimento from './atendimento.js';
+import * as atendeai from './billing/atendeai.js';
 import { interpretar, temAssistente } from './atendente.js';
 import { acharLink, lerPagina } from './pagina.js';
 import { compararConstante } from './cripto.js';
@@ -875,7 +876,11 @@ app.get('/api/atendimento', exigirAtendimento, async (req, res) => {
     campos: atendimento.CAMPOS,
     estruturados: atendimento.ESTRUTURADOS,
     conversa: conversa.map(mensagemParaTela),
-    consumo: { enviadas: consumo.enviadas, atualizadoEm: consumo.atualizado_em },
+    consumo: {
+      enviadas: consumo.enviadas,
+      atualizadoEm: consumo.atualizado_em,
+      ...atendeai.situacao(consumo.enviadas, req.conta.faixaAtendimento),
+    },
     assistente: temAssistente(),
   });
 });
@@ -1724,11 +1729,22 @@ app.post('/api/admin/contas/:id/senha', exigirOperador, async (req, res) => {
  * mao dentro do banco de producao.
  */
 app.post('/api/admin/contas/:id/modulo', exigirOperador, async (req, res) => {
-  const ligado = Boolean((req.body || {}).ligado);
-  const agora = await repo.definirModuloAtendimento(req.params.id, ligado);
+  const corpo = req.body || {};
+  const ligado = Boolean(corpo.ligado);
+  // Faixa invalida nao vira faixa de entrada no automatico: cair no plano
+  // barato por erro de digitacao e dinheiro que ninguem percebe faltando.
+  const pedida = corpo.faixa == null ? null : String(corpo.faixa);
+  if (pedida !== null && !atendeai.ehFaixa(pedida)) {
+    return res.status(400).json({ erro: 'faixa que nao existe' });
+  }
+  const agora = await repo.definirModuloAtendimento(
+    req.params.id, ligado, pedida, atendeai.FAIXA_DE_ENTRADA,
+  );
   if (agora === null) return res.status(404).json({ erro: 'conta nao encontrada' });
-  log.info('admin.atendimento', { conta_id: req.params.id, ligado: agora });
-  res.json({ atendimento: agora });
+  log.info('admin.atendimento', {
+    conta_id: req.params.id, ligado: agora.modulo_atendimento, faixa: agora.faixa_atendimento,
+  });
+  res.json({ atendimento: agora.modulo_atendimento, faixa: agora.faixa_atendimento });
 });
 
 app.post('/api/admin/contas/:id/entrar', exigirOperador, async (req, res) => {

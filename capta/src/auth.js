@@ -65,6 +65,7 @@ export async function carregarConta(req, _res, proximo) {
         // requisicao: assim nenhuma rota precisa de uma segunda ida ao banco
         // so para descobrir se a conta pode entrar ali.
         moduloAtendimento: Boolean(sessao.modulo_atendimento),
+        faixaAtendimento: sessao.faixa_atendimento || null,
       };
       req.sessaoId = sessaoId;
       // Sessao de personificacao: quem investiga o log depois precisa saber

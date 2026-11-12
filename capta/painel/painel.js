@@ -2262,12 +2262,49 @@
             api('/admin/contas/' + c.id + '/modulo', { method: 'POST', corpo: { ligado: ligar } })
               .then(function (r) {
                 c.modulo_atendimento = r.atendimento;
+                c.faixa_atendimento = r.faixa;
                 modulo.textContent = r.atendimento ? 'Ligado' : 'Desligado';
                 modulo.style.borderColor = r.atendimento ? 'var(--acento)' : '';
+                faixa.hidden = !r.atendimento;
+                if (r.faixa) faixa.value = r.faixa;
               })
               .catch(function (erro) { alert(erro.message); })
               .then(function () { modulo.disabled = false; });
           });
+
+          // A faixa so faz sentido com o modulo ligado, entao ela aparece
+          // junto e some junto.
+          var faixa = el('select');
+          faixa.style.width = 'auto';
+          faixa.style.margin = '0';
+          faixa.style.padding = '5px 26px 5px 9px';
+          faixa.style.fontSize = '12.5px';
+          [['essencial', 'Essencial'], ['crescimento', 'Crescimento'], ['escala', 'Escala']]
+            .forEach(function (par) {
+              var op = el('option', par[1]);
+              op.value = par[0];
+              faixa.appendChild(op);
+            });
+          faixa.value = c.faixa_atendimento || 'essencial';
+          faixa.hidden = !c.modulo_atendimento;
+          faixa.addEventListener('click', function (e) { e.stopPropagation(); });
+          faixa.addEventListener('change', function () {
+            faixa.disabled = true;
+            api('/admin/contas/' + c.id + '/modulo', {
+              method: 'POST', corpo: { ligado: true, faixa: faixa.value },
+            })
+              .then(function (r) { c.faixa_atendimento = r.faixa; })
+              .catch(function (erro) { alert(erro.message); faixa.value = c.faixa_atendimento; })
+              .then(function () { faixa.disabled = false; });
+          });
+
+          var celulaModulo = el('div');
+          celulaModulo.style.display = 'flex';
+          celulaModulo.style.gap = '6px';
+          celulaModulo.style.alignItems = 'center';
+
+          celulaModulo.appendChild(modulo);
+          celulaModulo.appendChild(faixa);
 
           var acoesConta = el('div');
           acoesConta.style.display = 'flex';
@@ -2284,7 +2321,7 @@
             c.ultimo_lead ? tempoRelativo(c.ultimo_lead) : 'nunca',
             c.conexoes,
             c.diasAtraso ? selo(c.diasAtraso + ' dias', 'falhou') : selo('em dia', 'criado'),
-            modulo,
+            celulaModulo,
             acoesConta,
           ] };
         }),
@@ -2346,15 +2383,34 @@
    */
   function consumoDoMes() {
     var caixa = el('div', null, 'consumo');
-    var n = (atendimento.consumo && atendimento.consumo.enviadas) || 0;
+    var c = atendimento.consumo || {};
 
-    if (!atendimento.consumo || !atendimento.consumo.atualizadoEm) {
+    if (!c.atualizadoEm) {
       caixa.appendChild(el('span', 'Ainda não recebi contagem do atendimento este mês.', 'hora'));
       return caixa;
     }
-    caixa.appendChild(el('strong', String(n)));
-    caixa.appendChild(el('span', n === 1 ? 'mensagem enviada este mês' : 'mensagens enviadas este mês', 'hora'));
-    caixa.appendChild(el('span', 'última em ' + quando(atendimento.consumo.atualizadoEm), 'hora'));
+
+    var topo = el('div', null, 'topo');
+    topo.appendChild(el('strong', c.enviadas.toLocaleString('pt-BR')));
+    topo.appendChild(el('span', 'de ' + c.incluidas.toLocaleString('pt-BR')
+      + ' mensagens no plano ' + c.nome, 'hora'));
+    caixa.appendChild(topo);
+
+    var barra = el('div', null, 'medidor' + (c.avisar ? ' cheio' : ''));
+    var dentro = el('span');
+    dentro.style.width = Math.min(100, Math.round((c.fatia || 0) * 100)) + '%';
+    barra.appendChild(dentro);
+    caixa.appendChild(barra);
+
+    // O excedente aparece em reais, e nao so em contagem: o lojista precisa
+    // ver o que ja entrou na fatura dele, nao descobrir no mes seguinte.
+    if (c.excedente && c.excedente.mensagens) {
+      caixa.appendChild(el('span', c.excedente.mensagens.toLocaleString('pt-BR')
+        + ' acima do plano, ' + dinheiro(c.excedente.valor) + ' no mês', 'hora'));
+    } else if (c.avisar) {
+      caixa.appendChild(el('span', 'Faltam ' + c.sobrando.toLocaleString('pt-BR')
+        + ' para o limite do plano.', 'hora'));
+    }
     return caixa;
   }
 

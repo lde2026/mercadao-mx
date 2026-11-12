@@ -232,20 +232,30 @@ export async function criarSessao(contaId, duracaoDias = 14, operadorId = null) 
  * Nao derruba sessao nenhuma de proposito: buscarSessao le este campo do
  * banco a cada requisicao, entao ligar e desligar valem na hora.
  */
-export async function definirModuloAtendimento(contaId, ligado) {
+export async function definirModuloAtendimento(contaId, ligado, faixa = null, padrao = null) {
+  // A ordem do coalesce e a regra: vale a faixa pedida; sem pedido, a que a
+  // conta ja tem; e so quem nunca teve nenhuma cai na padrao. Religar uma
+  // conta sem dizer a faixa nao pode rebaixar quem ja estava num plano maior,
+  // que e receita sumindo sem ninguem ver.
   const { rows } = await consultar(
-    `update contas set modulo_atendimento = $2, atualizado_em = now()
+    `update contas
+        set modulo_atendimento = $2,
+            faixa_atendimento = case
+              when $2 then coalesce($3, faixa_atendimento, $4)
+              else faixa_atendimento end,
+            atualizado_em = now()
       where id = $1
-      returning modulo_atendimento`,
-    [contaId, Boolean(ligado)],
+      returning modulo_atendimento, faixa_atendimento`,
+    [contaId, Boolean(ligado), faixa, padrao],
   );
-  return rows.length ? rows[0].modulo_atendimento : null;
+  return rows.length ? rows[0] : null;
 }
 
 export async function buscarSessao(id) {
   if (!id) return null;
   const { rows } = await consultar(
-    `select s.conta_id, s.operador_id, c.nome, c.email, c.teste_ate, c.modulo_atendimento
+    `select s.conta_id, s.operador_id, c.nome, c.email, c.teste_ate,
+            c.modulo_atendimento, c.faixa_atendimento
        from sessoes s join contas c on c.id = s.conta_id
       where s.id = $1 and s.expira_em > now()`,
     [id],
@@ -918,7 +928,7 @@ export async function resumoGeral() {
 
 export async function listarContas() {
   const { rows } = await consultar(
-    `select c.id, c.nome, c.email, c.criado_em, c.modulo_atendimento,
+    `select c.id, c.nome, c.email, c.criado_em, c.modulo_atendimento, c.faixa_atendimento,
             a.plano, a.ciclo, a.origem,
             (select count(*)::int from leads l where l.conta_id = c.id
                and l.criado_em >= date_trunc('month', now())) as leads_mes,

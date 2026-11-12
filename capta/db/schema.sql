@@ -456,6 +456,7 @@ create index if not exists base_mensagens_conta_idx on base_mensagens(conta_id, 
 -- Quem enxerga o modulo. Desligado por padrao: o atendimento e vendido a
 -- parte, e modulo vazio na barra de quem nao assina vira chamado de suporte.
 alter table contas add column if not exists modulo_atendimento boolean not null default false;
+alter table contas add column if not exists faixa_atendimento text;
 
 -- O medidor do Atende Ai.
 --

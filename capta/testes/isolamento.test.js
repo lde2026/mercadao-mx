@@ -250,6 +250,7 @@ test('o operador liga e desliga o Atende Ai, e a conta sente na hora', async () 
   });
   assert.equal(ligou.status, 200);
   assert.equal(ligou.json.atendimento, true);
+  assert.equal(ligou.json.faixa, 'essencial', 'liga na faixa de entrada');
 
   // Sem relogin: a sessao le o modulo do banco a cada requisicao, entao o
   // lojista que estava com o painel aberto passa a ver a tela.
@@ -268,6 +269,29 @@ test('o operador liga e desliga o Atende Ai, e a conta sente na hora', async () 
   // E a vizinha nao foi junto em nenhum dos dois sentidos.
   const vizinha = await pedir('/api/eu', { cookie: contaB.cookie });
   assert.equal(vizinha.json.modulos.atendimento, false);
+});
+
+test('a faixa do Atende Ai e escolhida, e faixa inventada nao passa', async () => {
+  const subiu = await pedir(`/api/admin/contas/${contaB.id}/modulo`, {
+    metodo: 'POST', cookie: operador.cookie, corpo: { ligado: true, faixa: 'escala' },
+  });
+  assert.equal(subiu.json.faixa, 'escala');
+
+  // Faixa torta nao vira faixa de entrada no automatico: cair no plano barato
+  // por erro de digitacao e dinheiro que ninguem percebe faltando.
+  const torta = await pedir(`/api/admin/contas/${contaB.id}/modulo`, {
+    metodo: 'POST', cookie: operador.cookie, corpo: { ligado: true, faixa: 'premium' },
+  });
+  assert.equal(torta.status, 400);
+
+  const ainda = await pedir(`/api/admin/contas/${contaB.id}/modulo`, {
+    metodo: 'POST', cookie: operador.cookie, corpo: { ligado: true },
+  });
+  assert.equal(ainda.json.faixa, 'escala', 'ligar de novo nao rebaixa quem ja tem faixa');
+
+  const tela = await pedir('/api/atendimento', { cookie: contaB.cookie });
+  assert.equal(tela.json.consumo.incluidas, 8000);
+  assert.equal(tela.json.consumo.nome, 'Escala');
 });
 
 test('ligar modulo de conta que nao existe nao inventa conta', async () => {

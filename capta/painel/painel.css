@@ -515,6 +515,13 @@ pre{background:var(--escuro);color:var(--superficie);padding:13px;border-radius:
 
 /* O medidor do mes. Linha discreta acima do historico: e informacao de
    acompanhamento, nao o assunto da tela. */
-.consumo{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.consumo{display:grid;gap:7px;justify-items:start;margin-bottom:16px}
 .consumo strong{font-size:19px;font-weight:600;color:var(--tinta)}
 .consumo .hora{margin:0}
+.consumo .topo{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+/* Nome proprio e nao .barra: a barra do topo do painel ja usa esse nome, com
+   padding lateral, e heranca de padding aqui corta as pontas do medidor. */
+.medidor{display:block;width:100%;max-width:320px;height:6px;padding:0;border-radius:999px;
+  background:var(--linha);overflow:hidden}
+.medidor span{display:block;height:100%;background:var(--acento)}
+.medidor.cheio span{background:var(--ruim)}
