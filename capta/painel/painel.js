@@ -2266,6 +2266,7 @@
                 modulo.textContent = r.atendimento ? 'Ligado' : 'Desligado';
                 modulo.style.borderColor = r.atendimento ? 'var(--acento)' : '';
                 faixa.hidden = !r.atendimento;
+                numero.hidden = !r.atendimento;
                 if (r.faixa) faixa.value = r.faixa;
               })
               .catch(function (erro) { alert(erro.message); })
@@ -2302,9 +2303,39 @@
           celulaModulo.style.display = 'flex';
           celulaModulo.style.gap = '6px';
           celulaModulo.style.alignItems = 'center';
+          celulaModulo.style.flexWrap = 'wrap';
+
+          // O numero decide de quem e a conversa que chega, entao ele fica
+          // aqui, junto da chave do modulo, e nao na tela do lojista.
+          var numero = el('input');
+          numero.type = 'text';
+          numero.placeholder = 'WhatsApp, com DDD';
+          numero.value = c.numero_atendimento || '';
+          numero.style.width = '150px';
+          numero.style.margin = '0';
+          numero.style.padding = '5px 9px';
+          numero.style.fontSize = '12.5px';
+          numero.hidden = !c.modulo_atendimento;
+          numero.addEventListener('click', function (e) { e.stopPropagation(); });
+          numero.addEventListener('change', function () {
+            numero.disabled = true;
+            api('/admin/contas/' + c.id + '/numero', {
+              method: 'POST', corpo: { numero: numero.value },
+            })
+              .then(function (r) {
+                c.numero_atendimento = r.numero;
+                numero.value = r.numero || '';
+              })
+              .catch(function (erro) {
+                alert(erro.dados && erro.dados.explicacao ? erro.dados.explicacao : erro.message);
+                numero.value = c.numero_atendimento || '';
+              })
+              .then(function () { numero.disabled = false; });
+          });
 
           celulaModulo.appendChild(modulo);
           celulaModulo.appendChild(faixa);
+          celulaModulo.appendChild(numero);
 
           var acoesConta = el('div');
           acoesConta.style.display = 'flex';
@@ -2364,6 +2395,8 @@
 
   function desenharAtendimento(corpo) {
     corpo.textContent = '';
+    var falta = prontidao();
+    if (falta) corpo.appendChild(falta);
     corpo.appendChild(consumoDoMes());
     corpo.appendChild(historicoDeVersoes(corpo));
 
@@ -2381,6 +2414,54 @@
    * atendimento parado quando na verdade e medidor desligado. Por isso o
    * texto muda em vez do numero.
    */
+  /** 5541999998888 vira +55 41 99999-8888, que e como ele reconhece o proprio numero. */
+  function numeroBonito(cru) {
+    var d = String(cru || '').replace(/\D/g, '');
+    if (d.length < 12) return cru;
+    var pais = d.slice(0, d.length - 11);
+    var ddd = d.slice(-11, -9);
+    var meio = d.slice(-9, -4);
+    return '+' + pais + ' ' + ddd + ' ' + meio + '-' + d.slice(-4);
+  }
+
+  /*
+   * O que ainda falta para o atendimento entrar no ar.
+   *
+   * Some quando estiver tudo de pe, de proposito: lista de pendencia que
+   * nunca zera vira enfeite e para de ser lida. E cada linha diz de quem e a
+   * pendencia, porque conectar o numero nao e tarefa do lojista e cobrar
+   * dele uma coisa que ele nao pode fazer e o jeito rapido de perder a
+   * confianca na tela.
+   */
+  function prontidao() {
+    var p = atendimento.prontidao || {};
+    var itens = [
+      { ok: Boolean(p.numero), texto: p.numero
+        ? 'Número conectado: ' + numeroBonito(p.numero)
+        : 'O número de WhatsApp ainda não está conectado. Quem faz isso somos nós, na ativação.' },
+      { ok: Boolean(p.base), texto: p.base
+        ? 'Base preenchida'
+        : 'Falta o básico da base: nome da loja, prazo de entrega, pagamento e troca.' },
+      { ok: Boolean(p.atendendo), texto: p.atendendo
+        ? 'O atendimento já está respondendo'
+        : 'O atendimento ainda não respondeu ninguém por aqui.' },
+    ];
+    var pronto = itens.every(function (i) { return i.ok; });
+    if (pronto) return null;
+
+    var caixa = el('div', null, 'prontidao');
+    caixa.appendChild(el('div', 'Para entrar no ar', 'rotulo'));
+    var lista = el('ul');
+    itens.forEach(function (i) {
+      var li = el('li', null, i.ok ? 'feito' : 'falta');
+      li.appendChild(el('span', i.ok ? '✓' : '•', 'marca'));
+      li.appendChild(el('span', i.texto));
+      lista.appendChild(li);
+    });
+    caixa.appendChild(lista);
+    return caixa;
+  }
+
   function consumoDoMes() {
     var caixa = el('div', null, 'consumo');
     var c = atendimento.consumo || {};

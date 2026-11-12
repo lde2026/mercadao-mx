@@ -525,3 +525,14 @@ pre{background:var(--escuro);color:var(--superficie);padding:13px;border-radius:
   background:var(--linha);overflow:hidden}
 .medidor span{display:block;height:100%;background:var(--acento)}
 .medidor.cheio span{background:var(--ruim)}
+
+/* A lista do que falta para entrar no ar. Fica no topo da tela enquanto
+   faltar algo, e some quando estiver tudo de pe. */
+.prontidao{border:1px solid var(--linha);border-left:3px solid var(--atencao);
+  background:var(--superficie);border-radius:12px;padding:16px 18px;margin-bottom:16px}
+.prontidao .rotulo{margin-bottom:10px}
+.prontidao ul{margin:0;padding:0;list-style:none;display:grid;gap:7px}
+.prontidao li{display:grid;grid-template-columns:16px 1fr;gap:8px;align-items:start;
+  font-size:13.5px;color:var(--fraco)}
+.prontidao li.feito{color:var(--acento-texto)}
+.prontidao .marca{font-weight:700;line-height:1.5}

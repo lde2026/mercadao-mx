@@ -209,28 +209,76 @@ Host, separados por virgula. Sem ela vale `atendeai.lojadoecommerce.com.br`.
 
 ### Ligar o modulo numa conta
 
-O menu so aparece para quem tem o modulo, e hoje isso e SQL no Postgres:
+Pelo Admin, na coluna **Atende Ai** da tabela de contas. Ver "Ligando um
+cliente novo", mais abaixo.
+
+Para conferir quem esta ligado, ou para achar o `id` de uma conta sem abrir o
+painel:
 
 ```sql
-update contas set modulo_atendimento = true where email = 'o-email-do-cliente';
-select id, nome, email from contas where modulo_atendimento = true;
+select id, nome, email, faixa_atendimento, numero_atendimento
+  from contas where modulo_atendimento = true;
 ```
 
-Depois disso o lojista precisa sair e entrar de novo: o modulo e lido na
-sessao. O `id` da consulta e o que o agente de WhatsApp usa na rota interna.
+### O agente de WhatsApp, as tres rotas
 
-### O agente de WhatsApp lendo a base
+Tudo com `Authorization: Bearer <CHAVE_SERVICO>`. Sem a chave no ambiente as
+tres recusam, e e de proposito: tratar a falta da chave como "sem exigencia"
+publicaria a base de todos os clientes na internet no primeiro deploy sem a
+variavel.
+
+**1. De quem e esta conversa.** O agente sabe em qual numero a mensagem caiu,
+nao de qual conta do Capta. Esta rota faz a ligacao, e ja devolve a base junto
+para nao precisar de duas viagens por mensagem.
+
+```
+GET /interno/numero/5541988887777
+```
+
+Devolve `{ conta: { id, nome }, base, atualizadoEm }`. O numero pode ir com
+mascara ou sem, com o 55 ou sem: ele e normalizado dos dois lados para 55 mais
+DDD mais numero. Numero que ninguem reivindicou, ou conta sem o modulo,
+responde 404.
+
+**2. A base, quando ja se sabe a conta.**
 
 ```
 GET /interno/base/<id-da-conta>
-Authorization: Bearer <CHAVE_SERVICO>
 ```
 
-Devolve a base em JSON e o `atualizadoEm`. Conta sem o modulo responde 404 e
-chave errada responde 401. O teto e 120 chamadas por minuto. Sem
-`CHAVE_SERVICO` no ambiente a rota recusa tudo, e e de proposito: tratar a
-falta da chave como "sem exigencia" publicaria a base de todos os clientes na
-internet no primeiro deploy sem a variavel.
+Mesma resposta. Use quando o agente ja guardou o id. O `atualizadoEm` serve
+para decidir se vale recarregar: a base muda pouco, e guardar a resposta por
+alguns minutos poupa viagem.
+
+**3. Contar a mensagem enviada.** Uma chamada por resposta que o agente
+mandar, ou em lote.
+
+```
+POST /interno/base/<id-da-conta>/consumo
+{ "enviadas": 1 }
+```
+
+Aceita de 1 a 500 por chamada; fora disso e aparado, nao recusado. Devolve o
+total do mes. **Sem esta chamada o painel do lojista fica sem consumo e a
+faixa nao pode ser cobrada**, entao ela e parte da integracao, nao um extra.
+
+Os tetos por minuto sao altos porque todos os agentes chegam pelo mesmo
+endereco: apertar isso seria apertar o cliente grande por causa do vizinho.
+
+### Ligando um cliente novo
+
+1. Admin, na linha da conta: botao **Ligado**, a **faixa** e o **numero** de
+   WhatsApp. Os tres ficam na mesma coluna, e a faixa e o numero so aparecem
+   com o modulo ligado.
+2. Nao precisa relogin: a sessao le o modulo do banco a cada requisicao, entao
+   o lojista com o painel aberto passa a ver a tela na hora.
+3. Religar uma conta sem dizer a faixa nao rebaixa quem ja tinha uma maior.
+4. Dois donos para o mesmo numero o banco recusa, com 409. Tire da outra conta
+   antes.
+
+A tela do lojista mostra sozinha o que ainda falta para entrar no ar: numero
+conectado, base preenchida e a primeira mensagem contada. A lista some quando
+os tres estao de pe.
 
 ## 4. Asaas
 

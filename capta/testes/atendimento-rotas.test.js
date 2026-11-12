@@ -6,6 +6,9 @@ process.env.NODE_ENV = 'test';
 // Definida antes de importar o servidor: a rota interna le a chave do
 // ambiente a cada chamada, mas o aviso de boot acontece na carga.
 process.env.CHAVE_SERVICO = 'chave-de-servico-de-teste-com-tamanho-suficiente';
+// Quem liga o modulo e define o numero de uma conta e o operador, e a lista
+// tambem e lida na carga.
+process.env.OPERADOR_EMAILS = 'contato@lojadoecommerce.com.br';
 
 const { pool, consultar } = await import('../src/db.js');
 await prepararBanco();
@@ -56,6 +59,9 @@ function pedir(caminho, { metodo = 'GET', cookie, corpo, cabecalhos = {} } = {})
 const contaA = await contaLogada('Bella Moda', 'pierre+ar-a@lojadoecommerce.com.br');
 const contaB = await contaLogada('Casa Verde', 'pierre+ar-b@lojadoecommerce.com.br');
 const semModulo = await contaLogada('Pet Cia', 'pierre+ar-c@lojadoecommerce.com.br', { modulo: false });
+// Um login so para o operador: o teto de entrada e por IP e por minuto, e
+// cada chamada a mais derruba as provas seguintes com 429.
+const operador = await contaLogada('Loja do E-commerce', 'contato@lojadoecommerce.com.br', { modulo: false });
 
 test('o lojista le e grava a propria base pelo painel', async () => {
   const vazia = await pedir('/api/atendimento', { cookie: contaA.cookie });
@@ -284,6 +290,96 @@ test('lote fora do limite e aparado, nao recusado', async () => {
     metodo: 'POST', cabecalhos: chave, corpo: { enviadas: 0 },
   });
   assert.equal(zero.json.enviadas, antes + 501, 'sem numero, conta uma');
+});
+
+/*
+ * O numero e a ligacao entre a conversa que chega e a loja que ela pertence.
+ *
+ * O agente sabe em qual numero a mensagem caiu, e nao de qual conta do Capta.
+ * Se essa resolucao errar, a loja A responde o cliente da loja B com a
+ * politica de troca errada, e isso nao aparece em tela nenhuma: aparece no
+ * WhatsApp do cliente final.
+ */
+test('o agente descobre a loja pelo numero que recebeu a mensagem', async () => {
+  const chave = { Authorization: `Bearer ${process.env.CHAVE_SERVICO}` };
+
+  const antes = await pedir('/interno/numero/5541988887777', { cabecalhos: chave });
+  assert.equal(antes.status, 404, 'numero que ninguem reivindicou nao resolve');
+
+  const posto = await pedir(`/api/admin/contas/${contaA.id}/numero`, {
+    metodo: 'POST', cookie: operador.cookie, corpo: { numero: '(41) 98888-7777' },
+  });
+  assert.equal(posto.status, 200);
+  assert.equal(posto.json.numero, '5541988887777', 'guarda numa forma so, com o pais');
+
+  const achou = await pedir('/interno/numero/41988887777', { cabecalhos: chave });
+  assert.equal(achou.status, 200);
+  assert.equal(achou.json.conta.id, contaA.id);
+  assert.equal(achou.json.base.nomeLoja, 'Bella Moda');
+
+  // O agente manda o numero do jeito que o WhatsApp entrega, com mascara ou
+  // sem: os dois precisam cair na mesma loja.
+  const mascarado = await pedir('/interno/numero/%2B55%20(41)%2098888-7777', { cabecalhos: chave });
+  assert.equal(mascarado.status, 200);
+  assert.equal(mascarado.json.conta.id, contaA.id);
+});
+
+test('numero so resolve com a chave de servico', async () => {
+  const semChave = await pedir('/interno/numero/41988887777');
+  assert.equal(semChave.status, 401);
+
+  const errada = await pedir('/interno/numero/41988887777', {
+    cabecalhos: { Authorization: 'Bearer nao-e-a-nossa' },
+  });
+  assert.equal(errada.status, 401);
+});
+
+test('o mesmo numero nao pode ter dois donos', async () => {
+  const conflito = await pedir(`/api/admin/contas/${contaB.id}/numero`, {
+    metodo: 'POST', cookie: operador.cookie, corpo: { numero: '41988887777' },
+  });
+  assert.equal(conflito.status, 409);
+
+  // E a conta A continua dona: tentativa recusada nao pode deixar as duas sem.
+  const ainda = await pedir('/interno/numero/41988887777', {
+    cabecalhos: { Authorization: `Bearer ${process.env.CHAVE_SERVICO}` },
+  });
+  assert.equal(ainda.json.conta.id, contaA.id);
+});
+
+test('so o operador define o numero de uma conta', async () => {
+  // O numero decide para onde vai a conversa do cliente final. Deixar o
+  // lojista declarar o proprio seria deixar ele apontar para o do vizinho.
+  const lojista = await pedir(`/api/admin/contas/${contaA.id}/numero`, {
+    metodo: 'POST', cookie: contaA.cookie, corpo: { numero: '41999990000' },
+  });
+  assert.equal(lojista.status, 403);
+});
+
+test('numero curto demais nao entra', async () => {
+  const r = await pedir(`/api/admin/contas/${contaB.id}/numero`, {
+    metodo: 'POST', cookie: operador.cookie, corpo: { numero: '4199' },
+  });
+  assert.equal(r.status, 400);
+});
+
+test('conta sem o modulo nao resolve pelo numero', async () => {
+  await pedir(`/api/admin/contas/${semModulo.id}/numero`, {
+    metodo: 'POST', cookie: operador.cookie, corpo: { numero: '41977776666' },
+  });
+  const r = await pedir('/interno/numero/41977776666', {
+    cabecalhos: { Authorization: `Bearer ${process.env.CHAVE_SERVICO}` },
+  });
+  assert.equal(r.status, 404);
+});
+
+test('a tela diz o que falta para o atendimento entrar no ar', async () => {
+  const tela = await pedir('/api/atendimento', { cookie: contaA.cookie });
+  assert.equal(tela.json.prontidao.numero, '5541988887777');
+  assert.equal(tela.json.prontidao.atendendo, true, 'ja contou mensagem nos testes acima');
+
+  const sem = await pedir('/api/atendimento', { cookie: contaB.cookie });
+  assert.equal(sem.json.prontidao.numero, null);
 });
 
 test.after(async () => {

@@ -104,3 +104,25 @@ test('faixaPara sugere o plano que caberia o volume', () => {
   // ou proposta, e nao um plano que o preco nao conhece.
   assert.equal(faixaPara(50000), 'escala');
 });
+
+/*
+ * A forma canonica do numero mora no repositorio, mas a regra e de negocio e
+ * a prova dela e barata aqui: e o que liga a conversa que chega na loja certa.
+ */
+test('o numero vira uma forma so, venha como vier', async () => {
+  const { numeroCanonico } = await import('../src/repositorio.js');
+
+  for (const escrito of [
+    '41988887777', '(41) 98888-7777', '41 9 8888-7777',
+    '5541988887777', '+55 41 98888-7777', '+55 (41) 98888-7777',
+  ]) {
+    assert.equal(numeroCanonico(escrito), '5541988887777', escrito);
+  }
+
+  // Fixo de oito digitos com DDD tambem e numero de loja.
+  assert.equal(numeroCanonico('4133334444'), '554133334444');
+  assert.equal(numeroCanonico(''), '');
+  assert.equal(numeroCanonico(null), '');
+  // Numero de outro pais passa inteiro em vez de ganhar 55 na frente.
+  assert.equal(numeroCanonico('351912345678'), '351912345678');
+});

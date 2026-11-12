@@ -677,6 +677,39 @@ app.get('/interno/base/:contaId', limitarPor('base-interna', 60, 120), async (re
  * chegam pelo mesmo endereco, entao apertar isto seria apertar o cliente
  * grande por causa do vizinho.
  */
+/**
+ * De que loja e este numero.
+ *
+ * O agente recebe a mensagem sabendo em qual numero ela chegou, e nao de qual
+ * conta do Capta. Sem esta rota, a ligacao entre os dois e uma tabela escrita
+ * a mao na plataforma do agente, que desencontra no dia em que uma loja troca
+ * de numero e ninguem lembra dos dois lugares.
+ *
+ * Devolve a base junto porque e isso que o agente ia pedir em seguida: duas
+ * viagens por mensagem recebida, numa instalacao com dezenas de lojas, e
+ * transito que nao precisa existir.
+ */
+app.get('/interno/numero/:numero', limitarPor('numero-interno', 60, 1200), async (req, res) => {
+  const esperada = process.env.CHAVE_SERVICO;
+  const cabecalho = String(req.headers.authorization || '');
+  const oferecida = cabecalho.startsWith('Bearer ') ? cabecalho.slice(7) : '';
+
+  if (!esperada || !oferecida || !compararConstante(oferecida, esperada)) {
+    log.aviso('numero.negado', {});
+    return res.status(401).json({ erro: 'nao autorizado' });
+  }
+
+  const conta = await repo.contaPorNumeroAtendimento(req.params.numero);
+  if (!conta || !conta.modulo_atendimento) return res.status(404).json({ erro: 'nao encontrada' });
+
+  const linha = await atendimento.base(conta.id);
+  res.set('Cache-Control', 'no-store').json({
+    conta: { id: conta.id, nome: conta.nome },
+    base: atendimento.conteudo(linha),
+    atualizadoEm: linha.atualizado_em,
+  });
+});
+
 app.post('/interno/base/:contaId/consumo', limitarPor('consumo-interno', 60, 1200), async (req, res) => {
   const esperada = process.env.CHAVE_SERVICO;
   const cabecalho = String(req.headers.authorization || '');
@@ -880,6 +913,15 @@ app.get('/api/atendimento', exigirAtendimento, async (req, res) => {
       enviadas: consumo.enviadas,
       atualizadoEm: consumo.atualizado_em,
       ...atendeai.situacao(consumo.enviadas, req.conta.faixaAtendimento),
+    },
+    // O que ainda falta para o atendimento entrar no ar. A tela mostra isso
+    // enquanto faltar algo e some quando estiver tudo de pe: lista de
+    // pendencia que nunca zera deixa de ser lida.
+    prontidao: {
+      numero: req.conta.numeroAtendimento,
+      base: Object.values(atendimento.conteudo(linha))
+        .filter((v) => (Array.isArray(v) ? v.length : v !== '' && v !== null)).length >= 4,
+      atendendo: Boolean(consumo.atualizado_em),
     },
     assistente: temAssistente(),
   });
@@ -1745,6 +1787,32 @@ app.post('/api/admin/contas/:id/modulo', exigirOperador, async (req, res) => {
     conta_id: req.params.id, ligado: agora.modulo_atendimento, faixa: agora.faixa_atendimento,
   });
   res.json({ atendimento: agora.modulo_atendimento, faixa: agora.faixa_atendimento });
+});
+
+/**
+ * O numero da conta e definido na ativacao, que e servico que passa por nos.
+ * Por isso fica no Admin e nao na tela do lojista: quem escolhe qual numero e
+ * de quem decide para onde vai a conversa do cliente final.
+ */
+app.post('/api/admin/contas/:id/numero', exigirOperador, async (req, res) => {
+  const numero = repo.soDigitos((req.body || {}).numero);
+  if (numero && numero.length < 10) {
+    return res.status(400).json({ erro: 'numero curto demais para ser um WhatsApp' });
+  }
+  try {
+    const agora = await repo.definirNumeroAtendimento(req.params.id, numero);
+    if (agora === null) return res.status(404).json({ erro: 'conta nao encontrada' });
+    log.info('admin.numero_atendimento', { conta_id: req.params.id, tem: Boolean(numero) });
+    res.json({ numero: agora.numero_atendimento });
+  } catch (erro) {
+    if (erro.code === '23505') {
+      return res.status(409).json({
+        erro: 'esse numero ja esta em outra conta',
+        explicacao: 'Dois donos para o mesmo número faria o agente responder com a base errada. Tire da outra conta primeiro.',
+      });
+    }
+    throw erro;
+  }
 });
 
 app.post('/api/admin/contas/:id/entrar', exigirOperador, async (req, res) => {

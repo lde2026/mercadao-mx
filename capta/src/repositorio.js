@@ -82,7 +82,7 @@ export async function redefinirSenha(contaId, senha) {
 export async function buscarConta(contaId) {
   const { rows } = await consultar(
     `select id, nome, email, documento, cliente_externo, email_aviso, whatsapp, avisar_lead,
-            teste_ate, modulo_atendimento, criado_em
+            teste_ate, modulo_atendimento, faixa_atendimento, numero_atendimento, criado_em
        from contas where id = $1`,
     [contaId],
   );
@@ -251,11 +251,64 @@ export async function definirModuloAtendimento(contaId, ligado, faixa = null, pa
   return rows.length ? rows[0] : null;
 }
 
+/** So digitos: o numero vem digitado por gente, com parenteses, traco e espaco. */
+export function soDigitos(numero) {
+  return String(numero == null ? '' : numero).replace(/\D/g, '').slice(0, 15);
+}
+
+/**
+ * O numero que o agente atende por esta conta.
+ *
+ * Quem define e o operador, na ativacao, e nao o lojista. O numero e o que
+ * decide de quem e a conversa que chega: deixar o proprio lojista declarar
+ * qual numero e dele seria deixar ele apontar para o numero do vizinho e
+ * receber a base alheia. A ativacao e servico pago e passa por nos de
+ * qualquer jeito.
+ */
+/**
+ * O numero guardado numa forma so: 55 mais DDD mais o numero.
+ *
+ * O operador digita "(41) 98888-7777" e o WhatsApp entrega "5541988887777".
+ * Sem forma canonica os dois viram chaves diferentes, e a conversa que chega
+ * nao acha a loja: o cliente escreve e ninguem responde, sem erro em lugar
+ * nenhum. O pais entra fixo porque o produto e vendido no Brasil; no dia de
+ * vender fora isto vira campo, e nao condicional espalhada pelo codigo.
+ */
+export function numeroCanonico(numero) {
+  const d = soDigitos(numero);
+  if (!d) return '';
+  if (d.length >= 12 && d.startsWith('55')) return d;
+  if (d.length === 10 || d.length === 11) return `55${d}`;
+  return d;
+}
+
+export async function definirNumeroAtendimento(contaId, numero) {
+  const limpo = numeroCanonico(numero);
+  const { rows } = await consultar(
+    `update contas set numero_atendimento = $2, atualizado_em = now()
+      where id = $1
+      returning numero_atendimento`,
+    [contaId, limpo || null],
+  );
+  return rows.length ? rows[0] : null;
+}
+
+export async function contaPorNumeroAtendimento(numero) {
+  const limpo = numeroCanonico(numero);
+  if (!limpo) return null;
+  const { rows } = await consultar(
+    `select id, nome, email, modulo_atendimento, faixa_atendimento, numero_atendimento
+       from contas where numero_atendimento = $1`,
+    [limpo],
+  );
+  return rows[0] || null;
+}
+
 export async function buscarSessao(id) {
   if (!id) return null;
   const { rows } = await consultar(
     `select s.conta_id, s.operador_id, c.nome, c.email, c.teste_ate,
-            c.modulo_atendimento, c.faixa_atendimento
+            c.modulo_atendimento, c.faixa_atendimento, c.numero_atendimento
        from sessoes s join contas c on c.id = s.conta_id
       where s.id = $1 and s.expira_em > now()`,
     [id],
@@ -928,7 +981,8 @@ export async function resumoGeral() {
 
 export async function listarContas() {
   const { rows } = await consultar(
-    `select c.id, c.nome, c.email, c.criado_em, c.modulo_atendimento, c.faixa_atendimento,
+    `select c.id, c.nome, c.email, c.criado_em,
+            c.modulo_atendimento, c.faixa_atendimento, c.numero_atendimento,
             a.plano, a.ciclo, a.origem,
             (select count(*)::int from leads l where l.conta_id = c.id
                and l.criado_em >= date_trunc('month', now())) as leads_mes,

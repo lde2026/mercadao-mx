@@ -66,6 +66,7 @@ export async function carregarConta(req, _res, proximo) {
         // so para descobrir se a conta pode entrar ali.
         moduloAtendimento: Boolean(sessao.modulo_atendimento),
         faixaAtendimento: sessao.faixa_atendimento || null,
+        numeroAtendimento: sessao.numero_atendimento || null,
       };
       req.sessaoId = sessaoId;
       // Sessao de personificacao: quem investiga o log depois precisa saber

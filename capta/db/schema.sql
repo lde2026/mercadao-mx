@@ -457,6 +457,14 @@ create index if not exists base_mensagens_conta_idx on base_mensagens(conta_id, 
 -- parte, e modulo vazio na barra de quem nao assina vira chamado de suporte.
 alter table contas add column if not exists modulo_atendimento boolean not null default false;
 alter table contas add column if not exists faixa_atendimento text;
+alter table contas add column if not exists numero_atendimento text;
+
+-- O numero decide de quem e a conversa que chega no WhatsApp. Dois donos para
+-- o mesmo numero seria o agente escolhendo no par ou impar qual base usar, e
+-- uma loja respondendo com a politica de troca da outra. Indice parcial
+-- porque a maioria das contas nunca tem numero.
+create unique index if not exists contas_numero_atendimento_idx
+  on contas (numero_atendimento) where numero_atendimento is not null;
 
 -- O medidor do Atende Ai.
 --
