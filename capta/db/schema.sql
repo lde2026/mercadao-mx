@@ -646,3 +646,12 @@ alter table atendimentos add column if not exists avisado_em timestamptz;
  */
 alter table contas add column if not exists relatorio_semanal boolean not null default true;
 alter table contas add column if not exists relatorio_em timestamptz;
+
+/*
+ * A faixa que o lojista pediu.
+ *
+ * Separada da faixa que vale, pelo mesmo motivo do numero: o que o lojista
+ * declara nao pode virar cobranca sozinho. Ele pede, nos confirmamos na hora
+ * de abrir a assinatura nova no Asaas.
+ */
+alter table contas add column if not exists faixa_solicitada text;

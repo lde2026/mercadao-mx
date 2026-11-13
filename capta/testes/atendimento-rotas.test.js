@@ -589,6 +589,41 @@ test('o Admin conta a recorrencia do Atende Ai pela faixa, separada do Capta', a
 });
 
 /*
+ * O pedido de faixa.
+ *
+ * Pedir nao pode trocar: a faixa define quanto a loja paga, e o que o lojista
+ * declara numa tela nunca vira cobranca sozinho. Mesmo motivo do numero.
+ */
+test('o lojista pede a faixa, e a que vale nao muda', async () => {
+  await consultar(
+    `update contas set faixa_atendimento = 'essencial' where id = $1`, [contaA.id],
+  );
+
+  const pediu = await pedir('/api/atendimento/faixa', {
+    metodo: 'POST', cookie: contaA.cookie, corpo: { faixa: 'escala' },
+  });
+  assert.equal(pediu.status, 200);
+  assert.equal(pediu.json.pedida, 'escala');
+  assert.equal(pediu.json.atual, 'essencial', 'pedir nao cobra nada');
+
+  const noBanco = await consultar(
+    `select faixa_atendimento, faixa_solicitada from contas where id = $1`, [contaA.id],
+  );
+  assert.equal(noBanco.rows[0].faixa_atendimento, 'essencial');
+  assert.equal(noBanco.rows[0].faixa_solicitada, 'escala');
+
+  const torta = await pedir('/api/atendimento/faixa', {
+    metodo: 'POST', cookie: contaA.cookie, corpo: { faixa: 'ouro' },
+  });
+  assert.equal(torta.status, 400);
+
+  const naoAssina = await pedir('/api/atendimento/faixa', {
+    metodo: 'POST', cookie: semModulo.cookie, corpo: { faixa: 'escala' },
+  });
+  assert.equal(naoAssina.status, 404, 'quem nao assina o modulo nem ve essa rota');
+});
+
+/*
  * Conversa fechada que volta.
  *
  * Fechar quer dizer "este assunto acabou", nao "nunca mais fale com esta

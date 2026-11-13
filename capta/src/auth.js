@@ -71,6 +71,7 @@ export async function carregarConta(req, _res, proximo) {
         atendimentoPausado: Boolean(sessao.atendimento_pausado),
         atendimentoRecado: sessao.atendimento_recado || null,
         whatsapp: sessao.whatsapp || null,
+        faixaSolicitada: sessao.faixa_solicitada || null,
       };
       req.sessaoId = sessaoId;
       // Sessao de personificacao: quem investiga o log depois precisa saber

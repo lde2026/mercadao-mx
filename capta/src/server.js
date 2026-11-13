@@ -1272,6 +1272,7 @@ app.get('/api/atendimento', exigirAtendimento, async (req, res) => {
     // pagina mostra diferente do que a fatura cobra e problema de consumidor.
     faixas: atendeai.FAIXAS,
     ativacoes: atendeai.ATIVACOES,
+    faixaPedida: req.conta.faixaSolicitada || null,
     excedente: atendeai.EXCEDENTE,
     descontoAnual: atendeai.DESCONTO_ANUAL,
     conversa: conversa.map(mensagemParaTela),
@@ -1422,6 +1423,32 @@ app.post('/api/atendimentos/:id/estado', exigirAtendimento, async (req, res) => 
   if (!agora) return res.status(404).json({ erro: 'nao encontrado' });
   log.info('atendimento.estado', { conta_id: req.conta.id, atendimento_id: agora.id, estado });
   res.json(agora);
+});
+
+/*
+ * O lojista pede para mudar de faixa.
+ *
+ * Pedir nao troca nada: a faixa que vale continua a mesma ate alguem abrir a
+ * assinatura nova no Asaas. Antes disto a tela dizia "fale com a gente", o
+ * que na pratica era o lojista com o plano estourando e sem nenhum botao
+ * para apertar as onze da noite.
+ */
+app.post('/api/atendimento/faixa', exigirAtendimento, async (req, res) => {
+  const faixa = String((req.body || {}).faixa || '');
+  if (!atendeai.ehFaixa(faixa)) return res.status(400).json({ erro: 'faixa invalida' });
+
+  const agora = await repo.pedirFaixa(req.conta.id, faixa);
+  if (!agora) return res.status(404).json({ erro: 'conta nao encontrada' });
+
+  log.info('atendeai.faixa_pedida', { conta_id: req.conta.id, faixa });
+  res.json({ atual: agora.faixa_atendimento, pedida: agora.faixa_solicitada });
+
+  avisarOperador({
+    contaId: req.conta.id,
+    tipo: 'faixa_pedida',
+    mensagem: `${req.conta.nome} pediu para mudar para a faixa ${atendeai.FAIXAS[faixa].nome}.`,
+    dados: { de: agora.faixa_atendimento || 'nenhuma', para: faixa },
+  }).catch((erro) => log.erro('faixa.aviso_falhou', { conta_id: req.conta.id, motivo: erro.message }));
 });
 
 app.post('/api/atendimento/pausa', exigirAtendimento, async (req, res) => {

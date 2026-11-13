@@ -2059,6 +2059,26 @@
    * que a pagina mostra diferente do que a fatura cobra e problema de
    * consumidor, nao de layout.
    */
+  /*
+   * Pedir uma faixa nao troca nada: a que vale continua a mesma ate alguem
+   * abrir a assinatura nova. O botao diz isso, em vez de prometer upgrade
+   * imediato que o lojista cobraria no minuto seguinte.
+   */
+  function botaoDeFaixa(nome, f) {
+    var b = el('button', 'Quero este', 'secundario');
+    b.type = 'button';
+    b.style.padding = '6px 12px';
+    b.addEventListener('click', function () {
+      if (!confirm('Pedir a mudança para o plano ' + f.nome + ', de '
+        + dinheiro(f.mensal) + ' por mês?\n\nNada muda agora: a gente confirma com você antes de cobrar.')) return;
+      b.disabled = true;
+      api('/atendimento/faixa', { method: 'POST', corpo: { faixa: nome } })
+        .then(function () { verFinanceiro(); })
+        .catch(function (e) { b.disabled = false; alert(e.message); });
+    });
+    return b;
+  }
+
   function planoDoAtendeAi(dados) {
     var c = dados.consumo || {};
     var faixas = dados.faixas || {};
@@ -2089,14 +2109,18 @@
     var linhas = Object.keys(faixas).map(function (nome) {
       var f = faixas[nome];
       var atual = nome === c.faixa;
+      var pedida = nome === dados.faixaPedida;
       return { celulas: [
         atual ? selo(f.nome, 'criado') : f.nome,
         f.mensagens.toLocaleString('pt-BR') + ' mensagens',
         dinheiro(f.mensal) + '/mês',
         dinheiro(Math.round(f.mensal * (1 - (dados.descontoAnual || 0)) * 100) / 100) + '/mês no anual',
+        atual ? el('span', 'é o seu plano', 'hora')
+          : pedida ? selo('pedido enviado', 'pendente')
+            : botaoDeFaixa(nome, f),
       ] };
     });
-    caixa.appendChild(tabela(['Plano', 'Inclui', 'Mensal', 'Anual'], linhas));
+    caixa.appendChild(tabela(['Plano', 'Inclui', 'Mensal', 'Anual', ''], linhas));
 
     var ativacoes = dados.ativacoes || {};
     if (ativacoes.simples) {
@@ -2104,7 +2128,7 @@
         + ', ou ' + dinheiro(ativacoes.acompanhada.valor) + ' com '
         + ativacoes.acompanhada.dias + ' dias de acompanhamento. Cobrança única, no começo.', 'legenda'));
     }
-    caixa.appendChild(el('p', 'Para mudar de plano, fale com a gente. A troca vale a partir da próxima fatura.', 'legenda'));
+    caixa.appendChild(el('p', 'A troca vale a partir da próxima fatura. A gente confirma com você antes de cobrar.', 'legenda'));
     return caixa;
   }
 

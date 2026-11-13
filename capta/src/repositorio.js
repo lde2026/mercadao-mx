@@ -370,7 +370,7 @@ export async function buscarSessao(id) {
     `select s.conta_id, s.operador_id, c.nome, c.email, c.teste_ate,
             c.modulo_atendimento, c.faixa_atendimento, c.numero_atendimento,
             c.numero_solicitado, c.atendimento_pausado, c.atendimento_recado,
-            c.whatsapp
+            c.whatsapp, c.faixa_solicitada
        from sessoes s join contas c on c.id = s.conta_id
       where s.id = $1 and s.expira_em > now()`,
     [id],
@@ -1472,4 +1472,14 @@ export async function contasParaRelatorio() {
 
 export async function marcarRelatorioEnviado(contaId) {
   await consultar(`update contas set relatorio_em = now() where id = $1`, [contaId]);
+}
+
+/** O lojista pede uma faixa. Quem troca de verdade e o operador, ao cobrar. */
+export async function pedirFaixa(contaId, faixa) {
+  const { rows } = await consultar(
+    `update contas set faixa_solicitada = $2, atualizado_em = now()
+      where id = $1 returning faixa_atendimento, faixa_solicitada`,
+    [contaId, faixa],
+  );
+  return rows[0] || null;
 }
