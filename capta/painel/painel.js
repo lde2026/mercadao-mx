@@ -4189,6 +4189,13 @@
       linha.appendChild(check);
       linha.appendChild(document.createTextNode('Receber um e-mail a cada lead novo'));
       form.appendChild(linha);
+
+      var linhaRel = el('label', null, 'linha-check');
+      var checkRel = el('input'); checkRel.type = 'checkbox'; checkRel.name = 'relatorioSemanal';
+      checkRel.checked = conta.relatorio_semanal !== false;
+      linhaRel.appendChild(checkRel);
+      linhaRel.appendChild(document.createTextNode('Receber o resumo da semana, nas segundas de manhã'));
+      form.appendChild(linhaRel);
       var erro = el('p', null, 'erro'); erro.hidden = true; form.appendChild(erro);
       var ok = el('p', null, 'ok'); ok.hidden = true; form.appendChild(ok);
       var acoes = el('div', null, 'acoes');
@@ -4201,6 +4208,7 @@
         api('/conta', { method: 'PUT', corpo: {
           nome: d.get('nome'), documento: d.get('documento'), emailAviso: d.get('emailAviso'),
           whatsapp: d.get('whatsapp'), avisarLead: check.checked,
+          relatorioSemanal: checkRel.checked,
         } }).then(function (atualizada) {
           ok.textContent = 'Salvo.'; ok.hidden = false; salvar.disabled = false;
           document.getElementById('nome-conta').textContent = atualizada.nome;

@@ -1639,7 +1639,7 @@ app.get('/api/conta', async (req, res) => {
 });
 
 app.put('/api/conta', async (req, res) => {
-  const { nome, documento, emailAviso, whatsapp, avisarLead } = req.body || {};
+  const { nome, documento, emailAviso, whatsapp, avisarLead, relatorioSemanal } = req.body || {};
   const campos = {};
   if (nome != null) {
     if (!String(nome).trim()) return res.status(400).json({ erro: 'nome obrigatorio' });
@@ -1653,6 +1653,7 @@ app.put('/api/conta', async (req, res) => {
   }
   if (whatsapp != null) campos.whatsapp = String(whatsapp).replace(/\D/g, '').slice(0, 15) || null;
   if (avisarLead != null) campos.avisar_lead = Boolean(avisarLead);
+  if (relatorioSemanal != null) campos.relatorio_semanal = Boolean(relatorioSemanal);
   const conta = await repo.atualizarConta(req.conta.id, campos);
   log.info('conta.atualizada', { conta_id: req.conta.id, campos: Object.keys(campos) });
   res.json(conta);

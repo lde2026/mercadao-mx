@@ -3,7 +3,8 @@ import { log } from './log.js';
 import { adaptador } from './adapters/index.js';
 import { calcularAcesso, DEGRAUS } from './billing/acesso.js';
 import { gerarCodigo } from './cupom.js';
-import { enviar, cupomAtrasado, clienteEsperando } from './email.js';
+import { enviar, cupomAtrasado, clienteEsperando, resumoSemanal } from './email.js';
+import { resumoDaSemana, valeMandar } from './relatorio.js';
 import * as repo from './repositorio.js';
 import { credenciaisProntas } from './credenciais.js';
 import { avisarCobranca } from './avisos.js';
@@ -217,6 +218,8 @@ export function agendar() {
   // De dez em dez minutos: quem esta do outro lado e um consumidor esperando
   // resposta, e meia hora de atraso ja e uma venda perdida.
   setInterval(() => { avisarConversasParadas().catch(() => {}); }, 10 * 60 * 1000).unref();
+  // De hora em hora, e a propria tarefa decide se e a janela de segunda.
+  setInterval(() => { enviarResumosDaSemana().catch(() => {}); }, 3600 * 1000).unref();
   log.info('tarefas.agendadas', { varredura_minutos: MINUTOS_VARREDURA });
 }
 
@@ -311,4 +314,53 @@ export async function avisarConversasParadas(minutos = 15) {
   }
 
   return { avisadas };
+}
+
+/**
+ * Manda o resumo da semana para quem quer receber.
+ *
+ * Segunda de manha, porque e quando o lojista decide a semana. Semana
+ * completamente parada nao vira e-mail: relatorio de zero atras de zero
+ * ensina a pessoa a marcar como spam, e aí o e-mail que importa, o do mes que
+ * vendeu, tambem nao e lido.
+ *
+ * A marca no banco e que garante um por semana: a tarefa roda de hora em
+ * hora e o processo reinicia a cada deploy.
+ */
+export async function enviarResumosDaSemana(agora = new Date()) {
+  // Segunda-feira, das 8 as 11. Fora disso nao faz nada, para o horario nao
+  // depender do minuto em que o ultimo deploy subiu.
+  if (agora.getDay() !== 1 || agora.getHours() < 8 || agora.getHours() > 10) {
+    return { enviados: 0, motivo: 'fora da janela' };
+  }
+
+  const contas = await repo.contasParaRelatorio();
+  let enviados = 0;
+
+  for (const conta of contas) {
+    const para = conta.email_aviso || conta.email;
+    if (!para) continue;
+    try {
+      const resumo = await resumoDaSemana(conta.id, agora);
+      if (!valeMandar(resumo)) {
+        // Marca mesmo sem mandar: senao a conta parada e relida toda hora.
+        await repo.marcarRelatorioEnviado(conta.id);
+        continue;
+      }
+      const mensagem = resumoSemanal({
+        nomeConta: conta.nome,
+        resumo,
+        temCapta: conta.conexoes > 0,
+        temAtendimento: Boolean(conta.modulo_atendimento),
+        urlPainel: `${process.env.URL_PUBLICA || ''}/#/resumo`,
+      });
+      await enviar({ para, contaId: conta.id, ...mensagem });
+      await repo.marcarRelatorioEnviado(conta.id);
+      enviados += 1;
+    } catch (erro) {
+      log.aviso('relatorio.falhou', { conta_id: conta.id, motivo: erro.message });
+    }
+  }
+
+  return { enviados };
 }

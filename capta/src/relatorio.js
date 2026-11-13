@@ -47,7 +47,18 @@ export async function resumoDaSemana(contaId, agora = new Date()) {
            and p.feito_em >= j.inicio and p.feito_em < j.fim)::int as pedidos,
        (select coalesce(sum(p.valor), 0) from pedidos p, janela j
          where p.conta_id = $1 and p.lead_id is not null
-           and p.feito_em >= j.inicio and p.feito_em < j.fim) as faturamento`,
+           and p.feito_em >= j.inicio and p.feito_em < j.fim) as faturamento,
+       -- O Atende Ai entra no mesmo relatorio, e nao num segundo e-mail: o
+       -- lojista tem uma loja so, e dois resumos na mesma manha ensinam a
+       -- pessoa a nao ler nenhum dos dois.
+       (select count(*) from atendimentos a, janela j
+         where a.conta_id = $1 and a.aberto_em >= j.inicio and a.aberto_em < j.fim)::int as conversas,
+       (select count(*) from atendimentos a, janela j
+         where a.conta_id = $1 and a.aberto_em >= j.inicio_anterior
+           and a.aberto_em < j.inicio)::int as conversas_antes,
+       (select count(*) from atendimentos a, janela j
+         where a.conta_id = $1 and a.estado = 'humano'
+           and a.ultima_em >= j.inicio and a.ultima_em < j.fim)::int as com_voce`,
     [contaId, inicio.toISOString(), fim.toISOString(), inicioAnterior.toISOString()],
   );
 
@@ -61,6 +72,9 @@ export async function resumoDaSemana(contaId, agora = new Date()) {
     cupons: linha.cupons,
     pedidos: linha.pedidos,
     faturamento: Number(linha.faturamento) || 0,
+    conversas: linha.conversas,
+    conversasAntes: linha.conversas_antes,
+    comVoce: linha.com_voce,
   };
 }
 
@@ -72,5 +86,6 @@ export async function resumoDaSemana(contaId, agora = new Date()) {
  * produto, e insistir por e-mail so ensina a pessoa a marcar como spam.
  */
 export function valeMandar(resumo) {
-  return resumo.leads > 0 || resumo.leadsAntes > 0;
+  return resumo.leads > 0 || resumo.leadsAntes > 0
+    || resumo.conversas > 0 || resumo.conversasAntes > 0;
 }

@@ -1,112 +1,87 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { prepararBanco, contaDeTeste, conexaoDeTeste } from './ajuda.js';
+import { prepararBanco, contaDeTeste } from './ajuda.js';
 
 process.env.NODE_ENV = 'test';
+process.env.URL_PUBLICA = 'http://localhost:3000';
+
+/*
+ * O resumo da semana.
+ *
+ * Ele sai por e-mail e nao da para voltar atras, entao a conta tem que
+ * aparecer no proprio resumo e em mais nenhum. E ele nao pode sair para quem
+ * nao usou nada: relatorio de zero atras de zero ensina a pessoa a marcar
+ * como spam, e aí o e-mail do mes que vendeu tambem nao e lido.
+ */
 
 const { pool, consultar } = await import('../src/db.js');
 await prepararBanco();
 const repo = await import('../src/repositorio.js');
 const { resumoDaSemana, valeMandar } = await import('../src/relatorio.js');
+const tarefas = await import('../src/tarefas.js');
 
-/**
- * Os numeros do relatorio semanal.
- *
- * Erro aqui nao derruba nada, e e por isso que e perigoso: o numero errado
- * sai por e-mail, chega na caixa do lojista e nao da para voltar atras. Dois
- * casos importam acima de todos: a janela de sete dias, que nao pode pegar
- * lead velho, e o filtro por conta, porque somar a loja de outro cliente no
- * relatorio deste seria o pior vazamento possivel.
- */
+const lojaA = await contaDeTeste('Mx Kids', 'mx@teste.local');
+const lojaB = await contaDeTeste('Vizinha', 'vizinha@teste.local');
+await consultar('update contas set modulo_atendimento = true where id in ($1, $2)', [lojaA.id, lojaB.id]);
 
-const DIA = 24 * 3600 * 1000;
-const agora = new Date();
-const diasAtras = (n) => new Date(agora.getTime() - n * DIA);
+await repo.registrarFala(lojaA.id, { cliente: '41988887777', direcao: 'cliente', texto: 'Oi' });
+await repo.registrarFala(lojaA.id, { cliente: '41977776666', direcao: 'cliente', texto: 'Prazo?' });
+await repo.registrarFala(lojaB.id, { cliente: '41911112222', direcao: 'cliente', texto: 'Da vizinha' });
 
-const conta = await contaDeTeste('Bella Moda', 'pierre+rel@lojadoecommerce.com.br');
-const loja = await conexaoDeTeste(conta.id, 'nuvemshop', 'Bella Moda', { store_id: '1' });
+test('o resumo conta so o que e da conta', async () => {
+  const minha = await resumoDaSemana(lojaA.id);
+  assert.equal(minha.conversas, 2);
 
-const vizinha = await contaDeTeste('Casa Verde', 'pierre+rel2@lojadoecommerce.com.br');
-const lojaVizinha = await conexaoDeTeste(vizinha.id, 'tray', 'Casa Verde');
-
-async function lead({ conta: c, conexao, nome, dias, contatado = false }) {
-  const novo = await repo.criarLead({
-    contaId: c.id, conexaoId: conexao.id, nome, email: `${nome}@teste.com.br`,
-    telefone: '41999990000', respostas: [], anonimoId: null, redeMascarada: null,
-  });
-  await consultar('update leads set criado_em = $2 where id = $1', [novo.id, diasAtras(dias)]);
-  if (contatado) await consultar('update leads set contatado_em = now() where id = $1', [novo.id]);
-  return novo;
-}
-
-test('a janela e de sete dias, e a semana anterior entra so para comparar', async () => {
-  await lead({ conta, conexao: loja, nome: 'ana', dias: 1 });
-  await lead({ conta, conexao: loja, nome: 'bia', dias: 3 });
-  await lead({ conta, conexao: loja, nome: 'cris', dias: 6 });
-  // Estes dois sao da semana passada: contam na comparacao, nunca no total.
-  await lead({ conta, conexao: loja, nome: 'dani', dias: 9 });
-  await lead({ conta, conexao: loja, nome: 'edu', dias: 13 });
-  // E este e velho demais para aparecer em qualquer um dos dois numeros.
-  await lead({ conta, conexao: loja, nome: 'fabi', dias: 30 });
-
-  const r = await resumoDaSemana(conta.id, agora);
-  assert.equal(r.leads, 3);
-  assert.equal(r.leadsAntes, 2);
+  const dela = await resumoDaSemana(lojaB.id);
+  assert.equal(dela.conversas, 1, 'o resumo de uma loja nao pode somar a conversa da outra');
 });
 
-test('lead de outra conta nunca entra no relatorio desta', async () => {
-  await lead({ conta: vizinha, conexao: lojaVizinha, nome: 'gabi', dias: 2 });
-  await lead({ conta: vizinha, conexao: lojaVizinha, nome: 'hugo', dias: 2 });
+test('conversa assumida aparece como esperando o lojista', async () => {
+  const lista = await repo.listarAtendimentos(lojaA.id);
+  await repo.definirEstadoAtendimento(lojaA.id, lista[0].id, 'humano');
 
-  const r = await resumoDaSemana(conta.id, agora);
-  assert.equal(r.leads, 3, 'o vizinho vazou para dentro do relatorio');
-
-  const dela = await resumoDaSemana(vizinha.id, agora);
-  assert.equal(dela.leads, 2);
+  const resumo = await resumoDaSemana(lojaA.id);
+  assert.equal(resumo.comVoce, 1);
 });
 
-test('quem ainda nao foi atendido aparece separado', async () => {
-  const atendido = await lead({ conta, conexao: loja, nome: 'ivo', dias: 2, contatado: true });
-  assert.ok(atendido.id);
-  const r = await resumoDaSemana(conta.id, agora);
-  assert.equal(r.leads, 4);
-  // Os tres do primeiro teste seguem sem contato; o quarto ja foi atendido.
-  assert.equal(r.semContato, 3);
+test('conta que conversou vale o e-mail; conta parada nao', async () => {
+  assert.equal(valeMandar(await resumoDaSemana(lojaA.id)), true);
+
+  const parada = await contaDeTeste('Parada', 'parada@teste.local');
+  assert.equal(valeMandar(await resumoDaSemana(parada.id)), false,
+    'semana zerada atras de semana zerada nao vira e-mail');
 });
 
-test('faturamento conta so pedido ligado a um lead', async () => {
-  const dela = await lead({ conta, conexao: loja, nome: 'joana', dias: 2 });
-  // A data entra a mao: "agora" foi fixado quando o arquivo carregou, e um
-  // cupom criado alguns segundos depois cairia fora da janela.
-  const { rows } = await consultar(
-    `insert into cupons (conta_id, conexao_id, lead_id, codigo, desconto, status, criado_em)
-     values ($1, $2, $3, 'BELLA-AAA111', 10, 'criado', $4) returning id`,
-    [conta.id, loja.id, dela.id, diasAtras(2)],
+test('fora da janela de segunda de manha nao sai nada', async () => {
+  const terca = new Date('2026-11-17T09:00:00');
+  const fora = await tarefas.enviarResumosDaSemana(terca);
+  assert.equal(fora.enviados, 0);
+  assert.equal(fora.motivo, 'fora da janela');
+
+  const madrugada = new Date('2026-11-16T03:00:00');
+  assert.equal((await tarefas.enviarResumosDaSemana(madrugada)).motivo, 'fora da janela');
+});
+
+test('na janela, cada conta recebe uma vez so na semana', async () => {
+  const segunda = new Date('2026-11-16T09:00:00');
+  const primeira = await tarefas.enviarResumosDaSemana(segunda);
+  assert.ok(primeira.enviados >= 1);
+
+  // A tarefa roda de hora em hora: rodar de novo nao pode mandar outro.
+  const segundaVez = await tarefas.enviarResumosDaSemana(segunda);
+  assert.equal(segundaVez.enviados, 0);
+
+  // Inclusive a conta parada fica marcada, senao seria relida toda hora.
+  const parada = await consultar(
+    `select relatorio_em from contas where email = 'parada@teste.local'`,
   );
-  assert.ok(rows[0].id);
-
-  await repo.registrarPedido({
-    contaId: conta.id, conexaoId: loja.id, idExterno: '900',
-    valor: 250.5, cupomCodigo: 'BELLA-AAA111', feitoEm: diasAtras(1),
-  });
-  // Pedido sem cupom do chat e venda da loja, nao venda do Captapp.
-  await repo.registrarPedido({
-    contaId: conta.id, conexaoId: loja.id, idExterno: '901',
-    valor: 999, cupomCodigo: null, feitoEm: diasAtras(1),
-  });
-
-  const r = await resumoDaSemana(conta.id, agora);
-  assert.equal(r.cupons, 1);
-  assert.equal(r.pedidos, 1);
-  assert.equal(r.faturamento, 250.5);
+  assert.ok(parada.rows[0].relatorio_em, 'marcar sem mandar evita reler a conta parada');
 });
 
-test('duas semanas sem lead nenhum nao viram e-mail', async () => {
-  // Relatorio de zero uma vez e util e cutuca. Toda semana e so ensinar a
-  // pessoa a marcar o remetente como spam.
-  assert.equal(valeMandar({ leads: 0, leadsAntes: 0 }), false);
-  assert.equal(valeMandar({ leads: 0, leadsAntes: 4 }), true);
-  assert.equal(valeMandar({ leads: 2, leadsAntes: 0 }), true);
+test('quem desligou nas configuracoes nao entra na lista', async () => {
+  await consultar(`update contas set relatorio_semanal = false, relatorio_em = null`);
+  const contas = await repo.contasParaRelatorio();
+  assert.equal(contas.length, 0);
 });
 
 test.after(async () => {

@@ -97,7 +97,8 @@ export async function buscarConta(contaId) {
             ciclo_atendimento, assinatura_atendimento,
             -- O token cifrado nao sai desta funcao: quem precisa dele usa
             -- contaPorPhoneId, que e chamada so no caminho de enviar.
-            whatsapp_phone_id, (whatsapp_token is not null) as whatsapp_token
+            whatsapp_phone_id, (whatsapp_token is not null) as whatsapp_token,
+            relatorio_semanal
        from contas where id = $1`,
     [contaId],
   );
@@ -106,7 +107,9 @@ export async function buscarConta(contaId) {
 
 /** Dados que o lojista edita na tela de configuracoes. Nada de senha ou e-mail de login aqui. */
 export async function atualizarConta(contaId, campos) {
-  const permitidos = ['nome', 'documento', 'email_aviso', 'whatsapp', 'avisar_lead'];
+  const permitidos = [
+    'nome', 'documento', 'email_aviso', 'whatsapp', 'avisar_lead', 'relatorio_semanal',
+  ];
   const partes = [];
   const valores = [contaId];
   for (const [chave, valor] of Object.entries(campos)) {
@@ -1446,4 +1449,27 @@ export async function marcarConversaAvisada(contaId, id) {
     `update atendimentos set avisado_em = now() where conta_id = $1 and id = $2`,
     [contaId, id],
   );
+}
+
+/**
+ * As contas que ainda nao receberam o resumo desta semana.
+ *
+ * O corte de seis dias, e nao de sete, e para o reinicio do processo nao
+ * atrasar o envio para a semana seguinte: a tarefa so roda com o servidor de
+ * pe, e deploy no dia do envio aconteceria.
+ */
+export async function contasParaRelatorio() {
+  const { rows } = await consultar(
+    `select id, nome, email, email_aviso, modulo_atendimento,
+            (select count(*)::int from conexoes x where x.conta_id = c.id) as conexoes
+       from contas c
+      where relatorio_semanal = true
+        and (relatorio_em is null or relatorio_em < now() - interval '6 days')
+      limit 200`,
+  );
+  return rows;
+}
+
+export async function marcarRelatorioEnviado(contaId) {
+  await consultar(`update contas set relatorio_em = now() where id = $1`, [contaId]);
 }

@@ -172,6 +172,59 @@ export function clienteEsperando({ nomeConta, quem, ultimaFala, minutos, urlPain
   };
 }
 
+/**
+ * O resumo da semana.
+ *
+ * Ele existe por retencao: quem instalou e parou de abrir o painel e
+ * justamente quem nao lembra o que o produto faz na hora de renovar. Por isso
+ * cada linha traz a semana anterior do lado: "12 conversas" sozinho nao diz
+ * nada, "12 contra 7" diz.
+ *
+ * Conta que so tem Atende Ai nao recebe linha de lead e de cupom. Quatro
+ * zeros de um produto que ela nao comprou fazem o e-mail parecer errado.
+ */
+export function resumoSemanal({ nomeConta, resumo, temCapta, temAtendimento, urlPainel }) {
+  const seta = (agora, antes) => {
+    if (antes === agora) return 'igual à semana passada';
+    if (antes === 0) return 'a semana passada foi zero';
+    const dif = Math.round(((agora - antes) / antes) * 100);
+    return `${dif > 0 ? '+' : ''}${dif}% sobre a semana passada`;
+  };
+
+  const linhas = [];
+  if (temAtendimento) {
+    linhas.push([`${resumo.conversas} conversas no WhatsApp`, seta(resumo.conversas, resumo.conversasAntes)]);
+    if (resumo.comVoce) {
+      linhas.push([`${resumo.comVoce} você assumiu`, 'o agente ficou calado nessas']);
+    }
+  }
+  if (temCapta) {
+    linhas.push([`${resumo.leads} leads pelo chat do site`, seta(resumo.leads, resumo.leadsAntes)]);
+    if (resumo.semContato) {
+      linhas.push([`${resumo.semContato} ainda sem contato`, 'estão esperando alguém da loja']);
+    }
+    if (resumo.pedidos) {
+      linhas.push([`${resumo.pedidos} pedidos vieram desses leads`,
+        `${resumo.faturamento.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} no total`]);
+    }
+  }
+
+  return {
+    assunto: assuntoLimpo(`Sua semana na ${nomeConta}`),
+    texto: `Resumo dos ultimos 7 dias.\n\n`
+      + linhas.map(([a, b]) => `- ${a} (${b})`).join('\n')
+      + `\n\nAbrir o painel: ${urlPainel}`,
+    html: moldura(`Sua semana na ${nomeConta}`,
+      `<p>O que aconteceu nos últimos 7 dias.</p>
+       <ul style="padding-left:18px">
+         ${linhas.map(([a, b]) => `<li><strong>${escapar(a)}</strong><br>
+           <span style="color:#71718c;font-size:13px">${escapar(b)}</span></li>`).join('')}
+       </ul>
+       <p><a href="${escapar(urlPainel)}">Abrir o painel</a></p>
+       <p style="color:#71718c;font-size:13px">Para parar de receber, é um clique em Configurações.</p>`),
+  };
+}
+
 /** Recuperacao de senha. O link vale uma hora e uma vez so. */
 export function recuperacaoSenha({ nomeConta, url }) {
   return {

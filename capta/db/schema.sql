@@ -635,3 +635,14 @@ alter table contas add column if not exists ativada_em timestamptz;
  * mandaria o mesmo e-mail seis vezes por hora.
  */
 alter table atendimentos add column if not exists avisado_em timestamptz;
+
+/*
+ * O relatorio semanal: se a conta quer receber, e quando foi o ultimo.
+ *
+ * Ligado por padrao porque ele existe por retencao: quem para de abrir o
+ * painel e justamente quem precisa ver o numero antes da renovacao. A marca
+ * do ultimo envio evita dois e-mails na mesma semana quando o processo
+ * reinicia, que acontece a cada deploy.
+ */
+alter table contas add column if not exists relatorio_semanal boolean not null default true;
+alter table contas add column if not exists relatorio_em timestamptz;
