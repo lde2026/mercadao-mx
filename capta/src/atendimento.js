@@ -38,6 +38,42 @@ export const CAMPOS = {
   observacoes: { coluna: 'observacoes', tipo: 'texto', teto: 4000, rotulo: 'Observações' },
 };
 
+/*
+ * O minimo para o agente atender sem passar vergonha.
+ *
+ * Antes a regra era "quatro campos quaisquer", e isso deixava uma loja entrar
+ * no ar sabendo o tom de voz e as observacoes e nao sabendo o que vende. Os
+ * dois primeiros sao quem a loja e; dos outros, bastam dois, porque sao os
+ * assuntos que o cliente pergunta na primeira mensagem.
+ */
+export const BASE_OBRIGATORIA = ['nomeLoja', 'segmento'];
+export const BASE_OPERACIONAL = [
+  'horarioAtendimento', 'prazosEntrega', 'politicaTroca', 'formasPagamento', 'linkSite',
+];
+export const OPERACIONAIS_MINIMOS = 2;
+
+function cheio(valor) {
+  if (Array.isArray(valor)) return valor.length > 0;
+  return valor !== '' && valor !== null && valor !== undefined;
+}
+
+/**
+ * O que ainda falta na base, por nome de campo. Vazio quer dizer pronta.
+ *
+ * Devolve a lista, e nao um booleano, porque as duas telas que usam isto
+ * precisam dizer ao lojista o que falta: "falta o basico" sem dizer qual e
+ * o motivo de ele achar que a tela esta quebrada.
+ */
+export function faltaNaBase(conteudo = {}) {
+  const faltando = BASE_OBRIGATORIA.filter((nome) => !cheio(conteudo[nome]));
+  const operacionais = BASE_OPERACIONAL.filter((nome) => cheio(conteudo[nome]));
+  return {
+    obrigatorios: faltando,
+    operacionaisQueFaltam: Math.max(0, OPERACIONAIS_MINIMOS - operacionais.length),
+    pronta: faltando.length === 0 && operacionais.length >= OPERACIONAIS_MINIMOS,
+  };
+}
+
 /** Os que o chat pode apontar campo a campo. O resto e texto corrido. */
 export const ESTRUTURADOS = [
   'nomeLoja', 'segmento', 'prazosEntrega', 'formasPagamento', 'politicaTroca',

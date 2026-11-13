@@ -1208,14 +1208,13 @@ app.get('/api/eu', async (req, res) => {
 /*
  * A base ja da para o agente responder?
  *
- * Quatro campos preenchidos e o corte, e ele aparece em dois lugares: na
- * lista de prontidao do painel e na decisao de o assistente conduzir a
- * ativacao. Os dois tem que concordar, senao a tela diz que falta base
- * enquanto o assistente ja trata a conversa como manutencao.
+ * A regra mora em atendimento.js porque ela aparece em tres lugares: a lista
+ * de prontidao do painel, a decisao de o assistente conduzir a ativacao e o
+ * diagnostico do operador. Os tres tem que concordar, senao a tela diz que
+ * falta base enquanto o assistente ja trata a conversa como manutencao.
  */
 function baseDaParaAtender(linha) {
-  return Object.values(atendimento.conteudo(linha))
-    .filter((v) => (Array.isArray(v) ? v.length : v !== '' && v !== null)).length >= 4;
+  return atendimento.faltaNaBase(atendimento.conteudo(linha)).pronta;
 }
 
 function mensagemParaTela(m) {
@@ -1267,6 +1266,9 @@ app.get('/api/atendimento', exigirAtendimento, async (req, res) => {
       // o que acabou de digitar na tela anterior.
       sugerido: req.conta.whatsapp || null,
       base: baseDaParaAtender(linha),
+      // O que falta, por nome de campo: a tela precisa dizer qual, nao so
+      // que falta alguma coisa.
+      falta: atendimento.faltaNaBase(atendimento.conteudo(linha)),
       atendendo: Boolean(consumo.atualizado_em),
     },
     assistente: temAssistente(),
@@ -2303,6 +2305,7 @@ app.get('/api/admin/diagnostico', exigirOperador, async (req, res) => {
 
   const linha = await atendimento.base(conta.id);
   const base = atendimento.conteudo(linha);
+  const falta = atendimento.faltaNaBase(base);
   const camposCheios = Object.values(base)
     .filter((v) => (Array.isArray(v) ? v.length : v !== '' && v !== null)).length;
   const sinal = await repo.ultimoSinalDoAgente(conta.id);
@@ -2310,7 +2313,11 @@ app.get('/api/admin/diagnostico', exigirOperador, async (req, res) => {
 
   const problemas = [];
   if (!conta.modulo_atendimento) problemas.push('O módulo Atende Aí está desligado nesta conta.');
-  if (!pronta) problemas.push(`A base tem ${camposCheios} campo(s) preenchido(s) e o agente responde pobre. Termine a ativação.`);
+  if (!pronta) {
+    const nomes = falta.obrigatorios.map((n) => atendimento.CAMPOS[n].rotulo).join(' e ');
+    problemas.push(`A base está incompleta: ${nomes ? `falta ${nomes}` : 'faltam informações operacionais'}`
+      + `${falta.operacionaisQueFaltam ? `, e ainda ${falta.operacionaisQueFaltam} de horário, entrega, troca, pagamento ou link` : ''}.`);
+  }
   if (conta.atendimento_pausado) problemas.push('O atendimento está pausado pelo lojista.');
   const temWhats = Boolean(conta.whatsapp_phone_id && conta.whatsapp_token);
   if (!temWhats) {
@@ -2328,6 +2335,7 @@ app.get('/api/admin/diagnostico', exigirOperador, async (req, res) => {
     pausado: Boolean(conta.atendimento_pausado),
     camposCheios,
     basePronta: pronta,
+    falta,
     whatsapp: temWhats,
     webhook: Boolean(process.env.META_APP_SECRET),
     conversas: sinal.conversas,

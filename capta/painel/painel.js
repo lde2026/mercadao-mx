@@ -3001,8 +3001,6 @@
     }
   }
 
-  var MINIMO_DA_BASE = 4;
-
   function preenchidos() {
     var base = atendimento.base || {};
     var campos = atendimento.campos || {};
@@ -3013,22 +3011,37 @@
     });
   }
 
+  /*
+   * O que falta vem do servidor por nome de campo, e nao de uma contagem
+   * feita aqui: a regra do que e base pronta e uma so, e ela mora no servidor
+   * junto com quem decide se o agente entra no ar.
+   */
   function oQueJaSei() {
     var campos = atendimento.campos || {};
+    var falta = (atendimento.prontidao || {}).falta || {};
     var tem = preenchidos();
     var caixa = el('div', null, 'ja-sei');
+
     if (!tem.length) {
       caixa.appendChild(el('span', 'Ainda não gravei nada da sua loja. O que o assistente propuser só entra depois que você confirmar.', 'hora'));
       return caixa;
     }
+
     caixa.appendChild(el('span', 'Já gravei: ' + tem.map(function (n) {
       return campos[n] ? campos[n].rotulo : n;
     }).join(', ') + '.', 'hora'));
-    var faltam = MINIMO_DA_BASE - tem.length;
-    caixa.appendChild(el('span', faltam > 0
-      ? (faltam === 1
-        ? 'Falta mais uma informação para o atendimento começar.'
-        : 'Faltam mais ' + faltam + ' informações para o atendimento começar.')
+
+    var pedidos = [];
+    (falta.obrigatorios || []).forEach(function (n) {
+      pedidos.push(campos[n] ? campos[n].rotulo.toLowerCase() : n);
+    });
+    if (falta.operacionaisQueFaltam) {
+      pedidos.push(falta.operacionaisQueFaltam === 1
+        ? 'mais uma entre horário, entrega, troca, pagamento ou link do site'
+        : falta.operacionaisQueFaltam + ' entre horário, entrega, troca, pagamento ou link do site');
+    }
+    caixa.appendChild(el('span', pedidos.length
+      ? 'Para o atendimento começar, falta ' + pedidos.join(', e ') + '.'
       : 'Já dá para começar.', 'hora'));
     return caixa;
   }
