@@ -222,6 +222,19 @@
     document.getElementById('campo-nome').hidden = !criando;
     document.querySelector('#campo-nome input').required = criando;
     // O aceite so existe no cadastro: quem ja tem conta aceitou quando criou.
+    /*
+     * No cadastro a senha e "new-password", e nao "current-password".
+     *
+     * Sem isso o gerenciador de senhas trata a tela como login, oferece a
+     * senha gerada e acaba preenchendo o campo de texto que estiver por
+     * perto: ja aconteceu de uma conta nascer chamada com a propria senha.
+     * O nome e o WhatsApp tambem vem antes do par e-mail e senha, pelo mesmo
+     * motivo: campo de texto depois da senha e campo que o gerenciador
+     * confunde.
+     */
+    document.getElementById('campo-senha').autocomplete = criando ? 'new-password' : 'current-password';
+    document.getElementById('campo-whatsapp').hidden = !criando;
+    document.querySelector('#campo-whatsapp input').required = criando;
     document.getElementById('campo-aceite').hidden = !criando;
     document.querySelector('#campo-aceite input').required = criando;
     document.getElementById('botao-entrada').textContent = criando ? 'Criar conta' : 'Entrar';
@@ -240,6 +253,7 @@
     var corpo = { email: dados.get('email'), senha: dados.get('senha') };
     if (criando) {
       corpo.nome = dados.get('nome');
+      corpo.whatsapp = dados.get('whatsapp');
       corpo.aceite = dados.get('aceite') === 'on';
     }
     api(criando ? '/cadastro' : '/login', { method: 'POST', corpo: corpo })

@@ -14,17 +14,20 @@ import { cotaDeLojas } from './billing/planos.js';
 export const DIAS_DE_TESTE = 7;
 
 export async function criarConta({
-  nome, email, senha, termosVersao = null, termosRede = null, diasDeTeste = DIAS_DE_TESTE,
+  nome, email, senha, whatsapp = null,
+  termosVersao = null, termosRede = null, diasDeTeste = DIAS_DE_TESTE,
 }) {
   return emTransacao(async (cliente) => {
     // O teste comeca na criacao da conta, nao no primeiro acesso: a data tem
     // que ser a mesma que o cliente vai ver no painel e no e-mail.
     const { rows } = await cliente.query(
-      `insert into contas (nome, email, senha_hash, termos_versao, termos_aceitos_em, termos_rede, teste_ate)
-       values ($1, lower($2), $3, $4::text, case when $4::text is null then null else now() end, $5,
+      `insert into contas (nome, email, senha_hash, whatsapp, termos_versao, termos_aceitos_em,
+                           termos_rede, teste_ate)
+       values ($1, lower($2), $3, nullif($7, ''),
+               $4::text, case when $4::text is null then null else now() end, $5,
                case when $6::int is null then null else now() + ($6 || ' days')::interval end)
-       returning id, nome, email, termos_versao, termos_aceitos_em, teste_ate, criado_em`,
-      [nome, email, hashSenha(senha), termosVersao, termosRede, diasDeTeste],
+       returning id, nome, email, whatsapp, termos_versao, termos_aceitos_em, teste_ate, criado_em`,
+      [nome, email, hashSenha(senha), termosVersao, termosRede, diasDeTeste, soDigitos(whatsapp)],
     );
     const conta = rows[0];
     await cliente.query(

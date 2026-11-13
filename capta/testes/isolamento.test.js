@@ -37,7 +37,7 @@ async function pedir(caminho, { metodo = 'GET', corpo, cookie } = {}) {
 
 async function contaLogada(nome, email) {
   const r = await pedir('/api/cadastro', {
-    metodo: 'POST', corpo: { nome, email, senha: 'senha-de-teste-123', aceite: true },
+    metodo: 'POST', corpo: { nome, email, senha: 'senha-de-teste-123', whatsapp: '41988887777', aceite: true },
   });
   assert.equal(r.status, 200, `cadastro de ${nome} falhou`);
   return { id: r.json.conta.id, cookie: r.cookie.split(';')[0] };
@@ -407,7 +407,7 @@ test('cadastro publico nao cria conta de operador', async () => {
 
   const r = await pedir('/api/cadastro', {
     metodo: 'POST',
-    corpo: { nome: 'Estranho', email: 'DONO@lojadoecommerce.com.br', senha: 'senha-de-teste-123', aceite: true },
+    corpo: { nome: 'Estranho', email: 'DONO@lojadoecommerce.com.br', senha: 'senha-de-teste-123', whatsapp: '41988887777', aceite: true },
   });
   assert.equal(r.status, 409, 'cadastro com e-mail de operador tinha que ser recusado');
   // Mesma resposta de e-mail repetido: a rota nao pode confirmar quem e dono.

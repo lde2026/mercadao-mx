@@ -797,8 +797,18 @@ app.get('/api/termos', (_req, res) => {
 });
 
 app.post('/api/cadastro', limitarEntrada, limitarCadastro, async (req, res) => {
-  const { nome, email, senha, aceite } = req.body || {};
+  const { nome, email, senha, aceite, whatsapp } = req.body || {};
   if (!nome || !email || !senha) return res.status(400).json({ erro: 'campos obrigatorios' });
+
+  /*
+   * O WhatsApp e pedido no cadastro, e nao depois nas configuracoes.
+   *
+   * E por ele que se fala com quem acabou de assinar, e quem nunca preenche
+   * um campo opcional e justamente a conta que some antes da primeira
+   * conversa. Dez digitos e o minimo que da para discar: DDD mais oito.
+   */
+  const fone = repo.soDigitos(whatsapp);
+  if (fone.length < 10) return res.status(400).json({ erro: 'informe um WhatsApp com DDD' });
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim())) return res.status(400).json({ erro: 'e-mail invalido' });
   if (String(senha).length < 8) return res.status(400).json({ erro: 'senha de no minimo 8 caracteres' });
   // Sem aceite nao se cria conta: o registro de quem aceitou o que, e quando,
@@ -820,6 +830,7 @@ app.post('/api/cadastro', limitarEntrada, limitarCadastro, async (req, res) => {
   try {
     const conta = await repo.criarConta({
       nome: String(nome).trim().slice(0, 120), email: String(email).trim(), senha: String(senha),
+      whatsapp: fone,
       termosVersao: TERMOS.versao, termosRede: mascararIp(ipDoCliente(req)),
     });
     const sessaoId = await repo.criarSessao(conta.id);

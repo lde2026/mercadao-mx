@@ -12,12 +12,13 @@
     <form id="form-entrada">
       <div class="marca-grande">captapp</div>
       <p class="sub">Painel do lojista</p>
+      <label id="campo-nome" hidden>Nome completo<input type="text" name="nome" autocomplete="name"></label>
+      <label id="campo-whatsapp" hidden>WhatsApp<input type="tel" name="whatsapp" inputmode="tel" placeholder="DDD + número" autocomplete="tel"></label>
       <label>E-mail<input type="email" name="email" required autocomplete="email"></label>
-      <label>Senha<input type="password" name="senha" required autocomplete="current-password"></label>
-      <label id="campo-nome" hidden>Nome da loja<input type="text" name="nome" autocomplete="organization"></label>
+      <label>Senha<input type="password" name="senha" id="campo-senha" required autocomplete="current-password"></label>
       <label id="campo-aceite" class="aceite" hidden>
         <input type="checkbox" name="aceite">
-        <span>Li e aceito os <a href="https://capta.lojadoecommerce.com.br/termos" target="_blank" rel="noopener">Termos de Uso</a> e a <a href="https://capta.lojadoecommerce.com.br/privacidade" target="_blank" rel="noopener">Política de Privacidade</a>.</span>
+        <span>Li e aceito os <a href="/termos" target="_blank" rel="noopener">Termos de Uso</a> e a <a href="/privacidade" target="_blank" rel="noopener">Política de Privacidade</a>.</span>
       </label>
       <p class="erro" id="erro-entrada" hidden></p>
       <button type="submit" id="botao-entrada">Entrar</button>

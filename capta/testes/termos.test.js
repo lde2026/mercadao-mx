@@ -36,7 +36,7 @@ test('a versao vigente dos termos e publica, sem sessao', async () => {
 
 test('cadastro com aceite grava versao, data e rede mascarada', async () => {
   const email = `com-aceite-${Date.now()}@teste.com.br`;
-  const r = await cadastrar({ nome: 'Loja Com Aceite', email, senha: 'senha-de-teste-123', aceite: true });
+  const r = await cadastrar({ nome: 'Loja Com Aceite', email, senha: 'senha-de-teste-123', whatsapp: '41988887777', aceite: true });
   assert.equal(r.status, 200);
 
   const { rows } = await consultar(
@@ -50,7 +50,7 @@ test('cadastro com aceite grava versao, data e rede mascarada', async () => {
 
 test('cadastro sem aceite e recusado e nao cria conta', async () => {
   const email = `sem-aceite-${Date.now()}@teste.com.br`;
-  const r = await cadastrar({ nome: 'Loja Sem Aceite', email, senha: 'senha-de-teste-123' });
+  const r = await cadastrar({ nome: 'Loja Sem Aceite', email, senha: 'senha-de-teste-123', whatsapp: '41988887777' });
   assert.equal(r.status, 400);
   assert.match((await r.json()).erro, /termos/);
   const { rows } = await consultar('select 1 from contas where email = $1', [email]);
