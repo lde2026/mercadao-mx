@@ -32,9 +32,9 @@ const base = `http://127.0.0.1:${servidor.address().port}`;
 
 async function contaLogada(nome, email, { modulo = true } = {}) {
   const conta = await contaDeTeste(nome, email);
-  if (modulo) {
-    await consultar('update contas set modulo_atendimento = true where id = $1', [conta.id]);
-  }
+  // Conta nova ja nasce com o modulo; aqui o teste desliga de proposito para
+  // provar o que acontece com quem nao assina.
+  await consultar('update contas set modulo_atendimento = $2 where id = $1', [conta.id, modulo]);
   const r = await fetch(`${base}/api/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

@@ -416,6 +416,13 @@
           alvo.appendChild(faixa);
         }
 
+        // Sem numero nao existe produto: o Atende Ai e so WhatsApp. Entao
+        // conectar vem antes de qualquer numero de desempenho.
+        if (atende && !(atende.prontidao || {}).numero) {
+          atendimento = atende;
+          alvo.appendChild(conectarWhatsapp(function () { verHoje(); }));
+        }
+
         var grade = el('div', null, 'grade-num');
         if (atende) {
           cartoesDoAtendeAi(atende).forEach(function (c) { grade.appendChild(c); });
@@ -2476,6 +2483,13 @@
           numero.type = 'text';
           numero.placeholder = 'WhatsApp, com DDD';
           numero.value = c.numero_atendimento || '';
+          if (!c.numero_atendimento && c.numero_solicitado) {
+            // O que o lojista informou aparece pronto para confirmar: a
+            // ativacao e nossa, e digitar de novo e so chance de errar.
+            numero.value = c.numero_solicitado;
+            numero.style.borderColor = 'var(--atencao)';
+            numero.title = 'O lojista informou este número. Confirme para ligar.';
+          }
           numero.style.width = '150px';
           numero.style.margin = '0';
           numero.style.padding = '5px 9px';
@@ -2584,6 +2598,9 @@
   function desenharAtendimento(corpo) {
     corpo.textContent = '';
     corpo.appendChild(freioDeMao(corpo));
+    if (!(atendimento.prontidao || {}).numero) {
+      corpo.appendChild(conectarWhatsapp(function () { desenharAtendimento(corpo); }));
+    }
     var falta = prontidao();
     if (falta) corpo.appendChild(falta);
     corpo.appendChild(consumoDoMes());
@@ -2603,6 +2620,66 @@
    * atendimento parado quando na verdade e medidor desligado. Por isso o
    * texto muda em vez do numero.
    */
+  /*
+   * A primeira coisa que o lojista ve, enquanto nao tiver numero.
+   *
+   * O Atende Ai e so WhatsApp: sem numero conectado nao existe produto, e
+   * qualquer outro numero na tela seria enfeite. Ele informa o dele; quem
+   * confirma somos nos, na ativacao, porque e o numero que decide de quem e
+   * a conversa que chega.
+   */
+  function conectarWhatsapp(aoMudar) {
+    var p = atendimento.prontidao || {};
+    var caixa = el('div', null, 'conectar');
+    caixa.appendChild(el('div', 'Conecte o seu WhatsApp', 'rotulo'));
+
+    if (p.solicitado) {
+      caixa.appendChild(el('p', 'Recebemos o número ' + numeroBonito(p.solicitado)
+        + '. Vamos fazer a verificação com a Meta e avisar quando ele estiver atendendo.', 'legenda'));
+      var trocar = el('button', 'Informar outro número', 'secundario');
+      trocar.type = 'button';
+      trocar.addEventListener('click', function () {
+        atendimento.prontidao.solicitado = null;
+        aoMudar();
+      });
+      caixa.appendChild(trocar);
+      return caixa;
+    }
+
+    caixa.appendChild(el('p', 'É o número que vai atender os seus clientes. Informe aqui e a gente faz a verificação com a Meta para colocar no ar.', 'legenda'));
+    var linha = el('div', null, 'linha');
+    var campo = el('input');
+    campo.type = 'tel';
+    campo.inputMode = 'tel';
+    campo.placeholder = 'DDD + número';
+    var enviar = el('button', 'Conectar meu WhatsApp');
+    enviar.type = 'button';
+    var erro = el('p', '', 'erro');
+    erro.hidden = true;
+
+    enviar.addEventListener('click', function () {
+      erro.hidden = true;
+      enviar.disabled = true;
+      api('/atendimento/numero', { method: 'POST', corpo: { numero: campo.value } })
+        .then(function (r) {
+          atendimento.prontidao.solicitado = r.solicitado;
+          aoMudar();
+        })
+        .catch(function (e) {
+          enviar.disabled = false;
+          erro.textContent = e.message;
+          erro.hidden = false;
+        });
+    });
+    campo.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') enviar.click(); });
+
+    linha.appendChild(campo);
+    linha.appendChild(enviar);
+    caixa.appendChild(linha);
+    caixa.appendChild(erro);
+    return caixa;
+  }
+
   /*
    * O freio de mao.
    *
@@ -2681,7 +2758,9 @@
     var itens = [
       { ok: Boolean(p.numero), texto: p.numero
         ? 'Número conectado: ' + numeroBonito(p.numero)
-        : 'O número de WhatsApp ainda não está conectado. Quem faz isso somos nós, na ativação.' },
+        : p.solicitado
+          ? 'Número informado. Falta a nossa verificação com a Meta.'
+          : 'O número de WhatsApp ainda não está conectado.' },
       { ok: Boolean(p.base), texto: p.base
         ? 'Base preenchida'
         : 'Falta o básico da base: nome da loja, prazo de entrega, pagamento e troca.' },

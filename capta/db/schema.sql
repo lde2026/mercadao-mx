@@ -468,6 +468,15 @@ alter table contas add column if not exists numero_atendimento text;
 alter table contas add column if not exists atendimento_pausado boolean not null default false;
 alter table contas add column if not exists atendimento_recado text;
 
+-- O numero que o lojista diz ser dele.
+--
+-- Separado do numero_atendimento de proposito. Este e pedido; aquele e o que
+-- decide de quem e a conversa que chega. Se o lojista escrevesse direto no
+-- que roteia, bastaria ele digitar o numero do vizinho para receber a base e
+-- as conversas da outra loja. Quem confirma somos nos, na ativacao, que e
+-- servico pago e passa por nos de qualquer jeito.
+alter table contas add column if not exists numero_solicitado text;
+
 -- O numero decide de quem e a conversa que chega no WhatsApp. Dois donos para
 -- o mesmo numero seria o agente escolhendo no par ou impar qual base usar, e
 -- uma loja respondendo com a politica de troca da outra. Indice parcial

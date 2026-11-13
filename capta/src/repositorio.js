@@ -16,18 +16,24 @@ export const DIAS_DE_TESTE = 7;
 export async function criarConta({
   nome, email, senha, whatsapp = null,
   termosVersao = null, termosRede = null, diasDeTeste = DIAS_DE_TESTE,
+  // O produto e o Atende Ai: conta nova ja nasce com ele. Nascer sem era
+  // cair no painel de captacao, procurando uma tela que nao existe ali.
+  moduloAtendimento = true,
 }) {
   return emTransacao(async (cliente) => {
     // O teste comeca na criacao da conta, nao no primeiro acesso: a data tem
     // que ser a mesma que o cliente vai ver no painel e no e-mail.
     const { rows } = await cliente.query(
       `insert into contas (nome, email, senha_hash, whatsapp, termos_versao, termos_aceitos_em,
-                           termos_rede, teste_ate)
+                           termos_rede, teste_ate, modulo_atendimento, faixa_atendimento)
        values ($1, lower($2), $3, nullif($7, ''),
                $4::text, case when $4::text is null then null else now() end, $5,
-               case when $6::int is null then null else now() + ($6 || ' days')::interval end)
-       returning id, nome, email, whatsapp, termos_versao, termos_aceitos_em, teste_ate, criado_em`,
-      [nome, email, hashSenha(senha), termosVersao, termosRede, diasDeTeste, soDigitos(whatsapp)],
+               case when $6::int is null then null else now() + ($6 || ' days')::interval end,
+               $8, case when $8 then 'essencial' else null end)
+       returning id, nome, email, whatsapp, modulo_atendimento, termos_versao, termos_aceitos_em,
+                 teste_ate, criado_em`,
+      [nome, email, hashSenha(senha), termosVersao, termosRede, diasDeTeste, soDigitos(whatsapp),
+       Boolean(moduloAtendimento)],
     );
     const conta = rows[0];
     await cliente.query(
@@ -319,6 +325,24 @@ export async function contaPorNumeroAtendimento(numero) {
  * O recado e opcional e e o que o agente responde enquanto estiver parado.
  * Vazio, quem decide o que dizer e o agente.
  */
+/**
+ * O numero que o lojista diz ser dele, guardado como pedido.
+ *
+ * Nao roteia nada: e so o que ele informou, para confirmarmos na ativacao.
+ * Se ele escrevesse direto no numero que roteia, bastaria digitar o do
+ * vizinho para receber a base e as conversas da outra loja.
+ */
+export async function pedirNumeroAtendimento(contaId, numero) {
+  const limpo = numeroCanonico(numero);
+  const { rows } = await consultar(
+    `update contas set numero_solicitado = nullif($2, ''), atualizado_em = now()
+      where id = $1
+      returning numero_solicitado`,
+    [contaId, limpo],
+  );
+  return rows.length ? rows[0] : null;
+}
+
 export async function pausarAtendimento(contaId, { pausado, recado = null }) {
   const { rows } = await consultar(
     `update contas
@@ -337,7 +361,7 @@ export async function buscarSessao(id) {
   const { rows } = await consultar(
     `select s.conta_id, s.operador_id, c.nome, c.email, c.teste_ate,
             c.modulo_atendimento, c.faixa_atendimento, c.numero_atendimento,
-            c.atendimento_pausado, c.atendimento_recado
+            c.numero_solicitado, c.atendimento_pausado, c.atendimento_recado
        from sessoes s join contas c on c.id = s.conta_id
       where s.id = $1 and s.expira_em > now()`,
     [id],
@@ -1011,7 +1035,7 @@ export async function resumoGeral() {
 export async function listarContas() {
   const { rows } = await consultar(
     `select c.id, c.nome, c.email, c.criado_em,
-            c.modulo_atendimento, c.faixa_atendimento, c.numero_atendimento,
+            c.modulo_atendimento, c.faixa_atendimento, c.numero_atendimento, c.numero_solicitado,
             a.plano, a.ciclo, a.origem,
             (select count(*)::int from leads l where l.conta_id = c.id
                and l.criado_em >= date_trunc('month', now())) as leads_mes,

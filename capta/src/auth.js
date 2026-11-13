@@ -67,6 +67,7 @@ export async function carregarConta(req, _res, proximo) {
         moduloAtendimento: Boolean(sessao.modulo_atendimento),
         faixaAtendimento: sessao.faixa_atendimento || null,
         numeroAtendimento: sessao.numero_atendimento || null,
+        numeroSolicitado: sessao.numero_solicitado || null,
         atendimentoPausado: Boolean(sessao.atendimento_pausado),
         atendimentoRecado: sessao.atendimento_recado || null,
       };

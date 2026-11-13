@@ -981,6 +981,7 @@ app.get('/api/atendimento', exigirAtendimento, async (req, res) => {
     },
     prontidao: {
       numero: req.conta.numeroAtendimento,
+      solicitado: req.conta.numeroSolicitado,
       base: Object.values(atendimento.conteudo(linha))
         .filter((v) => (Array.isArray(v) ? v.length : v !== '' && v !== null)).length >= 4,
       atendendo: Boolean(consumo.atualizado_em),
@@ -1020,6 +1021,25 @@ app.put('/api/atendimento', exigirAtendimento, async (req, res) => {
  * operacao, nao conhecimento. Religar e um clique, e e ele quem decide a
  * hora, sem falar com a gente e sem esperar deploy.
  */
+/**
+ * O lojista informa o numero dele; nos confirmamos.
+ *
+ * Ele nao escreve no numero que roteia conversa, e a separacao e de
+ * seguranca: bastaria digitar o do vizinho para receber a base e as
+ * conversas da outra loja. O que ele faz aqui e dizer qual e o dele, e isso
+ * vira a primeira tarefa da nossa ativacao.
+ */
+app.post('/api/atendimento/numero', exigirAtendimento, async (req, res) => {
+  const numero = repo.soDigitos((req.body || {}).numero);
+  if (numero.length < 10) {
+    return res.status(400).json({ erro: 'informe o WhatsApp com DDD' });
+  }
+  const agora = await repo.pedirNumeroAtendimento(req.conta.id, numero);
+  if (!agora) return res.status(404).json({ erro: 'conta nao encontrada' });
+  log.info('atendimento.numero_pedido', { conta_id: req.conta.id });
+  res.json({ solicitado: agora.numero_solicitado });
+});
+
 app.post('/api/atendimento/pausa', exigirAtendimento, async (req, res) => {
   const corpo = req.body || {};
   const agora = await repo.pausarAtendimento(req.conta.id, {

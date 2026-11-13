@@ -240,6 +240,13 @@ test('lojista comum nao alcanca as rotas do operador', async () => {
  * cobre quem nao alcanca; esta cobre o que acontece quando quem pode liga.
  */
 test('o operador liga e desliga o Atende Ai, e a conta sente na hora', async () => {
+  // Conta nova ja nasce com o modulo, porque o produto e o Atende Ai. O
+  // teste desliga primeiro para provar os dois sentidos do botao.
+  const deslige = await pedir(`/api/admin/contas/${contaA.id}/modulo`, {
+    metodo: 'POST', cookie: operador.cookie, corpo: { ligado: false },
+  });
+  assert.equal(deslige.json.atendimento, false);
+
   const antes = await pedir('/api/eu', { cookie: contaA.cookie });
   assert.equal(antes.json.modulos.atendimento, false);
   const fechado = await pedir('/api/atendimento', { cookie: contaA.cookie });
@@ -266,9 +273,10 @@ test('o operador liga e desliga o Atende Ai, e a conta sente na hora', async () 
   const trancado = await pedir('/api/atendimento', { cookie: contaA.cookie });
   assert.equal(trancado.status, 404);
 
-  // E a vizinha nao foi junto em nenhum dos dois sentidos.
+  // E a vizinha nao foi junto em nenhum dos dois sentidos: ela continua
+  // como nasceu, ligada, enquanto a conta A foi desligada e religada.
   const vizinha = await pedir('/api/eu', { cookie: contaB.cookie });
-  assert.equal(vizinha.json.modulos.atendimento, false);
+  assert.equal(vizinha.json.modulos.atendimento, true);
 });
 
 test('a faixa do Atende Ai e escolhida, e faixa inventada nao passa', async () => {

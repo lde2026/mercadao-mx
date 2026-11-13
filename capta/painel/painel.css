@@ -576,3 +576,14 @@ pre{background:var(--escuro);color:var(--superficie);padding:13px;border-radius:
   padding:13px 16px;margin-bottom:16px;font-size:14px;color:var(--atencao)}
 .faixa-aviso.ruim{background:var(--ruim-fundo);border-color:var(--ruim);color:var(--ruim)}
 .faixa-aviso button{flex:none;padding:7px 14px;font-size:13px}
+
+/* Conectar o WhatsApp: sem numero nao existe produto, entao ela vem antes
+   de qualquer numero de desempenho. */
+.conectar{border:1px solid var(--acento);border-radius:12px;padding:18px 20px;margin-bottom:18px;
+  background:var(--acento-suave);display:grid;gap:4px}
+.conectar .rotulo{margin:0;color:var(--acento-texto)}
+.conectar .legenda{margin-bottom:10px;max-width:62ch}
+.conectar .linha{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.conectar input{margin:0;width:auto;min-width:190px;flex:0 1 230px}
+.conectar button{flex:none}
+.conectar .erro{margin:8px 0 0}
