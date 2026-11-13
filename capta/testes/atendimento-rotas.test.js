@@ -455,6 +455,32 @@ test('pausar exige o modulo, e nao se pausa pela rota interna', async () => {
   assert.equal(agente.status, 401);
 });
 
+/*
+ * A receita do Atende Ai no Admin.
+ *
+ * Ela nao sai de assinaturas, e sim da faixa gravada na conta, entao nenhum
+ * teste de plano cobre isso: sem este, mudar a faixa de uma conta mexeria no
+ * numero do Admin sem ninguem perceber. E as duas receitas ficam separadas de
+ * proposito, porque o Atende Ai ainda nao passa pela cobranca automatica.
+ */
+test('o Admin conta a recorrencia do Atende Ai pela faixa, separada do Capta', async () => {
+  await consultar(
+    `update contas set modulo_atendimento = false where email <> $1`,
+    [contaA.email],
+  );
+  await consultar(
+    `update contas set modulo_atendimento = true, faixa_atendimento = 'escala' where id = $1`,
+    [contaA.id],
+  );
+
+  const resumo = await pedir('/api/admin/resumo', { cookie: operador.cookie });
+  assert.equal(resumo.status, 200);
+  assert.equal(resumo.json.mrrAtendimento, 797);
+  assert.equal(resumo.json.mrr, 0, 'conta sem assinatura nao pode virar receita do Capta');
+  assert.deepEqual(resumo.json.atendimento, [{ faixa: 'escala', n: 1 }]);
+  assert.equal(resumo.json.faixas.escala.mensal, 797);
+});
+
 test.after(async () => {
   servidor.close();
   await pool.end();

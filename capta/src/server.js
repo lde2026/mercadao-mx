@@ -1792,7 +1792,23 @@ app.get('/api/admin/resumo', exigirOperador, async (_req, res) => {
     const preco = precoDoPlano(a.plano, a.ciclo);
     return soma + (a.ciclo === 'anual' ? preco / 12 : preco) * a.n;
   }, 0);
-  res.json({ ...resumo, mrr: Math.round(mrr * 100) / 100, planos: PLANOS });
+  /*
+   * A recorrencia do Atende Ai vai separada, e nao somada no MRR.
+   *
+   * Nenhuma conta do Atende Ai e cobrada pelo Asaas ainda: somar as duas
+   * daria um numero que parece faturado e nao esta. Separado, da para ver o
+   * que ja entra e o que ainda falta ligar na cobranca.
+   */
+  const mrrAtendimento = resumo.atendimento.reduce(
+    (soma, f) => soma + ((atendeai.precoDaFaixa(f.faixa) || {}).mensal || 0) * f.n, 0,
+  );
+  res.json({
+    ...resumo,
+    mrr: Math.round(mrr * 100) / 100,
+    mrrAtendimento: Math.round(mrrAtendimento * 100) / 100,
+    planos: PLANOS,
+    faixas: atendeai.FAIXAS,
+  });
 });
 
 /**

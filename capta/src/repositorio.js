@@ -1009,10 +1009,16 @@ export async function reabrirCobranca(origem, idExterno) {
 
 /** Visao geral do Captapp inteiro. So o operador chama. */
 export async function resumoGeral() {
-  const [contas, assinantes, inadimplentes, leadsHoje, leadsMes, conexoes, cuponsFalhos, alertas] =
+  const [contas, assinantes, atendimento, inadimplentes, leadsHoje, leadsMes, conexoes,
+    cuponsFalhos, alertas] =
     await Promise.all([
       consultar(`select count(*)::int as n from contas`),
       consultar(`select plano, ciclo, count(*)::int as n from assinaturas where status = 'ativa' group by 1, 2`),
+      // O Atende Ai nao tem linha em assinaturas: quem paga e quem esta com o
+      // modulo ligado, e a faixa na conta e que diz quanto. Contar por aqui e
+      // o unico jeito de a receita dele aparecer no Admin.
+      consultar(`select coalesce(faixa_atendimento, 'essencial') as faixa, count(*)::int as n
+                   from contas where modulo_atendimento = true group by 1 order by 1`),
       consultar(`select count(distinct conta_id)::int as n from cobrancas where status = 'aberta' and vence_em < current_date`),
       consultar(`select count(*)::int as n from leads where criado_em >= current_date`),
       consultar(`select count(*)::int as n from leads where criado_em >= date_trunc('month', now())`),
@@ -1023,6 +1029,7 @@ export async function resumoGeral() {
   return {
     contas: contas.rows[0].n,
     assinantes: assinantes.rows,
+    atendimento: atendimento.rows,
     inadimplentes: inadimplentes.rows[0].n,
     leadsHoje: leadsHoje.rows[0].n,
     leadsMes: leadsMes.rows[0].n,

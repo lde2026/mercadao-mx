@@ -2343,8 +2343,10 @@
       }));
       grade.appendChild(cartaoNumero({
         rotulo: 'Receita mensal recorrente', valor: dinheiro(resumo.mrr), nomeIcone: 'dinheiro', tom: 'bom',
-        detalhe: 'anual contado por doze avos',
-        rodape: { texto: 'Só mensalidades, sem implantação' },
+        detalhe: 'Capta, anual contado por doze avos',
+        // O Atende Ai aparece ao lado, e nao somado: ele ainda nao passa pelo
+        // Asaas, entao somar daria um total com cara de faturado.
+        rodape: { texto: dinheiro(resumo.mrrAtendimento || 0) + ' em Atende Aí, fora da cobrança automática' },
       }));
       grade.appendChild(cartaoNumero({
         rotulo: 'Inadimplentes', valor: String(resumo.inadimplentes), nomeIcone: 'alerta',
@@ -2365,8 +2367,28 @@
       }));
       alvo.appendChild(grade);
 
+      var porFaixa = el('div', null, 'cartao');
+      porFaixa.appendChild(el('div', 'Atende Aí por faixa', 'rotulo'));
+      var contasAtende = (resumo.atendimento || []).reduce(function (t, f) { return t + f.n; }, 0);
+      if (contasAtende) {
+        porFaixa.appendChild(tabela(['Faixa', 'Mensalidade', 'Mensagens no plano', 'Contas'],
+          Object.keys(resumo.faixas || {}).map(function (id) {
+            var linha = (resumo.atendimento || []).filter(function (f) { return f.faixa === id; })
+              .reduce(function (t, f) { return t + f.n; }, 0);
+            return { celulas: [
+              resumo.faixas[id].nome,
+              dinheiro(resumo.faixas[id].mensal) + '/mês',
+              resumo.faixas[id].mensagens.toLocaleString('pt-BR'),
+              linha,
+            ] };
+          })));
+      } else {
+        porFaixa.appendChild(el('p', 'Nenhuma conta com o Atende Aí ligado ainda.', 'vazio'));
+      }
+      alvo.appendChild(porFaixa);
+
       var porPlano = el('div', null, 'cartao');
-      porPlano.appendChild(el('div', 'Assinantes por plano', 'rotulo'));
+      porPlano.appendChild(el('div', 'Capta: assinantes por plano', 'rotulo'));
       var linhasPlano = Object.keys(resumo.planos).map(function (id) {
         var mensal = resumo.assinantes.filter(function (a) { return a.plano === id && a.ciclo === 'mensal'; }).reduce(function (t, a) { return t + a.n; }, 0);
         var anual = resumo.assinantes.filter(function (a) { return a.plano === id && a.ciclo === 'anual'; }).reduce(function (t, a) { return t + a.n; }, 0);
