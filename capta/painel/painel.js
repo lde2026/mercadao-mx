@@ -2439,6 +2439,7 @@
                 modulo.style.borderColor = r.atendimento ? 'var(--acento)' : '';
                 faixa.hidden = !r.atendimento;
                 numero.hidden = !r.atendimento;
+                if (confirmar) confirmar.hidden = !r.atendimento;
                 if (r.faixa) faixa.value = r.faixa;
               })
               .catch(function (erro) { alert(erro.message); })
@@ -2483,7 +2484,8 @@
           numero.type = 'text';
           numero.placeholder = 'WhatsApp, com DDD';
           numero.value = c.numero_atendimento || '';
-          if (!c.numero_atendimento && c.numero_solicitado) {
+          var pendente = Boolean(!c.numero_atendimento && c.numero_solicitado);
+          if (pendente) {
             // O que o lojista informou aparece pronto para confirmar: a
             // ativacao e nossa, e digitar de novo e so chance de errar.
             numero.value = c.numero_solicitado;
@@ -2496,25 +2498,54 @@
           numero.style.fontSize = '12.5px';
           numero.hidden = !c.modulo_atendimento;
           numero.addEventListener('click', function (e) { e.stopPropagation(); });
-          numero.addEventListener('change', function () {
+
+          // O botao existe porque change so dispara quando o campo e editado:
+          // o numero que ja veio preenchido pelo lojista ficaria para sempre
+          // em ambar, com cara de salvo, sem nunca ter sido gravado.
+          var confirmar = pendente ? el('button', 'Confirmar', 'secundario') : null;
+
+          function gravarNumero() {
             numero.disabled = true;
+            if (confirmar) confirmar.disabled = true;
             api('/admin/contas/' + c.id + '/numero', {
               method: 'POST', corpo: { numero: numero.value },
             })
               .then(function (r) {
                 c.numero_atendimento = r.numero;
                 numero.value = r.numero || '';
+                numero.style.borderColor = '';
+                numero.title = r.numero
+                  ? 'Número ligado. As conversas dele chegam nesta conta.'
+                  : '';
+                if (confirmar) { confirmar.remove(); confirmar = null; }
               })
               .catch(function (erro) {
                 alert(erro.dados && erro.dados.explicacao ? erro.dados.explicacao : erro.message);
-                numero.value = c.numero_atendimento || '';
+                numero.value = c.numero_atendimento || (pendente ? c.numero_solicitado : '');
               })
-              .then(function () { numero.disabled = false; });
-          });
+              .then(function () {
+                numero.disabled = false;
+                if (confirmar) confirmar.disabled = false;
+              });
+          }
+
+          numero.addEventListener('change', gravarNumero);
+
+          if (confirmar) {
+            confirmar.type = 'button';
+            confirmar.style.padding = '6px 10px';
+            confirmar.style.borderColor = 'var(--atencao)';
+            confirmar.hidden = !c.modulo_atendimento;
+            confirmar.addEventListener('click', function (e) {
+              e.stopPropagation();
+              gravarNumero();
+            });
+          }
 
           celulaModulo.appendChild(modulo);
           celulaModulo.appendChild(faixa);
           celulaModulo.appendChild(numero);
+          if (confirmar) celulaModulo.appendChild(confirmar);
 
           var acoesConta = el('div');
           acoesConta.style.display = 'flex';
