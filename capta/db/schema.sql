@@ -618,3 +618,20 @@ create table if not exists whatsapp_vistas (
   primary key (conta_id, mensagem_id)
 );
 create index if not exists whatsapp_vistas_limpeza_idx on whatsapp_vistas (visto_em);
+
+/*
+ * Quando a conta terminou a ativacao.
+ *
+ * Serve para avisar uma vez so. Sem a marca, ou o operador nao fica sabendo
+ * que um cliente entrou no ar, ou e avisado de novo a cada vez que a base e
+ * editada.
+ */
+alter table contas add column if not exists ativada_em timestamptz;
+
+/*
+ * Quando o lojista foi avisado de que esse cliente esta esperando por ele.
+ *
+ * Sem a marca o aviso vira perseguicao: a tarefa roda a cada dez minutos e
+ * mandaria o mesmo e-mail seis vezes por hora.
+ */
+alter table atendimentos add column if not exists avisado_em timestamptz;

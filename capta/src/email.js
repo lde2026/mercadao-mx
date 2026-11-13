@@ -150,6 +150,28 @@ export function alertaOperador({ tipo, mensagem, nomeConta, dados, urlPainel }) 
   };
 }
 
+/**
+ * Cliente esperando o lojista.
+ *
+ * So acontece em conversa que ele mesmo assumiu: ele mandou o agente calar e
+ * depois nao voltou. Do lado de fora, quem esta esperando e uma pessoa que
+ * acha que falou com a loja.
+ */
+export function clienteEsperando({ nomeConta, quem, ultimaFala, minutos, urlPainel }) {
+  return {
+    assunto: assuntoLimpo(`${quem} está esperando sua resposta no WhatsApp`),
+    texto: `Voce assumiu essa conversa e o agente parou de responder nela.\n\n`
+      + `Cliente: ${quem}\nUltima mensagem dele, ha ${minutos} minutos:\n"${ultimaFala}"\n\n`
+      + `Responder: ${urlPainel}`,
+    html: moldura('Um cliente está esperando você',
+      `<p>Você assumiu essa conversa, então o agente parou de responder nela.</p>
+       <p><strong>${escapar(quem)}</strong> escreveu há ${escapar(String(minutos))} minutos:</p>
+       <blockquote>${escapar(ultimaFala)}</blockquote>
+       <p><a href="${escapar(urlPainel)}">Abrir a conversa e responder</a></p>
+       <p>Se preferir devolver para a IA, é um clique na mesma tela.</p>`),
+  };
+}
+
 /** Recuperacao de senha. O link vale uma hora e uma vez so. */
 export function recuperacaoSenha({ nomeConta, url }) {
   return {

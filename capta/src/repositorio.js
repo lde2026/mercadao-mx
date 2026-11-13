@@ -1397,3 +1397,53 @@ export async function falasDaConversa(contaId, atendimentoId, limite = 12) {
   );
   return rows.reverse();
 }
+
+/**
+ * Marca a conta como ativada, e diz se foi agora.
+ *
+ * Devolve linha so na primeira vez. E isso que torna o aviso de ativacao um
+ * aviso, e nao um lembrete que chega toda vez que o lojista mexe na base.
+ */
+export async function marcarAtivada(contaId) {
+  const { rows } = await consultar(
+    `update contas set ativada_em = now()
+      where id = $1 and ativada_em is null
+      returning id, nome, email, numero_atendimento, numero_solicitado`,
+    [contaId],
+  );
+  return rows[0] || null;
+}
+
+/**
+ * As conversas em que o cliente falou por ultimo e o lojista nao voltou.
+ *
+ * So as que ele mesmo assumiu: nas outras quem responde e o agente, e nao ha
+ * ninguem esperando. A ultima fala precisa ser do cliente, senao avisariamos
+ * logo depois de o lojista ter respondido.
+ */
+export async function conversasEsperandoLojista(minutos = 15) {
+  const { rows } = await consultar(
+    `select a.id, a.conta_id, a.cliente, a.nome, a.ultima_fala, a.ultima_em,
+            c.nome as conta_nome, c.email, c.email_aviso
+       from atendimentos a
+       join contas c on c.id = a.conta_id
+      where a.estado = 'humano'
+        and c.modulo_atendimento = true
+        and a.ultima_em < now() - make_interval(mins => $1)
+        and a.ultima_em > now() - interval '2 days'
+        and (a.avisado_em is null or a.avisado_em < a.ultima_em)
+        and (select f.direcao from atendimento_falas f
+              where f.atendimento_id = a.id
+              order by f.criado_em desc limit 1) = 'cliente'
+      limit 100`,
+    [Math.max(1, Number(minutos) || 15)],
+  );
+  return rows;
+}
+
+export async function marcarConversaAvisada(contaId, id) {
+  await consultar(
+    `update atendimentos set avisado_em = now() where conta_id = $1 and id = $2`,
+    [contaId, id],
+  );
+}

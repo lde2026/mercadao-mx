@@ -3,7 +3,7 @@ import { log } from './log.js';
 import { adaptador } from './adapters/index.js';
 import { calcularAcesso, DEGRAUS } from './billing/acesso.js';
 import { gerarCodigo } from './cupom.js';
-import { enviar, cupomAtrasado } from './email.js';
+import { enviar, cupomAtrasado, clienteEsperando } from './email.js';
 import * as repo from './repositorio.js';
 import { credenciaisProntas } from './credenciais.js';
 import { avisarCobranca } from './avisos.js';
@@ -214,6 +214,9 @@ export function agendar() {
   // A marca no consumo e que garante uma fatura so.
   setInterval(() => { fecharExcedentes().catch(() => {}); }, 6 * 3600 * 1000).unref();
   setInterval(() => { repo.limparVistas().catch(() => {}); }, 12 * 3600 * 1000).unref();
+  // De dez em dez minutos: quem esta do outro lado e um consumidor esperando
+  // resposta, e meia hora de atraso ja e uma venda perdida.
+  setInterval(() => { avisarConversasParadas().catch(() => {}); }, 10 * 60 * 1000).unref();
   log.info('tarefas.agendadas', { varredura_minutos: MINUTOS_VARREDURA });
 }
 
@@ -269,4 +272,43 @@ export async function fecharExcedentes(hoje = new Date()) {
   }
 
   return { fechados, competencia };
+}
+
+/**
+ * Avisa o lojista quando um cliente ficou esperando por ele.
+ *
+ * Isto so acontece em conversa que ele mesmo assumiu: ele mandou o agente
+ * calar e depois nao voltou. Do lado de fora, quem espera e uma pessoa que
+ * acha que falou com a loja, e o pior caso do produto e exatamente esse
+ * silencio, porque nenhuma tela nossa grita sozinha.
+ *
+ * Um aviso por mensagem nova do cliente, nao um por rodada: a marca guarda
+ * quando avisamos e so volta a avisar se ele escrever de novo.
+ */
+export async function avisarConversasParadas(minutos = 15) {
+  const paradas = await repo.conversasEsperandoLojista(minutos);
+  let avisadas = 0;
+
+  for (const conversa of paradas) {
+    const para = conversa.email_aviso || conversa.email;
+    if (!para) continue;
+    try {
+      const espera = Math.round((Date.now() - new Date(conversa.ultima_em).getTime()) / 60000);
+      const mensagem = clienteEsperando({
+        nomeConta: conversa.conta_nome,
+        quem: conversa.nome || conversa.cliente,
+        ultimaFala: conversa.ultima_fala || '',
+        minutos: espera,
+        urlPainel: `${process.env.URL_PUBLICA || ''}/#/conversa/${conversa.id}`,
+      });
+      await enviar({ para, contaId: conversa.conta_id, ...mensagem });
+      await repo.marcarConversaAvisada(conversa.conta_id, conversa.id);
+      avisadas += 1;
+    } catch (erro) {
+      // Uma conta sem e-mail configurado nao pode travar o aviso das outras.
+      log.aviso('conversa.aviso_falhou', { conta_id: conversa.conta_id, motivo: erro.message });
+    }
+  }
+
+  return { avisadas };
 }

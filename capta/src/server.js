@@ -20,7 +20,7 @@ import * as kiwify from './billing/kiwify.js';
 import { agendar } from './tarefas.js';
 import { credenciaisProntas } from './credenciais.js';
 import { registrarRotasOauth, concluirOauth, configuracaoOauth } from './oauth.js';
-import { enviarRecuperacaoSenha } from './avisos.js';
+import { enviarRecuperacaoSenha, avisarOperador } from './avisos.js';
 import { TERMOS } from './termos.js';
 import { CHAVE_DEMO, fluxoDemo, cupomDemo, LOJA_DEMO } from './demo.js';
 import { exigirAmbiente } from './ambiente.js';
@@ -1217,6 +1217,35 @@ function baseDaParaAtender(linha) {
   return atendimento.faltaNaBase(atendimento.conteudo(linha)).pronta;
 }
 
+/*
+ * Avisa o operador quando um cliente termina a ativacao.
+ *
+ * Roda depois de toda gravacao de base. Sem isto, a unica forma de saber que
+ * um cliente entrou no ar era abrir o Admin e reparar. Quem ativa fora do
+ * horario comercial passava a noite inteira no ar sem ninguem ter olhado.
+ *
+ * A marca no banco e que faz disto um aviso e nao um lembrete diario.
+ */
+async function avisarSeAtivou(conta, linha) {
+  if (!conta.moduloAtendimento) return;
+  if (!(conta.numeroAtendimento || conta.numeroSolicitado)) return;
+  if (!baseDaParaAtender(linha)) return;
+
+  const agora = await repo.marcarAtivada(conta.id);
+  if (!agora) return;
+
+  log.info('atendeai.ativada', { conta_id: conta.id });
+  await avisarOperador({
+    contaId: conta.id,
+    tipo: 'cliente_ativou',
+    mensagem: `${agora.nome} terminou a ativacao do Atende Ai e esta pronta para atender.`,
+    dados: {
+      numero: agora.numero_atendimento || agora.numero_solicitado,
+      confirmado: agora.numero_atendimento ? 'sim' : 'nao, so informado',
+    },
+  });
+}
+
 function mensagemParaTela(m) {
   return {
     id: m.id, papel: m.papel, texto: m.texto,
@@ -1284,7 +1313,12 @@ app.put('/api/atendimento', exigirAtendimento, async (req, res) => {
     origem: 'formulario',
   });
   if (!linha) return res.status(404).json({ erro: 'nao encontrada' });
+  // Depois de responder nao da: o aviso manda e-mail e pode demorar. Antes
+  // da resposta prenderia a tela do lojista por causa de um e-mail nosso.
   res.json({ base: atendimento.conteudo(linha), atualizadoEm: linha.atualizado_em });
+  avisarSeAtivou(req.conta, linha).catch((erro) => {
+    log.erro('ativacao.aviso_falhou', { conta_id: req.conta.id, motivo: erro.message });
+  });
 });
 
 /**
@@ -1575,6 +1609,11 @@ app.post('/api/atendimento/chat/:id/confirmar', exigirAtendimento, async (req, r
   res.json({
     base: atendimento.conteudo(saida.base),
     atualizadoEm: saida.base.atualizado_em,
+  });
+  // Este e o caminho em que a ativacao termina na pratica: o lojista conversa
+  // com o assistente e confirma a proposta.
+  avisarSeAtivou(req.conta, saida.base).catch((erro) => {
+    log.erro('ativacao.aviso_falhou', { conta_id: req.conta.id, motivo: erro.message });
   });
 });
 
