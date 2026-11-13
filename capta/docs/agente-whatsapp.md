@@ -1,11 +1,15 @@
-# O contrato do agente de WhatsApp
+# O agente de WhatsApp
 
-O Atende Aí tem duas metades. O painel é este projeto. **O agente que fala
-com o cliente final roda fora daqui** e conversa com o painel por três rotas
-internas, todas autenticadas pela mesma chave.
+**O agente vive dentro deste projeto.** A Meta entrega a mensagem em
+`/webhook/whatsapp`, o `phone_number_id` diz de qual loja ela é, a base vira
+resposta e a resposta volta pela Meta. Não há nada para manter fora daqui.
 
-Este documento é o contrato entre as duas metades. Quem monta o agente (Make,
-n8n, um worker próprio) só precisa disto.
+Como ligar está em `docs/por-onde-comecar.md`.
+
+As rotas internas descritas abaixo continuam valendo e seguem suportadas: elas
+existem para quem quiser trocar o agente de dentro por um externo (Make, n8n,
+um worker próprio), ou rodar os dois lado a lado para lojas diferentes. Se
+você está usando o agente de dentro, **não precisa de nada deste documento**.
 
 ## Autenticação
 

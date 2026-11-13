@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import { consultar, emTransacao } from './db.js';
 import { cifrar, decifrar, gerarChavePublica, hashSenha, conferirSenha } from './cripto.js';
 import { cotaDeLojas } from './billing/planos.js';
+import { log } from './log.js';
 
 /**
  * Regra unica desta camada: id vindo da URL nunca e autorizacao. Toda funcao
@@ -92,7 +93,11 @@ export async function buscarConta(contaId) {
   const { rows } = await consultar(
     `select id, nome, email, documento, cliente_externo, email_aviso, whatsapp, avisar_lead,
             teste_ate, modulo_atendimento, faixa_atendimento, numero_atendimento,
-            atendimento_pausado, atendimento_recado, criado_em
+            atendimento_pausado, atendimento_recado, criado_em,
+            ciclo_atendimento, assinatura_atendimento,
+            -- O token cifrado nao sai desta funcao: quem precisa dele usa
+            -- contaPorPhoneId, que e chamada so no caminho de enviar.
+            whatsapp_phone_id, (whatsapp_token is not null) as whatsapp_token
        from contas where id = $1`,
     [contaId],
   );
@@ -1044,6 +1049,7 @@ export async function listarContas() {
   const { rows } = await consultar(
     `select c.id, c.nome, c.email, c.criado_em,
             c.modulo_atendimento, c.faixa_atendimento, c.numero_atendimento, c.numero_solicitado,
+            c.whatsapp_phone_id,
             a.plano, a.ciclo, a.origem,
             (select count(*)::int from leads l where l.conta_id = c.id
                and l.criado_em >= date_trunc('month', now())) as leads_mes,
@@ -1309,4 +1315,85 @@ export async function contaComNumeroSolicitado(numero) {
     [alvo],
   );
   return rows[0] || null;
+}
+
+// ------------------------------------------------- credenciais do whatsapp ---
+
+/**
+ * Guarda o numero da loja dentro da Meta e o token que fala por ela.
+ *
+ * O token vai cifrado. Ele manda mensagem em nome da loja: vazado, alguem
+ * conversa com os clientes dela. O phone_id nao e segredo, e por ele que a
+ * mensagem que chega vira conta.
+ *
+ * Token vazio nao apaga o que ja esta la: a tela manda o campo em branco
+ * quando o operador so quis trocar o phone_id, e apagar ali tiraria a loja
+ * do ar sem ninguem pedir.
+ */
+export async function definirWhatsapp(contaId, { phoneId, token }) {
+  const id = String(phoneId ?? '').trim().slice(0, 64) || null;
+  const cifrado = token ? cifrar(String(token)) : null;
+  const { rows } = await consultar(
+    `update contas
+        set whatsapp_phone_id = $2,
+            whatsapp_token = coalesce($3, whatsapp_token),
+            atualizado_em = now()
+      where id = $1
+      returning id, whatsapp_phone_id, (whatsapp_token is not null) as tem_token`,
+    [contaId, id, cifrado],
+  );
+  return rows[0] || null;
+}
+
+export async function contaPorPhoneId(phoneId) {
+  const id = String(phoneId ?? '').trim();
+  if (!id) return null;
+  const { rows } = await consultar(
+    `select id, nome, modulo_atendimento, faixa_atendimento, atendimento_pausado,
+            atendimento_recado, whatsapp_phone_id, whatsapp_token
+       from contas where whatsapp_phone_id = $1`,
+    [id],
+  );
+  return rows[0] || null;
+}
+
+/** O token em claro, so no momento de mandar a mensagem. Nunca sai em json. */
+export function tokenDoWhatsapp(conta) {
+  if (!conta?.whatsapp_token) return null;
+  try {
+    return decifrar(conta.whatsapp_token);
+  } catch {
+    log.erro('whatsapp.token_ilegivel', { conta_id: conta.id });
+    return null;
+  }
+}
+
+/**
+ * Primeira vez que esta mensagem aparece? A Meta reenvia o mesmo evento
+ * quando acha que a entrega falhou, e sem isto o cliente receberia a mesma
+ * resposta duas vezes, com a loja pagando as duas.
+ */
+export async function primeiraVezQueVejo(contaId, mensagemId) {
+  if (!mensagemId) return true;
+  const { rows } = await consultar(
+    `insert into whatsapp_vistas (conta_id, mensagem_id) values ($1, $2)
+     on conflict do nothing returning mensagem_id`,
+    [contaId, String(mensagemId).slice(0, 200)],
+  );
+  return rows.length > 0;
+}
+
+export async function limparVistas() {
+  await consultar(`delete from whatsapp_vistas where visto_em < now() - interval '7 days'`);
+}
+
+/** As ultimas falas de uma conversa, para o agente ter contexto. */
+export async function falasDaConversa(contaId, atendimentoId, limite = 12) {
+  const { rows } = await consultar(
+    `select direcao, texto, criado_em from atendimento_falas
+      where conta_id = $1 and atendimento_id = $2
+      order by criado_em desc limit $3`,
+    [contaId, atendimentoId, Math.min(Math.max(Number(limite) || 12, 1), 40)],
+  );
+  return rows.reverse();
 }

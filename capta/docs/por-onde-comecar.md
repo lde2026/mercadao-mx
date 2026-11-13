@@ -111,3 +111,66 @@ Você disse para decidir, então decidi. Qualquer uma destas se desfaz rápido.
   Railway a cada push.
 - **Ligar o Asaas de fato.** Depende da chave, que só você tem. O código está
   pronto e testado contra um Asaas de mentira.
+
+---
+
+# Ligar o WhatsApp da Mx Kids
+
+O agente passou a viver dentro do projeto. Não existe mais nada para montar
+fora: a Meta entrega a mensagem aqui, a base vira resposta e a resposta volta
+pela Meta.
+
+## 1. Duas variáveis no Railway
+
+- `META_APP_SECRET`: o App Secret do seu app na Meta, em Configurações básicas.
+  É com ele que a assinatura de cada entrega é conferida. Sem ele, o webhook
+  recusa tudo, de propósito.
+- `META_VERIFY_TOKEN`: uma senha que você inventa agora. Ela só serve para a
+  Meta confirmar que este endereço é seu, no momento do cadastro.
+
+Nenhuma das duas passa por mim. Você cola direto no Railway.
+
+## 2. Cadastrar o webhook na Meta
+
+No app da Meta, em WhatsApp, Configuração:
+
+- URL de callback: `https://atendeai.lojadoecommerce.com.br/webhook/whatsapp`
+- Token de verificação: o mesmo `META_VERIFY_TOKEN`
+- Assinar o campo **messages**
+
+Se a verificação falhar, é quase sempre o token diferente dos dois lados, ou o
+deploy ainda não ter subido a variável.
+
+## 3. Conectar o número da loja
+
+No **Admin**, cartão **Conectar o WhatsApp de uma conta**:
+
+- a conta (Mx Kids)
+- o **phone number id**, que está no painel da Meta junto do número
+- o WhatsApp da loja com DDD
+- o **token** da Meta
+
+O token é cifrado na hora e nunca mais aparece na tela. Deixar o campo em
+branco numa edição mantém o que já está guardado.
+
+## 4. Mandar uma mensagem de teste
+
+Mande qualquer coisa para o número da loja, de outro celular. Em segundos a
+resposta chega, a conversa aparece em **Atendimentos** e o contador de
+mensagens do mês sobe em um.
+
+Se não acontecer, abra o Admin e use **Por que um número não está atendendo**.
+Ele diz exatamente onde parou.
+
+## O que o agente faz e não faz
+
+- Responde só com o que está na base. O que não estiver, ele diz que vai
+  confirmar com a equipe, em vez de inventar prazo ou desconto.
+- Não repete resposta quando a Meta reenvia o mesmo evento.
+- Fica calado na conversa que você assumiu, e só nela.
+- Com a loja pausada, manda o recado no máximo uma vez por hora por cliente.
+- Áudio e figurinha ainda não são lidos: ele avisa a pessoa e registra a
+  conversa, para você ver que alguém chamou.
+- Tem um teto de 3.000 respostas por dia por conta. Não é regra de plano,
+  passar da faixa vira excedente na fatura. É freio de incêndio, para um laço
+  de mensagem não virar conta de milhares de reais numa madrugada.

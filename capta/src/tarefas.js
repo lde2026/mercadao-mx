@@ -213,6 +213,7 @@ export function agendar() {
   // deploy, e um agendamento mensal em memoria nunca chegaria no dia certo.
   // A marca no consumo e que garante uma fatura so.
   setInterval(() => { fecharExcedentes().catch(() => {}); }, 6 * 3600 * 1000).unref();
+  setInterval(() => { repo.limparVistas().catch(() => {}); }, 12 * 3600 * 1000).unref();
   log.info('tarefas.agendadas', { varredura_minutos: MINUTOS_VARREDURA });
 }
 

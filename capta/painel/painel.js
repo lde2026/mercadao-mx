@@ -2334,6 +2334,89 @@
    * modulo desligado, base vazia, ou o agente nunca tendo chamado a gente.
    * Aqui o operador digita o numero e ve o que o agente veria.
    */
+  /*
+   * Conectar o WhatsApp de uma conta.
+   *
+   * O que entra aqui e o token que fala em nome da loja na Meta. Por isso a
+   * tela e do operador e nao do lojista, e por isso o campo nunca mostra o
+   * que ja esta guardado: ele diz que existe, e so.
+   */
+  function cartaoConectarWhatsapp(contas, aoConectar) {
+    var cartao = el('div', null, 'cartao');
+    cartao.appendChild(el('div', 'Conectar o WhatsApp de uma conta', 'rotulo'));
+    cartao.appendChild(el('p', 'O phone number id e o token vêm do app da Meta. O token fica cifrado e nunca mais aparece aqui.', 'legenda'));
+
+    var form = el('form', null, 'form-config');
+
+    var rotConta = el('label', 'Conta');
+    var conta = el('select');
+    contas.filter(function (c) { return c.modulo_atendimento; }).forEach(function (c) {
+      var op = el('option', c.nome + (c.whatsapp_phone_id ? ' (já conectada)' : ''));
+      op.value = c.id;
+      conta.appendChild(op);
+    });
+    rotConta.appendChild(conta);
+    form.appendChild(rotConta);
+
+    var rotId = el('label', 'Phone number id');
+    var phoneId = el('input');
+    phoneId.type = 'text';
+    phoneId.placeholder = 'Só números, do painel da Meta';
+    rotId.appendChild(phoneId);
+    form.appendChild(rotId);
+
+    var rotNumero = el('label', 'WhatsApp da loja, com DDD');
+    var numero = el('input');
+    numero.type = 'tel';
+    numero.placeholder = 'O mesmo número desse phone id';
+    rotNumero.appendChild(numero);
+    form.appendChild(rotNumero);
+
+    var rotToken = el('label', 'Token da Meta');
+    var token = el('input');
+    token.type = 'password';
+    token.autocomplete = 'off';
+    token.placeholder = 'Deixe em branco para manter o que já está guardado';
+    rotToken.appendChild(token);
+    form.appendChild(rotToken);
+
+    var erro = el('p', null, 'erro'); erro.hidden = true; form.appendChild(erro);
+    var pronto = el('p', null, 'ok'); pronto.hidden = true; form.appendChild(pronto);
+
+    var acoes = el('div', null, 'acoes');
+    var salvar = el('button', 'Conectar');
+    salvar.type = 'submit';
+    acoes.appendChild(salvar);
+    form.appendChild(acoes);
+
+    form.addEventListener('submit', function (evento) {
+      evento.preventDefault();
+      erro.hidden = true; pronto.hidden = true;
+      salvar.disabled = true;
+      api('/admin/contas/' + conta.value + '/whatsapp', {
+        method: 'POST',
+        corpo: { phoneId: phoneId.value, token: token.value, numero: numero.value },
+      })
+        .then(function (r) {
+          pronto.textContent = r.temToken
+            ? 'Conectado. As mensagens desse número já caem nesta conta.'
+            : 'Phone id salvo, mas ainda falta o token: sem ele o agente lê e não responde.';
+          pronto.hidden = false;
+          // O token sai da tela assim que vai para o servidor.
+          token.value = '';
+          if (aoConectar) aoConectar();
+        })
+        .catch(function (e) {
+          erro.textContent = e.dados && e.dados.explicacao ? e.dados.explicacao : e.message;
+          erro.hidden = false;
+        })
+        .then(function () { salvar.disabled = false; });
+    });
+
+    cartao.appendChild(form);
+    return cartao;
+  }
+
   function cartaoDiagnostico() {
     var cartao = el('div', null, 'cartao');
     cartao.appendChild(el('div', 'Por que um número não está atendendo', 'rotulo'));
@@ -2368,6 +2451,8 @@
             itens.push(['Módulo', d.modulo ? 'ligado' : 'desligado']);
             itens.push(['Pausado', d.pausado ? 'sim' : 'não']);
             itens.push(['Base', d.camposCheios + ' campo(s), ' + (d.basePronta ? 'pronta' : 'incompleta')]);
+            itens.push(['WhatsApp conectado', d.whatsapp ? 'sim' : 'FALTA phone id ou token']);
+            itens.push(['Webhook da Meta no servidor', d.webhook ? 'configurado' : 'FALTA META_APP_SECRET']);
             itens.push(['Conversas registradas', String(d.conversas)]);
             itens.push(['Última fala do agente', d.ultimaFala ? quando(d.ultimaFala) : 'nunca']);
             itens.push(['Última contagem de mensagens', d.ultimoConsumo ? quando(d.ultimoConsumo) : 'nunca']);
@@ -2615,6 +2700,7 @@
       }));
       alvo.appendChild(grade);
 
+      alvo.appendChild(cartaoConectarWhatsapp(contas, function () { verAdmin(); }));
       alvo.appendChild(cartaoDiagnostico());
 
       if (resumo.faixas && resumo.ativacoes) {

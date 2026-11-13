@@ -33,6 +33,8 @@ import * as atendimento from './atendimento.js';
 import * as atendeai from './billing/atendeai.js';
 import { interpretar, temAssistente } from './atendente.js';
 import { acharLink, lerPagina, lerLoja } from './pagina.js';
+import * as whatsapp from './whatsapp.js';
+import * as agente from './agente.js';
 import { compararConstante } from './cripto.js';
 
 const aqui = path.dirname(fileURLToPath(import.meta.url));
@@ -352,6 +354,170 @@ app.get('/saude', async (_req, res) => {
 // --------------------------------------------------------------- webhooks ---
 // Corpo cru antes do parser de JSON: a assinatura e conferida sobre os bytes
 // exatos que chegaram, e o JSON.parse seguido de stringify muda os bytes.
+
+/*
+ * O WhatsApp da loja.
+ *
+ * Este e o unico lugar do projeto em que um modelo fala direto com alguem que
+ * nao e cliente nosso. O caminho inteiro mora aqui: a Meta entrega a mensagem,
+ * o phone_number_id diz de qual loja ela e, a base vira resposta e a resposta
+ * volta pela Meta.
+ *
+ * A confirmacao do cadastro do webhook vem antes de tudo, e sem corpo: e so a
+ * Meta perguntando se este endereco e nosso mesmo.
+ */
+app.get('/webhook/whatsapp', (req, res) => {
+  const desafio = whatsapp.desafioDoWebhook(req.query);
+  if (desafio === null) {
+    log.aviso('whatsapp.verificacao_recusada', {});
+    return res.status(403).end();
+  }
+  res.type('text/plain').send(desafio);
+});
+
+app.post('/webhook/whatsapp', express.raw({ type: '*/*', limit: '512kb' }), async (req, res) => {
+  if (!whatsapp.assinaturaConfere(req.body, req.headers['x-hub-signature-256'])) {
+    log.aviso('whatsapp.assinatura_recusada', {});
+    return res.status(401).end();
+  }
+
+  let corpo;
+  try {
+    corpo = JSON.parse(req.body.toString('utf8'));
+  } catch {
+    return res.status(400).end();
+  }
+
+  /*
+   * Responder antes de pensar.
+   *
+   * A Meta reenvia o evento se a gente demorar, e pensar aqui demora: e uma
+   * chamada ao modelo mais uma de envio. Demorar viraria mensagem repetida
+   * para o cliente e conta dobrada para a loja.
+   */
+  res.status(200).end();
+
+  for (const mensagem of whatsapp.lerEvento(corpo)) {
+    atenderMensagem(mensagem).catch((erro) => {
+      log.erro('whatsapp.atendimento_falhou', { motivo: erro.message });
+    });
+  }
+});
+
+/**
+ * O ciclo de uma mensagem.
+ *
+ * Em ordem: de quem e, ja vi essa, guarda a fala, manda o que o lojista
+ * escreveu no painel, e so entao responde. Guardar a fala vem antes de
+ * responder de proposito: se o modelo falhar, o lojista ainda ve que um
+ * cliente chamou, em vez de a mensagem desaparecer.
+ */
+async function atenderMensagem(msg) {
+  const conta = await repo.contaPorPhoneId(msg.phoneId);
+  if (!conta || !conta.modulo_atendimento) return;
+  if (!(await repo.primeiraVezQueVejo(conta.id, msg.id))) return;
+
+  const texto = msg.tipo === 'text' ? String(msg.texto || '').trim() : '';
+  const atend = await repo.registrarFala(conta.id, {
+    cliente: msg.de,
+    nome: msg.nome,
+    direcao: 'cliente',
+    texto: texto || `[${msg.tipo || 'mensagem'} que eu ainda nao sei ler]`,
+  });
+  if (!atend) return;
+
+  const token = repo.tokenDoWhatsapp(conta);
+  if (!token) {
+    log.erro('whatsapp.sem_token', { conta_id: conta.id });
+    return;
+  }
+
+  const mandar = async (resposta, comoHumano = false) => {
+    await whatsapp.enviarTexto({
+      phoneId: conta.whatsapp_phone_id, token, para: msg.de, texto: resposta, contaId: conta.id,
+    });
+    await repo.registrarFala(conta.id, {
+      cliente: msg.de, direcao: comoHumano ? 'humano' : 'agente', texto: resposta,
+    });
+    await atendimento.somarConsumo(conta.id, 1);
+  };
+
+  // O que o lojista escreveu no painel sai antes da resposta automatica: ele
+  // escreveu primeiro, e chegar depois do robo seria conversa fora de ordem.
+  await despacharFila(conta, token, msg.de, mandar);
+
+  if (conta.atendimento_pausado) {
+    /*
+     * Recado no maximo uma vez por hora por conversa. Sem o teto, um cliente
+     * mandando cinco mensagens seguidas receberia cinco vezes o mesmo aviso,
+     * e a loja pagaria as cinco.
+     */
+    if (conta.atendimento_recado
+      && await repo.consumirLimite(`recado:${atend.id}`, 3600, 1)) {
+      await mandar(conta.atendimento_recado);
+    }
+    return;
+  }
+
+  // Assumida pelo lojista: o agente fica calado nela, e so nela.
+  if (atend.estado !== 'ia') return;
+
+  if (!texto) {
+    await mandar('Recebi a sua mensagem, mas por aqui eu só consigo ler texto. Pode escrever o que você precisa?');
+    return;
+  }
+
+  /*
+   * Teto diario por conta, bem acima de qualquer faixa.
+   *
+   * Ele nao e regra de plano: passar da faixa vira excedente na fatura, nao
+   * silencio. Isto aqui e freio de incendio, para um laco de mensagem nao
+   * virar conta de milhares de reais numa madrugada.
+   */
+  if (!(await repo.consumirLimite(`agente:${conta.id}`, 86400, 3000))) {
+    log.erro('agente.teto_diario', { conta_id: conta.id });
+    return;
+  }
+
+  const linha = await atendimento.base(conta.id);
+  const historico = await repo.falasDaConversa(conta.id, atend.id, 12);
+  // A fala que acabou de entrar ja esta no historico; a pergunta vai separada.
+  const anteriores = historico.slice(0, -1);
+
+  let resposta;
+  try {
+    resposta = await agente.responder({
+      base: atendimento.conteudo(linha), historico: anteriores, pergunta: texto, contaId: conta.id,
+    });
+  } catch (erro) {
+    log.erro('agente.falhou', { conta_id: conta.id, motivo: erro.message });
+    await repo.alertar({
+      contaId: conta.id, tipo: 'agente_falhou', gravidade: 'erro',
+      mensagem: 'O agente nao conseguiu responder um cliente no WhatsApp.',
+      dados: { atendimento_id: atend.id },
+    });
+    return;
+  }
+
+  await mandar(resposta);
+}
+
+/** O que o lojista escreveu no painel para este cliente, na ordem. */
+async function despacharFila(conta, token, cliente, mandar) {
+  const alvo = repo.numeroCanonico(cliente);
+  const fila = await repo.saidaPendente(conta.id, 10);
+  for (const item of fila) {
+    if (repo.numeroCanonico(item.cliente) !== alvo) continue;
+    try {
+      await mandar(item.texto, true);
+      await repo.marcarSaidaEntregue(conta.id, item.id);
+    } catch (erro) {
+      // Nao marca entregue: sai na proxima. Melhor repetir que sumir.
+      log.erro('whatsapp.fila_falhou', { conta_id: conta.id, motivo: erro.message });
+      return;
+    }
+  }
+}
 
 app.post('/webhook/asaas', express.raw({ type: '*/*', limit: '256kb' }), async (req, res) => {
   if (!asaas.conferirToken(req.headers)) {
@@ -2070,6 +2236,41 @@ app.post('/api/admin/contas/:id/cobranca', exigirOperador, async (req, res) => {
 });
 
 /*
+ * Conectar o WhatsApp de uma conta.
+ *
+ * So o operador: o que entra aqui e o token que fala em nome da loja na Meta,
+ * e isso nao e coisa que o lojista tenha nem deva colar. A ativacao e nossa.
+ *
+ * O token nunca volta no json, nem inteiro nem em pedaco. A resposta diz
+ * apenas se existe um guardado.
+ */
+app.post('/api/admin/contas/:id/whatsapp', exigirOperador, async (req, res) => {
+  const { phoneId, token, numero } = req.body || {};
+  if (!String(phoneId || '').trim()) return res.status(400).json({ erro: 'informe o phone number id' });
+
+  const conta = await repo.buscarConta(req.params.id);
+  if (!conta) return res.status(404).json({ erro: 'nao encontrada' });
+
+  try {
+    const salvo = await repo.definirWhatsapp(conta.id, { phoneId, token });
+    // O numero que roteia a conversa no painel e o mesmo que atende na Meta:
+    // deixar os dois diferentes e a conta aparecer conectada numa tela e
+    // desconectada na outra.
+    if (numero) await repo.definirNumeroAtendimento(conta.id, numero);
+    log.info('whatsapp.conectado', { conta_id: conta.id, tem_token: salvo.tem_token });
+    res.json({ phoneId: salvo.whatsapp_phone_id, temToken: salvo.tem_token });
+  } catch (erro) {
+    if (erro.code === '23505') {
+      return res.status(409).json({
+        erro: 'esse numero ja esta em outra conta',
+        explicacao: 'Cada número do WhatsApp atende uma conta só.',
+      });
+    }
+    throw erro;
+  }
+});
+
+/*
  * O diagnostico de um numero.
  *
  * Responde a pergunta que aparece toda vez que uma ativacao nao funciona:
@@ -2111,8 +2312,12 @@ app.get('/api/admin/diagnostico', exigirOperador, async (req, res) => {
   if (!conta.modulo_atendimento) problemas.push('O módulo Atende Aí está desligado nesta conta.');
   if (!pronta) problemas.push(`A base tem ${camposCheios} campo(s) preenchido(s) e o agente responde pobre. Termine a ativação.`);
   if (conta.atendimento_pausado) problemas.push('O atendimento está pausado pelo lojista.');
-  if (!sinal.ultima_fala && !sinal.ultimo_consumo) {
-    problemas.push('O agente nunca chamou estas rotas. Confira a URL e a CHAVE_SERVICO do lado dele.');
+  const temWhats = Boolean(conta.whatsapp_phone_id && conta.whatsapp_token);
+  if (!temWhats) {
+    problemas.push('O WhatsApp desta conta não está conectado: falta o phone number id ou o token da Meta.');
+  }
+  if (temWhats && !sinal.ultima_fala && !sinal.ultimo_consumo) {
+    problemas.push('Nenhuma mensagem chegou ainda. Confira se o webhook da Meta aponta para /webhook/whatsapp e se o número está inscrito no app.');
   }
 
   res.json({
@@ -2123,6 +2328,8 @@ app.get('/api/admin/diagnostico', exigirOperador, async (req, res) => {
     pausado: Boolean(conta.atendimento_pausado),
     camposCheios,
     basePronta: pronta,
+    whatsapp: temWhats,
+    webhook: Boolean(process.env.META_APP_SECRET),
     conversas: sinal.conversas,
     ultimaFala: sinal.ultima_fala,
     ultimoConsumo: sinal.ultimo_consumo,

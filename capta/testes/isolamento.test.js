@@ -227,7 +227,10 @@ test('lojista comum nao alcanca as rotas do operador', async () => {
     ['/api/admin/rede', 'GET'], [`/api/admin/contas/${contaA.id}/entrar`, 'POST'],
     [`/api/admin/contas/${contaA.id}/senha`, 'POST'],
     [`/api/admin/contas/${contaA.id}/modulo`, 'POST'],
-    [`/api/admin/contas/${contaA.id}/cobranca`, 'POST']]) {
+    [`/api/admin/contas/${contaA.id}/cobranca`, 'POST'],
+    // O token da Meta fala em nome da loja: lojista nenhum cola um aqui.
+    [`/api/admin/contas/${contaA.id}/whatsapp`, 'POST'],
+    ['/api/admin/diagnostico', 'GET']]) {
     const r = await pedir(caminho, { metodo, cookie: contaB.cookie });
     assert.equal(r.status, 403, `${metodo} ${caminho} tinha que ser 403 para lojista`);
   }

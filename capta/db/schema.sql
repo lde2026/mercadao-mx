@@ -588,3 +588,33 @@ create table if not exists atendimento_saida (
 );
 create index if not exists atendimento_saida_fila_idx
   on atendimento_saida (conta_id, criado_em) where entregue_em is null;
+
+/*
+ * As credenciais do WhatsApp da loja.
+ *
+ * O phone_id e o identificador do numero dentro da Meta, e e por ele que a
+ * mensagem que chega vira conta: ele e o unico campo do webhook em que da
+ * para confiar para dizer de quem e a conversa.
+ *
+ * O token fica cifrado, nunca em claro e nunca em log. Ele manda mensagem em
+ * nome da loja: vazado, alguem fala com os clientes dela.
+ */
+alter table contas add column if not exists whatsapp_phone_id text;
+alter table contas add column if not exists whatsapp_token text;
+create unique index if not exists contas_whatsapp_phone_idx
+  on contas (whatsapp_phone_id) where whatsapp_phone_id is not null;
+
+/*
+ * As mensagens do WhatsApp que ja foram atendidas.
+ *
+ * A Meta reenvia o mesmo evento quando acha que a entrega falhou, e sem isto
+ * o cliente receberia a mesma resposta duas vezes e a loja pagaria as duas.
+ * Guarda so o id da mensagem na Meta, nunca o numero de quem mandou.
+ */
+create table if not exists whatsapp_vistas (
+  conta_id uuid not null references contas(id) on delete cascade,
+  mensagem_id text not null,
+  visto_em timestamptz not null default now(),
+  primary key (conta_id, mensagem_id)
+);
+create index if not exists whatsapp_vistas_limpeza_idx on whatsapp_vistas (visto_em);
