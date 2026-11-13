@@ -382,6 +382,79 @@ test('a tela diz o que falta para o atendimento entrar no ar', async () => {
   assert.equal(sem.json.prontidao.numero, null);
 });
 
+/*
+ * O freio de mao.
+ *
+ * Se o agente nao enxergar a pausa, ele continua respondendo por horas depois
+ * de o lojista ter puxado o freio, e o lojista so descobre pelo cliente
+ * reclamando. Por isso a pausa viaja nas duas rotas que o agente usa.
+ */
+test('o lojista pausa e o agente enxerga, pelas duas rotas', async () => {
+  const chave = { Authorization: `Bearer ${process.env.CHAVE_SERVICO}` };
+
+  const antes = await pedir(`/interno/base/${contaA.id}`, { cabecalhos: chave });
+  assert.equal(antes.json.pausado, false);
+
+  const parou = await pedir('/api/atendimento/pausa', {
+    metodo: 'POST', cookie: contaA.cookie,
+    corpo: { pausado: true, recado: 'Estamos em manutenção hoje.' },
+  });
+  assert.equal(parou.status, 200);
+  assert.equal(parou.json.pausado, true);
+
+  const porId = await pedir(`/interno/base/${contaA.id}`, { cabecalhos: chave });
+  assert.equal(porId.json.pausado, true);
+  assert.equal(porId.json.recado, 'Estamos em manutenção hoje.');
+
+  const porNumero = await pedir('/interno/numero/41988887777', { cabecalhos: chave });
+  assert.equal(porNumero.json.pausado, true);
+  assert.equal(porNumero.json.recado, 'Estamos em manutenção hoje.');
+
+  const tela = await pedir('/api/atendimento', { cookie: contaA.cookie });
+  assert.equal(tela.json.pausa.pausado, true);
+});
+
+test('religar mantem o recado guardado para a proxima vez', async () => {
+  const voltou = await pedir('/api/atendimento/pausa', {
+    metodo: 'POST', cookie: contaA.cookie, corpo: { pausado: false },
+  });
+  assert.equal(voltou.json.pausado, false);
+  // Quem escreveu o recado uma vez nao devia ter que escrever de novo no
+  // proximo dia de manutencao.
+  assert.equal(voltou.json.recado, 'Estamos em manutenção hoje.');
+
+  const agente = await pedir(`/interno/base/${contaA.id}`, {
+    cabecalhos: { Authorization: `Bearer ${process.env.CHAVE_SERVICO}` },
+  });
+  assert.equal(agente.json.pausado, false);
+});
+
+test('a pausa de uma conta nao para a outra', async () => {
+  await pedir('/api/atendimento/pausa', {
+    metodo: 'POST', cookie: contaA.cookie, corpo: { pausado: true },
+  });
+  const vizinha = await pedir('/api/atendimento', { cookie: contaB.cookie });
+  assert.equal(vizinha.json.pausa.pausado, false);
+
+  await pedir('/api/atendimento/pausa', {
+    metodo: 'POST', cookie: contaA.cookie, corpo: { pausado: false },
+  });
+});
+
+test('pausar exige o modulo, e nao se pausa pela rota interna', async () => {
+  const sem = await pedir('/api/atendimento/pausa', {
+    metodo: 'POST', cookie: semModulo.cookie, corpo: { pausado: true },
+  });
+  assert.equal(sem.status, 404);
+
+  // A pausa e decisao do lojista. O agente le, nao escreve.
+  const agente = await pedir('/api/atendimento/pausa', {
+    metodo: 'POST', cabecalhos: { Authorization: `Bearer ${process.env.CHAVE_SERVICO}` },
+    corpo: { pausado: true },
+  });
+  assert.equal(agente.status, 401);
+});
+
 test.after(async () => {
   servidor.close();
   await pool.end();

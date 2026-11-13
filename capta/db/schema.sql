@@ -459,6 +459,15 @@ alter table contas add column if not exists modulo_atendimento boolean not null 
 alter table contas add column if not exists faixa_atendimento text;
 alter table contas add column if not exists numero_atendimento text;
 
+-- A pausa do atendimento.
+--
+-- Fica na conta e nao na base: nao e conhecimento, e estado de operacao. Na
+-- base ela entraria no historico de versoes e poderia voltar sozinha numa
+-- restauracao, que e o jeito mais silencioso de religar um atendimento que o
+-- lojista tinha desligado de proposito.
+alter table contas add column if not exists atendimento_pausado boolean not null default false;
+alter table contas add column if not exists atendimento_recado text;
+
 -- O numero decide de quem e a conversa que chega no WhatsApp. Dois donos para
 -- o mesmo numero seria o agente escolhendo no par ou impar qual base usar, e
 -- uma loja respondendo com a politica de troca da outra. Indice parcial

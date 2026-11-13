@@ -535,4 +535,16 @@ pre{background:var(--escuro);color:var(--superficie);padding:13px;border-radius:
 .prontidao li{display:grid;grid-template-columns:16px 1fr;gap:8px;align-items:start;
   font-size:13.5px;color:var(--fraco)}
 .prontidao li.feito{color:var(--acento-texto)}
-.prontidao .marca{font-weight:700;line-height:1.5}
+.prontidao .sinal{font-weight:700;line-height:1.5}
+
+/* O freio de mao: topo da tela, porque e o que se procura com pressa. */
+.freio{display:grid;grid-template-columns:1fr auto;gap:12px 16px;align-items:center;
+  border:1px solid var(--linha);border-radius:12px;padding:14px 16px;margin-bottom:16px;
+  background:var(--superficie)}
+.freio .dizer .rotulo{margin:0}
+.freio .dizer .hora{margin-top:2px}
+.freio button{flex:none}
+.freio label{grid-column:1 / -1;display:block;font-size:13px;color:var(--fraco)}
+.freio textarea{margin-top:5px;min-height:62px;resize:vertical}
+.freio.parado{border-color:var(--atencao);background:var(--atencao-fundo)}
+.freio.parado .rotulo{color:var(--atencao)}

@@ -676,10 +676,15 @@ app.get('/interno/base/:contaId', limitarPor('base-interna', 60, 120), async (re
   if (!conta || !conta.modulo_atendimento) return res.status(404).json({ erro: 'nao encontrada' });
 
   const linha = await atendimento.base(conta.id);
+  // A pausa viaja junto: o agente precisa saber que esta parado no mesmo
+  // lugar em que le a base, senao continuaria respondendo por horas depois
+  // de o lojista ter puxado o freio.
   res.set('Cache-Control', 'no-store').json({
     conta: { id: conta.id, nome: conta.nome },
     base: atendimento.conteudo(linha),
     atualizadoEm: linha.atualizado_em,
+    pausado: Boolean(conta.atendimento_pausado),
+    recado: conta.atendimento_recado || null,
   });
 });
 
@@ -720,10 +725,15 @@ app.get('/interno/numero/:numero', limitarPor('numero-interno', 60, 1200), async
   if (!conta || !conta.modulo_atendimento) return res.status(404).json({ erro: 'nao encontrada' });
 
   const linha = await atendimento.base(conta.id);
+  // A pausa viaja junto: o agente precisa saber que esta parado no mesmo
+  // lugar em que le a base, senao continuaria respondendo por horas depois
+  // de o lojista ter puxado o freio.
   res.set('Cache-Control', 'no-store').json({
     conta: { id: conta.id, nome: conta.nome },
     base: atendimento.conteudo(linha),
     atualizadoEm: linha.atualizado_em,
+    pausado: Boolean(conta.atendimento_pausado),
+    recado: conta.atendimento_recado || null,
   });
 });
 
@@ -934,6 +944,10 @@ app.get('/api/atendimento', exigirAtendimento, async (req, res) => {
     // O que ainda falta para o atendimento entrar no ar. A tela mostra isso
     // enquanto faltar algo e some quando estiver tudo de pe: lista de
     // pendencia que nunca zera deixa de ser lida.
+    pausa: {
+      pausado: req.conta.atendimentoPausado,
+      recado: req.conta.atendimentoRecado,
+    },
     prontidao: {
       numero: req.conta.numeroAtendimento,
       base: Object.values(atendimento.conteudo(linha))
@@ -968,6 +982,24 @@ app.put('/api/atendimento', exigirAtendimento, async (req, res) => {
  * coisa, leu a proposta, nao gostou e escreveu outra. Se a primeira
  * continuasse valendo, um clique distraido aplicaria o que ele abandonou.
  */
+/**
+ * O freio de mao do lojista.
+ *
+ * Pausar nao apaga nada e nao entra no historico de versoes: e estado de
+ * operacao, nao conhecimento. Religar e um clique, e e ele quem decide a
+ * hora, sem falar com a gente e sem esperar deploy.
+ */
+app.post('/api/atendimento/pausa', exigirAtendimento, async (req, res) => {
+  const corpo = req.body || {};
+  const agora = await repo.pausarAtendimento(req.conta.id, {
+    pausado: Boolean(corpo.pausado),
+    recado: corpo.recado === undefined ? null : corpo.recado,
+  });
+  if (!agora) return res.status(404).json({ erro: 'conta nao encontrada' });
+  log.info('atendimento.pausa', { conta_id: req.conta.id, pausado: agora.atendimento_pausado });
+  res.json({ pausado: agora.atendimento_pausado, recado: agora.atendimento_recado });
+});
+
 app.post('/api/atendimento/chat', exigirAtendimento, async (req, res) => {
   if (!temAssistente()) {
     return res.status(503).json({

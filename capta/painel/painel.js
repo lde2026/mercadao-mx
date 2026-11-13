@@ -2404,6 +2404,7 @@
 
   function desenharAtendimento(corpo) {
     corpo.textContent = '';
+    corpo.appendChild(freioDeMao(corpo));
     var falta = prontidao();
     if (falta) corpo.appendChild(falta);
     corpo.appendChild(consumoDoMes());
@@ -2423,6 +2424,60 @@
    * atendimento parado quando na verdade e medidor desligado. Por isso o
    * texto muda em vez do numero.
    */
+  /*
+   * O freio de mao.
+   *
+   * Estoque errado no ar, promocao que saiu torta, ou um dia em que ele quer
+   * atender a mao: o lojista precisa conseguir parar o atendimento sozinho,
+   * na hora, sem falar com a gente. Fica no topo da tela porque e a coisa
+   * que se procura com pressa.
+   */
+  function freioDeMao(corpo) {
+    var p = atendimento.pausa || {};
+    var caixa = el('div', null, 'freio' + (p.pausado ? ' parado' : ''));
+
+    var texto = el('div', null, 'dizer');
+    texto.appendChild(el('div', p.pausado ? 'Atendimento pausado' : 'Atendimento no ar', 'rotulo'));
+    texto.appendChild(el('p', p.pausado
+      ? 'O agente não está respondendo ninguém no WhatsApp.'
+      : 'O agente está respondendo os seus clientes com a base desta tela.', 'hora'));
+    caixa.appendChild(texto);
+
+    var botao = el('button', p.pausado ? 'Voltar a atender' : 'Pausar atendimento',
+      p.pausado ? '' : 'secundario');
+    botao.type = 'button';
+    botao.addEventListener('click', function () {
+      var parar = !p.pausado;
+      if (parar && !confirm('Pausar o atendimento?\n\nO agente para de responder no WhatsApp até você religar. Nada da base é apagado.')) return;
+      botao.disabled = true;
+      api('/atendimento/pausa', { method: 'POST', corpo: { pausado: parar } })
+        .then(function (r) {
+          atendimento.pausa = r;
+          desenharAtendimento(corpo);
+        })
+        .catch(function (e) { botao.disabled = false; alert(e.message); });
+    });
+    caixa.appendChild(botao);
+
+    if (p.pausado) {
+      // O recado so aparece parado: perguntar o que dizer enquanto esta
+      // parado para quem nao parou e pergunta sem assunto.
+      var rot = el('label', 'O que responder enquanto estiver parado');
+      var campo = el('textarea');
+      campo.placeholder = 'Ex.: Estamos em manutenção hoje. Respondemos amanhã pela manhã.';
+      campo.maxLength = 300;
+      campo.value = p.recado || '';
+      campo.addEventListener('change', function () {
+        api('/atendimento/pausa', { method: 'POST', corpo: { pausado: true, recado: campo.value } })
+          .then(function (r) { atendimento.pausa = r; })
+          .catch(function (e) { alert(e.message); });
+      });
+      rot.appendChild(campo);
+      caixa.appendChild(rot);
+    }
+    return caixa;
+  }
+
   /** 5541999998888 vira +55 41 99999-8888, que e como ele reconhece o proprio numero. */
   function numeroBonito(cru) {
     var d = String(cru || '').replace(/\D/g, '');
@@ -2463,7 +2518,10 @@
     var lista = el('ul');
     itens.forEach(function (i) {
       var li = el('li', null, i.ok ? 'feito' : 'falta');
-      li.appendChild(el('span', i.ok ? '✓' : '•', 'marca'));
+      // Nome proprio e nao 'marca': aquela classe e a do logotipo no topo,
+      // com um ::after que desenha a bolinha da marca, e cada item da lista
+      // herdava a bolinha junto.
+      li.appendChild(el('span', i.ok ? '✓' : '•', 'sinal'));
       li.appendChild(el('span', i.texto));
       lista.appendChild(li);
     });

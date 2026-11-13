@@ -82,7 +82,8 @@ export async function redefinirSenha(contaId, senha) {
 export async function buscarConta(contaId) {
   const { rows } = await consultar(
     `select id, nome, email, documento, cliente_externo, email_aviso, whatsapp, avisar_lead,
-            teste_ate, modulo_atendimento, faixa_atendimento, numero_atendimento, criado_em
+            teste_ate, modulo_atendimento, faixa_atendimento, numero_atendimento,
+            atendimento_pausado, atendimento_recado, criado_em
        from contas where id = $1`,
     [contaId],
   );
@@ -297,18 +298,43 @@ export async function contaPorNumeroAtendimento(numero) {
   const limpo = numeroCanonico(numero);
   if (!limpo) return null;
   const { rows } = await consultar(
-    `select id, nome, email, modulo_atendimento, faixa_atendimento, numero_atendimento
+    `select id, nome, email, modulo_atendimento, faixa_atendimento, numero_atendimento,
+            atendimento_pausado, atendimento_recado
        from contas where numero_atendimento = $1`,
     [limpo],
   );
   return rows[0] || null;
 }
 
+/**
+ * Pausa e despausa o atendimento.
+ *
+ * E o freio de mao do lojista: estoque errado no ar, promocao que saiu torta,
+ * ou simplesmente um dia em que ele quer atender a mao. Quem decide isso e
+ * ele, sem passar por nos e sem esperar deploy.
+ *
+ * O recado e opcional e e o que o agente responde enquanto estiver parado.
+ * Vazio, quem decide o que dizer e o agente.
+ */
+export async function pausarAtendimento(contaId, { pausado, recado = null }) {
+  const { rows } = await consultar(
+    `update contas
+        set atendimento_pausado = $2,
+            atendimento_recado = case when $3::text is null then atendimento_recado else nullif($3, '') end,
+            atualizado_em = now()
+      where id = $1
+      returning atendimento_pausado, atendimento_recado`,
+    [contaId, Boolean(pausado), recado === null ? null : String(recado).trim().slice(0, 300)],
+  );
+  return rows.length ? rows[0] : null;
+}
+
 export async function buscarSessao(id) {
   if (!id) return null;
   const { rows } = await consultar(
     `select s.conta_id, s.operador_id, c.nome, c.email, c.teste_ate,
-            c.modulo_atendimento, c.faixa_atendimento, c.numero_atendimento
+            c.modulo_atendimento, c.faixa_atendimento, c.numero_atendimento,
+            c.atendimento_pausado, c.atendimento_recado
        from sessoes s join contas c on c.id = s.conta_id
       where s.id = $1 and s.expira_em > now()`,
     [id],
