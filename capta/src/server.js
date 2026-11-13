@@ -1008,7 +1008,10 @@ app.post('/api/atendimento/chat', exigirAtendimento, async (req, res) => {
     });
   }
 
-  const pedido = String((req.body || {}).texto || '').trim().slice(0, 1000);
+  // Teto largo de proposito: ele cola o historico de atendimentos de um dia
+  // inteiro para o assistente tirar dali o que vira base. Mil caracteres
+  // cortariam a terceira conversa no meio.
+  const pedido = String((req.body || {}).texto || '').trim().slice(0, 8000);
   if (pedido.length < 3) return res.status(400).json({ erro: 'escreva o que voce quer mudar' });
 
   /*
@@ -1078,19 +1081,51 @@ app.post('/api/atendimento/chat', exigirAtendimento, async (req, res) => {
     });
   }
 
+  /*
+   * Parar acontece na hora; voltar pede confirmacao.
+   *
+   * A assimetria e de risco, nao de gosto. Quem escreve "pare, eu assumo"
+   * esta com um cliente na mao e nao pode esperar um clique. Religar no
+   * automatico e o contrario: o agente voltaria a responder por cima de um
+   * atendimento humano em andamento, e ninguem veria acontecer.
+   */
+  if (leitura.tipo === 'acao' && leitura.acao === 'pausar') {
+    await repo.pausarAtendimento(req.conta.id, { pausado: true });
+    const dita = await atendimento.registrarMensagem(req.conta.id, {
+      papel: 'assistente', texto: leitura.texto,
+      proposta: { acao: 'pausar', feito: true }, estado: 'conversa',
+    });
+    log.info('atendimento.pausa', { conta_id: req.conta.id, pausado: true, origem: 'chat' });
+    return res.json({
+      minha: mensagemParaTela(minha), resposta: mensagemParaTela(dita),
+      pausa: { pausado: true, recado: req.conta.atendimentoRecado },
+    });
+  }
+
   const resposta = await atendimento.registrarMensagem(req.conta.id, {
     papel: 'assistente',
     texto: leitura.texto,
     proposta: leitura.tipo === 'proposta'
       ? { mudancas: leitura.mudancas, antes: leitura.antes }
-      : null,
-    estado: leitura.tipo === 'proposta' ? 'pendente' : 'conversa',
+      : leitura.tipo === 'acao' ? { acao: leitura.acao } : null,
+    estado: leitura.tipo === 'proposta' || leitura.tipo === 'acao' ? 'pendente' : 'conversa',
   });
 
   res.json({ minha: mensagemParaTela(minha), resposta: mensagemParaTela(resposta) });
 });
 
 app.post('/api/atendimento/chat/:id/confirmar', exigirAtendimento, async (req, res) => {
+  // Acao nao passa por salvar(): nao e conhecimento, nao cria versao e nao
+  // tem "de X para Y" para comparar. Por isso ela resolve aqui, antes.
+  const pendente = await atendimento.propostaPendente(req.conta.id);
+  if (pendente && pendente.id === req.params.id && pendente.proposta
+      && pendente.proposta.acao === 'retomar') {
+    const agora = await repo.pausarAtendimento(req.conta.id, { pausado: false });
+    await atendimento.marcarConfirmada(req.conta.id, req.params.id);
+    log.info('atendimento.pausa', { conta_id: req.conta.id, pausado: false, origem: 'chat' });
+    return res.json({ pausa: { pausado: agora.atendimento_pausado, recado: agora.atendimento_recado } });
+  }
+
   const saida = await atendimento.confirmar(req.conta.id, req.params.id, {
     autorEmail: req.conta.email,
     operadorId: req.operadorId,

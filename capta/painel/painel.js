@@ -2402,6 +2402,29 @@
     });
   }
 
+  /*
+   * A tela que e so a conversa.
+   *
+   * O formulario continua existindo, mas quem usa isto todo dia fala, nao
+   * preenche campo: "o prazo do Nordeste mudou", "pare, eu assumo agora".
+   * Por isso ela nao divide espaco com mais nada.
+   */
+  function verAssistente() {
+    var alvo = pintar('Assistente', 'Diga o que mudou, mande parar o atendimento, ou cole o histórico de um dia para eu aprender com ele.');
+    var corpo = el('div');
+    alvo.appendChild(corpo);
+    corpo.appendChild(el('p', 'Carregando...', 'vazio'));
+
+    api('/atendimento').then(function (dados) {
+      atendimento = dados;
+      corpo.textContent = '';
+      corpo.appendChild(chatDoAssistente(corpo, true));
+    }).catch(function (e) {
+      corpo.textContent = '';
+      corpo.appendChild(el('p', e.message, 'vazio'));
+    });
+  }
+
   function desenharAtendimento(corpo) {
     corpo.textContent = '';
     corpo.appendChild(freioDeMao(corpo));
@@ -2764,8 +2787,9 @@
    * consegue pegar o modelo entendendo "7 dias" como "7 meses" antes de o
    * atendimento comecar a responder isso para cliente de verdade.
    */
-  function chatDoAssistente(corpo) {
-    var caixa = el('div', null, 'assistente-chat');
+  function chatDoAssistente(corpo, grande) {
+    var caixa = el('div', null, 'assistente-chat' + (grande ? ' grande' : ''));
+    function redesenhar() { if (grande) verAssistente(); else desenharAtendimento(corpo); }
     var cab = el('div', null, 'cab');
     cab.appendChild(el('div', 'Assistente', 'rotulo'));
     cab.appendChild(el('div', 'Descreva a mudança e confirme antes de gravar.', 'hora'));
@@ -2776,11 +2800,12 @@
 
     var pe = el('div', null, 'ac-pe');
     var campo = el('textarea');
-    campo.placeholder = 'Cole o link da sua loja, ou diga o que mudou';
-    campo.maxLength = 1000;
+    campo.placeholder = 'Diga o que mudou, cole o link da loja, ou mande parar o atendimento';
+    campo.maxLength = 8000;
     var enviar = el('button', 'Enviar');
     enviar.type = 'button';
     pe.appendChild(campo);
+    pe.appendChild(microfone(campo));
     pe.appendChild(enviar);
     caixa.appendChild(pe);
 
@@ -2810,13 +2835,65 @@
       }
       conversa.forEach(function (m) {
         mensagens.appendChild(el('div', m.texto, 'ac-bb ' + m.papel));
-        if (m.proposta && m.proposta.mudancas) mensagens.appendChild(cartaoDaProposta(m));
+        if (m.proposta && (m.proposta.mudancas || m.proposta.acao)) {
+          mensagens.appendChild(cartaoDaProposta(m));
+        }
       });
       mensagens.scrollTop = mensagens.scrollHeight;
     }
 
+    /*
+     * Acao nao e proposta de campo: nao tem "de X para Y" para comparar,
+     * porque o que ela mexe e o interruptor do atendimento, nao a base.
+     * Parar ja aconteceu quando este cartao aparece; voltar espera o clique.
+     */
+    function cartaoDaAcao(m) {
+      var cartao = el('div', null, 'ac-prop acao' + (m.estado === 'pendente' ? '' : ' passada'));
+
+      if (m.proposta.acao === 'pausar') {
+        cartao.appendChild(el('div', 'Atendimento parado', 'ac-cp'));
+        cartao.appendChild(el('div', 'O agente não responde ninguém até você mandar voltar.', 'hora'));
+        return cartao;
+      }
+
+      cartao.appendChild(el('div', 'Voltar a atender', 'ac-cp'));
+      if (m.estado !== 'pendente') {
+        cartao.appendChild(el('div', m.estado === 'confirmada'
+          ? 'O agente voltou a responder.'
+          : 'Descartada. O atendimento seguiu parado.', 'hora'));
+        return cartao;
+      }
+      cartao.appendChild(el('div', 'O agente volta a responder os seus clientes no WhatsApp.', 'hora'));
+
+      var acoes = el('div', null, 'ac-acoes');
+      var sim = el('button', 'Voltar a atender');
+      sim.type = 'button';
+      var nao = el('button', 'Agora não', 'secundario');
+      nao.type = 'button';
+
+      sim.addEventListener('click', function () {
+        sim.disabled = true; nao.disabled = true;
+        aviso.hidden = true;
+        api('/atendimento/chat/' + m.id + '/confirmar', { method: 'POST' })
+          .then(function () { return api('/atendimento'); })
+          .then(function (dados) { atendimento = dados; redesenhar(); })
+          .catch(function (e) { sim.disabled = false; nao.disabled = false; falhou(e); });
+      });
+      nao.addEventListener('click', function () {
+        sim.disabled = true; nao.disabled = true;
+        api('/atendimento/chat/' + m.id + '/descartar', { method: 'POST' })
+          .then(function () { m.estado = 'descartada'; desenhar(); })
+          .catch(function (e) { sim.disabled = false; nao.disabled = false; falhou(e); });
+      });
+      acoes.appendChild(sim);
+      acoes.appendChild(nao);
+      cartao.appendChild(acoes);
+      return cartao;
+    }
+
     /** A proposta: os campos que mudam, o valor de agora e o valor novo. */
     function cartaoDaProposta(m) {
+      if (m.proposta.acao) return cartaoDaAcao(m);
       var cartao = el('div', null, 'ac-prop' + (m.estado === 'pendente' ? '' : ' passada'));
       Object.keys(m.proposta.mudancas).forEach(function (nome) {
         var campoDef = atendimento.campos[nome];
@@ -2852,7 +2929,7 @@
             // Recarrega a tela toda: a base mudou, e com ela o formulario e o
             // historico de versoes, nao so a bolha do chat.
             atendimento = dados;
-            desenharAtendimento(corpo);
+            redesenhar();
           })
           .catch(function (e) {
             confirmar.disabled = false;
@@ -2903,6 +2980,8 @@
           atendimento.conversa = atendimento.conversa
             .filter(function (m) { return m.id !== 'enviando'; })
             .concat([dados.minha, dados.resposta]);
+          // Parar acontece na hora, entao o resto da tela precisa saber.
+          if (dados.pausa) { atendimento.pausa = dados.pausa; redesenhar(); return; }
           campo.disabled = false;
           enviar.disabled = false;
           desenhar();
@@ -2927,6 +3006,66 @@
 
     desenhar();
     return caixa;
+  }
+
+  /*
+   * Ditar em vez de digitar.
+   *
+   * Quem esta no balcao com cliente na frente nao para para escrever. Usa o
+   * reconhecimento do proprio navegador: sem biblioteca nova e sem audio
+   * passando pelo nosso servidor. Fora do Chrome ele nao existe, e ai o botao
+   * nem aparece, em vez de aparecer e nao funcionar.
+   *
+   * Vale dizer ao lojista: no Chrome, o que ele fala vai para o servico de
+   * reconhecimento do Google, que e quem transcreve.
+   */
+  function microfone(campo) {
+    var Reconhecimento = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!Reconhecimento) return el('span');
+
+    var botao = el('button', '', 'ac-mic');
+    botao.type = 'button';
+    botao.title = 'Ditar';
+    botao.setAttribute('aria-label', 'Ditar');
+    botao.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" width="18" height="18">'
+      + '<path d="M12 3a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3z"/>'
+      + '<path d="M18 11a6 6 0 0 1-12 0"/><path d="M12 17v4"/></svg>';
+
+    var ouvindo = null;
+    botao.addEventListener('click', function () {
+      if (ouvindo) { ouvindo.stop(); return; }
+
+      var r = new Reconhecimento();
+      r.lang = 'pt-BR';
+      r.continuous = true;
+      r.interimResults = true;
+      var jaTinha = campo.value ? campo.value + ' ' : '';
+      var fechado = '';
+
+      r.onresult = function (ev) {
+        var aberto = '';
+        for (var i = ev.resultIndex; i < ev.results.length; i += 1) {
+          var trecho = ev.results[i][0].transcript;
+          if (ev.results[i].isFinal) fechado += trecho; else aberto += trecho;
+        }
+        campo.value = jaTinha + fechado + aberto;
+      };
+      r.onerror = function () { parar(); };
+      r.onend = function () { parar(); };
+
+      function parar() {
+        ouvindo = null;
+        botao.classList.remove('ouvindo');
+        campo.focus();
+      }
+
+      try {
+        r.start();
+        ouvindo = r;
+        botao.classList.add('ouvindo');
+      } catch (e) { parar(); }
+    });
+    return botao;
   }
 
   /** O valor de um campo escrito como gente le, para o "de X para Y". */
@@ -3020,7 +3159,7 @@
     // antigo salvo nao pode cair numa tela em branco por causa de um rotulo.
     '#/resumo': verHoje, '#/hoje': verHoje, '#/leads': verLeads, '#/chat': verChat,
     '#/integracoes': verIntegracoes, '#/financeiro': verFinanceiro, '#/admin': verAdmin,
-    '#/atendimento': verAtendimento,
+    '#/atendimento': verAtendimento, '#/assistente': verAssistente,
     '#/configuracoes': verConfiguracoes,
   };
 
@@ -3063,6 +3202,7 @@
       // Modulo vendido a parte: quem nao assina nao ve o item no menu, e a
       // rota responde 404 de qualquer jeito.
       document.getElementById('menu-atendimento').hidden = !(dados.modulos && dados.modulos.atendimento);
+      document.getElementById('menu-assistente').hidden = !(dados.modulos && dados.modulos.atendimento);
 
       var faixa = document.getElementById('faixa');
       if (dados.aviso) {

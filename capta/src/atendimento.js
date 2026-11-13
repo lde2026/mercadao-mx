@@ -344,6 +344,22 @@ export async function confirmar(contaId, mensagemId, { autorEmail = null, operad
   return { base: salva };
 }
 
+/**
+ * Fecha uma pendencia que nao e mudanca de base.
+ *
+ * O chat tambem propoe acao, como voltar a atender, e acao nao passa por
+ * salvar(): nao e conhecimento e nao cria versao. Quem aplica e a rota, e o
+ * que sobra aqui e marcar a mensagem como resolvida, para o botao sumir.
+ */
+export async function marcarConfirmada(contaId, mensagemId) {
+  const { rowCount } = await consultar(
+    `update base_mensagens set estado = 'confirmada'
+      where id = $1 and conta_id = $2 and estado = 'pendente'`,
+    [mensagemId, contaId],
+  );
+  return rowCount > 0;
+}
+
 export async function descartar(contaId, mensagemId) {
   const { rowCount } = await consultar(
     `update base_mensagens set estado = 'descartada'

@@ -53,7 +53,7 @@ const INSTRUCOES = [
   'Os campos da base, e só eles existem:',
   LISTA_DE_CAMPOS,
   '',
-  'Devolva SOMENTE um objeto JSON, sem texto antes ou depois, em uma destas duas formas:',
+  'Devolva SOMENTE um objeto JSON, sem texto antes ou depois, em uma destas três formas:',
   '',
   '1. Quando o pedido estiver claro e você souber exatamente quais campos mudam:',
   '{"tipo":"proposta","texto":"uma frase dizendo o que vai mudar","mudancas":{"campo":"valor novo"}}',
@@ -61,6 +61,18 @@ const INSTRUCOES = [
   '2. Quando faltar informação, o pedido servir para mais de um campo, ou você não',
   'tiver certeza de qual campo mexer:',
   '{"tipo":"pergunta","texto":"a pergunta que falta"}',
+  '',
+  '3. Quando ele mandar parar ou voltar a atender:',
+  '{"tipo":"acao","acao":"pausar","texto":"o que você fez"}',
+  '{"tipo":"acao","acao":"retomar","texto":"o que vai acontecer"}',
+  '',
+  'Sobre parar e voltar:',
+  '- "pare o atendimento", "eu assumo agora", "deixa que eu respondo", "silencia" e',
+  '  parecidos são "pausar". O atendimento para na hora, e você diz que parou.',
+  '- "pode voltar", "volta a atender", "me libera" e parecidos são "retomar". Esse',
+  '  não acontece sozinho: ele precisa confirmar, e o seu texto diz isso.',
+  '- Na dúvida entre parar e mudar um campo, parar vem primeiro: quem pede silêncio',
+  '  está com um cliente na mão.',
   '',
   'Regras que não se negociam:',
   '- Na dúvida, pergunte. Propor errado custa mais que perguntar.',
@@ -162,6 +174,21 @@ export async function interpretar({
 
   const cru = recortarJson(texto);
   const fala = String(cru.texto || '').trim().slice(0, 1000);
+
+  /*
+   * A acao e o unico caminho em que o modelo mexe em algo que nao e campo da
+   * base. Por isso a lista de acoes e fechada aqui: o que nao for exatamente
+   * pausar ou retomar vira conversa, e nao uma acao desconhecida escorregando
+   * para dentro do servidor.
+   */
+  if (cru.tipo === 'acao' && (cru.acao === 'pausar' || cru.acao === 'retomar')) {
+    log.info('assistente.acao', { conta_id: contaId, acao: cru.acao });
+    return {
+      tipo: 'acao',
+      acao: cru.acao,
+      texto: fala || (cru.acao === 'pausar' ? 'Parei o atendimento.' : 'Posso voltar a atender?'),
+    };
+  }
 
   if (cru.tipo !== 'proposta') {
     return { tipo: 'pergunta', texto: fala || 'Pode me dar mais detalhes?' };

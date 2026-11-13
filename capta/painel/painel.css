@@ -548,3 +548,19 @@ pre{background:var(--escuro);color:var(--superficie);padding:13px;border-radius:
 .freio textarea{margin-top:5px;min-height:62px;resize:vertical}
 .freio.parado{border-color:var(--atencao);background:var(--atencao-fundo)}
 .freio.parado .rotulo{color:var(--atencao)}
+
+/* A tela que e so a conversa: ela ocupa a altura que tiver. */
+.assistente-chat.grande{position:static;max-width:860px;margin-inline:auto}
+.assistente-chat.grande .ac-ms{min-height:52vh;max-height:none;height:calc(100vh - 290px)}
+.assistente-chat.grande .ac-bb{max-width:74%;font-size:14.5px}
+.assistente-chat.grande .ac-prop{max-width:74%}
+
+/* Acao nao e proposta de campo: sem o "de X para Y", so o que vai acontecer. */
+.ac-prop.acao{align-self:flex-start;max-width:88%}
+.ac-prop.acao .hora{margin:0}
+
+.ac-mic{flex:none;width:38px;height:38px;padding:0;border-radius:10px;display:grid;place-items:center;
+  background:var(--superficie);border:1px solid var(--linha);color:var(--fraco)}
+.ac-mic svg{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.ac-mic:hover{border-color:var(--acento);color:var(--acento-texto)}
+.ac-mic.ouvindo{background:var(--ruim-fundo);border-color:var(--ruim);color:var(--ruim)}
