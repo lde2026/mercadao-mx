@@ -42,7 +42,7 @@ await prepararBanco();
 const { app } = await import('../src/server.js');
 const atendimento = await import('../src/atendimento.js');
 const { interpretar } = await import('../src/atendente.js');
-const { enderecoFechado, conferir, textoDoHtml, acharLink } = await import('../src/pagina.js');
+const { enderecoFechado, conferir, textoDoHtml, acharLink, linksUteis } = await import('../src/pagina.js');
 
 const servidor = app.listen(0);
 const base = `http://127.0.0.1:${servidor.address().port}`;
@@ -127,6 +127,52 @@ test('o texto da pagina sai sem marcacao e com titulo', () => {
 test('pagina gigante e cortada', () => {
   const texto = textoDoHtml(`<p>${'palavra '.repeat(40000)}</p>`);
   assert.ok(texto.length <= 12_000, `cortou em ${texto.length}`);
+});
+
+/*
+ * Os links que valem seguir.
+ *
+ * O lojista manda o endereco da loja e espera que a gente saiba a politica de
+ * troca dele. Ela nunca esta na home: esta atras de um link no rodape. E a
+ * escolha de quais links seguir nao e so comodidade, e seguranca: seguir o
+ * link do Instagram da loja seria o nosso servidor buscando um dominio que
+ * quem escreveu a pagina escolheu.
+ */
+test('os links da loja que valem seguir sao do mesmo site e falam do assunto', () => {
+  const html = `
+    <a href="/politica-de-trocas">Trocas e devoluções</a>
+    <a href="/pagina/entrega">Prazo de entrega</a>
+    <a href="/institucional/x">Formas de pagamento</a>
+    <a href="/carrinho">Meu carrinho</a>
+    <a href="/produto/quadriciclo-49cc">Quadriciclo 49cc</a>
+    <a href="https://instagram.com/mxkids/troca">Instagram</a>
+    <a href="https://mxkids.com.br/politica-de-trocas">Trocas</a>
+    <a href="/politica-de-trocas#topo">Trocas de novo</a>
+    <a href="/">Home</a>
+  `;
+  const achados = linksUteis(html, 'https://mxkids.com.br/');
+
+  assert.ok(achados.includes('https://mxkids.com.br/politica-de-trocas'),
+    'a politica de troca e o motivo de tudo isso existir');
+  assert.ok(achados.includes('https://mxkids.com.br/pagina/entrega'));
+  assert.ok(achados.includes('https://mxkids.com.br/institucional/x'),
+    'o texto do link tambem conta, nao so o caminho');
+
+  assert.ok(!achados.some((u) => u.includes('instagram.com')),
+    'dominio de terceiro nunca, mesmo falando de troca');
+  assert.ok(!achados.includes('https://mxkids.com.br/carrinho'));
+  assert.ok(!achados.some((u) => u.includes('/produto/')));
+  assert.ok(!achados.includes('https://mxkids.com.br/'), 'a propria pagina nao se segue');
+
+  const trocas = achados.filter((u) => u.includes('politica-de-trocas'));
+  assert.equal(trocas.length, 1, 'o mesmo endereco, com ancora ou absoluto, conta uma vez');
+});
+
+test('html sem link nenhum nao quebra a leitura da loja', () => {
+  assert.deepEqual(linksUteis('<p>oi</p>', 'https://mxkids.com.br/'), []);
+  assert.deepEqual(linksUteis('', 'https://mxkids.com.br/'), []);
+  // href torto nao pode derrubar: a pagina vem de fora e pode ter qualquer coisa.
+  assert.deepEqual(linksUteis('<a href="javascript:void(0)">troca</a>', 'https://mxkids.com.br/'), []);
 });
 
 test('o link e achado do jeito que o lojista cola', () => {

@@ -3677,8 +3677,9 @@
          * sempre a mesma primeira pergunta.
          */
         if (!(atendimento.prontidao || {}).base) {
-          mensagens.appendChild(el('div', 'Oi! Vou montar o atendimento da sua loja.'
-            + ' Para começar: qual é o nome da loja, o que ela vende, e qual é o link do site?',
+          mensagens.appendChild(el('div', 'Oi! Vou montar o atendimento da sua loja, e vou te'
+            + ' perguntar o mínimo. Para começar: qual é o nome da loja, o que ela vende, e qual'
+            + ' é o link do site? Com o link eu leio o site e tiro de lá o que der.',
           'ac-bb assistente'));
         } else {
           mensagens.appendChild(el('p', 'Cole o link da sua loja e eu leio o site para adiantar o que der. Ou escreva o que mudou. Você confirma antes de gravar.', 'ac-vazio'));

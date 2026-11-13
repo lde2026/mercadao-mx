@@ -32,7 +32,7 @@ import {
 import * as atendimento from './atendimento.js';
 import * as atendeai from './billing/atendeai.js';
 import { interpretar, temAssistente } from './atendente.js';
-import { acharLink, lerPagina } from './pagina.js';
+import { acharLink, lerPagina, lerLoja } from './pagina.js';
 import { compararConstante } from './cripto.js';
 
 const aqui = path.dirname(fileURLToPath(import.meta.url));
@@ -1266,8 +1266,8 @@ app.post('/api/atendimento/chat', exigirAtendimento, async (req, res) => {
   const atual = atendimento.conteudo(linhaBase);
   const ativacao = !baseDaParaAtender(linhaBase);
   const saidaDoErro = ativacao
-    ? ' Me conte por aqui mesmo: nome da loja, o que ela vende, horário de atendimento,'
-      + ' prazo de entrega, formas de pagamento e política de troca.'
+    ? ' Me conte por aqui mesmo: nome da loja, o que ela vende, até onde você entrega'
+      + ' e o horário de atendimento.'
     : ' Me conte aqui o que mudou e eu monto a alteração.';
 
   const link = acharLink(pedido);
@@ -1278,7 +1278,13 @@ app.post('/api/atendimento/chat', exigirAtendimento, async (req, res) => {
     if (!cabePagina) {
       recado = 'Já abri dez páginas por aqui hoje.' + saidaDoErro;
     } else {
-      const lida = await lerPagina(link, { contaId: req.conta.id });
+      // Na ativacao le a loja inteira, e nao so a pagina que ele mandou: a
+      // home nao tem politica de troca, ela tem o link para a politica de
+      // troca. Depois da ativacao, quando ele cola um link, e quase sempre
+      // uma pagina especifica que ele quer que eu leia, entao segue so ela.
+      const lida = ativacao
+        ? await lerLoja(link, { contaId: req.conta.id })
+        : await lerPagina(link, { contaId: req.conta.id });
       if (lida.erro) {
         recado = `Não consegui ler ${link}: ${lida.erro}.` + saidaDoErro;
       } else {

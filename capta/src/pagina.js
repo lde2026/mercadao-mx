@@ -184,11 +184,14 @@ export async function lerPagina(cru, { contaId = null } = {}) {
       pedacos.push(pedaco);
       if (bytes >= TETO_BYTES) break;
     }
-    const texto = textoDoHtml(Buffer.concat(pedacos).toString('utf8'));
+    const html = Buffer.concat(pedacos).toString('utf8');
+    const texto = textoDoHtml(html);
     if (texto.length < 80) return { erro: 'essa página não tem texto que eu consiga ler' };
 
     log.info('pagina.lida', { conta_id: contaId, caracteres: texto.length });
-    return { texto, endereco: checado.url.toString() };
+    // O html volta junto para quem precisa dos links da pagina. Ele nao sai
+    // daqui para o modelo: o que vai para o prompt e sempre o texto.
+    return { texto, html, endereco: checado.url.toString() };
   }
 
   return { erro: 'essa página redireciona demais' };
@@ -205,4 +208,95 @@ export function acharLink(texto) {
     return `https://${nu[1]}${nu[2] || ''}`;
   }
   return null;
+}
+
+
+/*
+ * As paginas que respondem o que o lojista nao deveria ter que digitar.
+ *
+ * A home de uma loja nao tem politica de troca: ela tem um link para a
+ * politica de troca, no rodape. Entao, para "manda o link que eu leio o
+ * site" ser verdade, e preciso seguir esses links. A lista e de palavras que
+ * aparecem no caminho ou no texto do link, e nao de caminhos fixos, porque
+ * cada plataforma usa um.
+ */
+const PALAVRAS = [
+  'troca', 'devolu', 'reembolso', 'garantia',
+  'entrega', 'frete', 'envio', 'prazo',
+  'pagamento', 'parcel',
+  'faq', 'duvida', 'duvidas', 'ajuda', 'atendimento', 'contato',
+  'politica', 'privacidade', 'termos', 'sobre', 'quem-somos', 'quem_somos',
+];
+
+const TETO_EXTRA = 5_000;
+const TETO_JUNTO = 22_000;
+const EXTRAS = 3;
+
+/** Os links da pagina que parecem responder alguma coisa da base. */
+export function linksUteis(html, base) {
+  const achados = [];
+  const vistos = new Set();
+  const raiz = new URL(base);
+  const padrao = /<a\b[^>]*href=["']([^"'#]+)["'][^>]*>([\s\S]{0,200}?)<\/a>/gi;
+
+  let casou = padrao.exec(html);
+  while (casou) {
+    let url = null;
+    try {
+      url = new URL(casou[1], base);
+    } catch { url = null; }
+
+    if (url && (url.protocol === 'http:' || url.protocol === 'https:')
+      // So o mesmo site. Link para o Instagram da loja nao e base de
+      // conhecimento, e seguir dominio de terceiro aqui seria transformar o
+      // nosso servidor em buscador de endereco escolhido por quem escreveu a
+      // pagina.
+      && url.hostname === raiz.hostname) {
+      url.hash = '';
+      const chave = url.toString();
+      const alvo = (url.pathname + ' ' + casou[2]).toLowerCase();
+      if (!vistos.has(chave) && chave !== base && PALAVRAS.some((p) => alvo.includes(p))) {
+        vistos.add(chave);
+        achados.push(chave);
+      }
+    }
+    casou = padrao.exec(html);
+  }
+  return achados;
+}
+
+/**
+ * Le a loja: a pagina que o lojista mandou mais as que ela aponta.
+ *
+ * O lojista manda o endereco da loja e espera que a gente saiba a politica de
+ * troca dele. Ler so a home nao cumpre isso, e ficar perguntando campo por
+ * campo e o que ele pediu para parar de fazer.
+ */
+export async function lerLoja(cru, { contaId = null, extras = EXTRAS } = {}) {
+  const principal = await lerPagina(cru, { contaId });
+  if (principal.erro) return principal;
+
+  const candidatas = linksUteis(principal.html || '', principal.endereco).slice(0, extras);
+  const partes = [`Página ${principal.endereco}:\n${principal.texto}`];
+  const lidas = [principal.endereco];
+  let tamanho = partes[0].length;
+
+  for (const endereco of candidatas) {
+    if (tamanho >= TETO_JUNTO) break;
+    // Uma pagina que nao abre nao derruba a leitura: a loja continua tendo a
+    // home, que ja vale mais que nada.
+    const extra = await lerPagina(endereco, { contaId });
+    if (extra.erro) continue;
+    const pedaco = `Página ${extra.endereco}:\n${extra.texto.slice(0, TETO_EXTRA)}`;
+    partes.push(pedaco);
+    lidas.push(extra.endereco);
+    tamanho += pedaco.length;
+  }
+
+  log.info('loja.lida', { conta_id: contaId, paginas: lidas.length });
+  return {
+    texto: partes.join('\n\n').slice(0, TETO_JUNTO),
+    endereco: principal.endereco,
+    paginas: lidas,
+  };
 }
