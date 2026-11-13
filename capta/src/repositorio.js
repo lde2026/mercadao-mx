@@ -1057,3 +1057,110 @@ export async function listarContas() {
   );
   return rows;
 }
+
+// ---------------------------------------------------- atendimentos do zap ---
+
+const ESTADOS_ATENDIMENTO = ['ia', 'humano', 'fechado'];
+
+export function ehEstadoAtendimento(estado) {
+  return ESTADOS_ATENDIMENTO.includes(String(estado));
+}
+
+/**
+ * Guarda uma fala e devolve o atendimento como ele ficou.
+ *
+ * Quem chama e o agente, por rota interna, a cada mensagem que entra ou sai.
+ * O upsert pela chave (conta, cliente) e o que mantem uma conversa por
+ * cliente em vez de um card novo por mensagem.
+ *
+ * O estado NAO e tocado aqui de proposito: se o lojista assumiu a conversa,
+ * a chegada de uma mensagem nova nao pode devolver o atendimento para a IA.
+ */
+export async function registrarFala(contaId, { cliente, nome = null, direcao, texto }) {
+  const numero = numeroCanonico(cliente);
+  if (!numero) return null;
+  const fala = String(texto ?? '').trim().slice(0, 4000);
+  if (!fala) return null;
+  const lado = ['cliente', 'agente', 'humano'].includes(direcao) ? direcao : 'cliente';
+
+  const { rows } = await consultar(
+    `insert into atendimentos (conta_id, cliente, nome, ultima_fala, ultima_em, falas)
+          values ($1, $2, nullif($3, ''), $4, now(), 1)
+     on conflict (conta_id, cliente) do update
+        set ultima_fala = excluded.ultima_fala,
+            ultima_em = now(),
+            falas = atendimentos.falas + 1,
+            nome = coalesce(nullif($3, ''), atendimentos.nome)
+      returning *`,
+    [contaId, numero, String(nome ?? '').trim().slice(0, 120), fala],
+  );
+  const atend = rows[0];
+  await consultar(
+    `insert into atendimento_falas (atendimento_id, conta_id, direcao, texto)
+          values ($1, $2, $3, $4)`,
+    [atend.id, contaId, lado, fala],
+  );
+  return atend;
+}
+
+export async function listarAtendimentos(contaId, { limite = 60 } = {}) {
+  const { rows } = await consultar(
+    `select id, cliente, nome, estado, ultima_fala, ultima_em, falas, aberto_em, assumido_em
+       from atendimentos
+      where conta_id = $1
+      order by ultima_em desc
+      limit $2`,
+    [contaId, Math.min(Math.max(Number(limite) || 60, 1), 200)],
+  );
+  return rows;
+}
+
+/**
+ * Um atendimento com as falas dele.
+ *
+ * O conta_id entra no where, e nao numa conferencia depois: id de URL nunca
+ * e autorizacao, e aqui o id vem da tela de uma conta que pode nao ser a
+ * dona da conversa.
+ */
+export async function atendimentoComFalas(contaId, id) {
+  const { rows } = await consultar(
+    `select id, cliente, nome, estado, ultima_fala, ultima_em, falas, aberto_em, assumido_em
+       from atendimentos where conta_id = $1 and id = $2`,
+    [contaId, id],
+  );
+  if (!rows[0]) return null;
+  const falas = await consultar(
+    `select id, direcao, texto, criado_em
+       from atendimento_falas
+      where conta_id = $1 and atendimento_id = $2
+      order by criado_em asc
+      limit 400`,
+    [contaId, id],
+  );
+  return { ...rows[0], falas: falas.rows };
+}
+
+export async function definirEstadoAtendimento(contaId, id, estado) {
+  if (!ehEstadoAtendimento(estado)) return null;
+  const { rows } = await consultar(
+    `update atendimentos
+        set estado = $3,
+            assumido_em = case when $3 = 'humano' then now() else null end
+      where conta_id = $1 and id = $2
+      returning id, estado, assumido_em`,
+    [contaId, id, estado],
+  );
+  return rows[0] || null;
+}
+
+/** Quantos atendimentos esperam o lojista. Vai no Resumo. */
+export async function contarAtendimentos(contaId) {
+  const { rows } = await consultar(
+    `select count(*)::int as total,
+            count(*) filter (where estado = 'humano')::int as comigo,
+            count(*) filter (where ultima_em >= current_date)::int as hoje
+       from atendimentos where conta_id = $1`,
+    [contaId],
+  );
+  return rows[0];
+}

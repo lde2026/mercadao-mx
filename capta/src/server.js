@@ -667,11 +667,7 @@ registrarRotasOauth(app);
  * todos os clientes para a internet no primeiro deploy sem a variavel.
  */
 app.get('/interno/base/:contaId', limitarPor('base-interna', 60, 120), async (req, res) => {
-  const esperada = process.env.CHAVE_SERVICO;
-  const cabecalho = String(req.headers.authorization || '');
-  const oferecida = cabecalho.startsWith('Bearer ') ? cabecalho.slice(7) : '';
-
-  if (!esperada || !oferecida || !compararConstante(oferecida, esperada)) {
+  if (!chaveDeServicoOk(req)) {
     log.aviso('base.interna_negada', { conta_id: req.params.contaId });
     return res.status(401).json({ erro: 'nao autorizado' });
   }
@@ -716,11 +712,7 @@ app.get('/interno/base/:contaId', limitarPor('base-interna', 60, 120), async (re
  * transito que nao precisa existir.
  */
 app.get('/interno/numero/:numero', limitarPor('numero-interno', 60, 1200), async (req, res) => {
-  const esperada = process.env.CHAVE_SERVICO;
-  const cabecalho = String(req.headers.authorization || '');
-  const oferecida = cabecalho.startsWith('Bearer ') ? cabecalho.slice(7) : '';
-
-  if (!esperada || !oferecida || !compararConstante(oferecida, esperada)) {
+  if (!chaveDeServicoOk(req)) {
     log.aviso('numero.negado', {});
     return res.status(401).json({ erro: 'nao autorizado' });
   }
@@ -741,12 +733,22 @@ app.get('/interno/numero/:numero', limitarPor('numero-interno', 60, 1200), async
   });
 });
 
-app.post('/interno/base/:contaId/consumo', limitarPor('consumo-interno', 60, 1200), async (req, res) => {
+/*
+ * A chave de servico das rotas internas.
+ *
+ * Comparacao em tempo constante e chave vazia valendo recusa: sem a segunda
+ * parte, uma instalacao que esquecesse CHAVE_SERVICO aceitaria qualquer
+ * Bearer vazio e abriria a base de todas as contas.
+ */
+function chaveDeServicoOk(req) {
   const esperada = process.env.CHAVE_SERVICO;
   const cabecalho = String(req.headers.authorization || '');
   const oferecida = cabecalho.startsWith('Bearer ') ? cabecalho.slice(7) : '';
+  return Boolean(esperada) && Boolean(oferecida) && compararConstante(oferecida, esperada);
+}
 
-  if (!esperada || !oferecida || !compararConstante(oferecida, esperada)) {
+app.post('/interno/base/:contaId/consumo', limitarPor('consumo-interno', 60, 1200), async (req, res) => {
+  if (!chaveDeServicoOk(req)) {
     log.aviso('consumo.negado', { conta_id: req.params.contaId });
     return res.status(401).json({ erro: 'nao autorizado' });
   }
@@ -757,6 +759,46 @@ app.post('/interno/base/:contaId/consumo', limitarPor('consumo-interno', 60, 120
   const marca = await atendimento.somarConsumo(conta.id, (req.body || {}).enviadas);
   res.set('Cache-Control', 'no-store').json({
     competencia: marca.competencia, enviadas: marca.enviadas,
+  });
+});
+
+/*
+ * O espelho das conversas do WhatsApp no painel.
+ *
+ * O agente manda cada fala que entra e cada uma que ele responde. O que
+ * volta e o estado do atendimento, e e por ele que o agente sabe se deve
+ * continuar respondendo: assumido pelo lojista, ele cala a boca naquela
+ * conversa sem precisar de uma segunda chamada para perguntar.
+ *
+ * O numero do cliente final entra no banco porque e a chave da conversa, e
+ * nao entra em log nenhum: ele e dado pessoal de alguem que nem cliente
+ * nosso e.
+ */
+app.post('/interno/atendimentos/:contaId', limitarPor('atendimento-interno', 60, 1800), async (req, res) => {
+  if (!chaveDeServicoOk(req)) {
+    log.aviso('atendimento_interno.negado', { conta_id: req.params.contaId });
+    return res.status(401).json({ erro: 'nao autorizado' });
+  }
+
+  const conta = await repo.buscarConta(req.params.contaId);
+  if (!conta || !conta.modulo_atendimento) return res.status(404).json({ erro: 'nao encontrada' });
+
+  const corpo = req.body || {};
+  const atend = await repo.registrarFala(conta.id, {
+    cliente: corpo.cliente,
+    nome: corpo.nome,
+    direcao: corpo.direcao,
+    texto: corpo.texto,
+  });
+  if (!atend) return res.status(400).json({ erro: 'informe cliente e texto' });
+
+  log.info('atendimento.fala', { conta_id: conta.id, atendimento_id: atend.id });
+  res.set('Cache-Control', 'no-store').json({
+    id: atend.id,
+    estado: atend.estado,
+    // O agente le isto e para. Nome explicito para nao depender de ele
+    // interpretar o estado certo do nosso lado.
+    responder: atend.estado === 'ia' && !conta.atendimento_pausado,
   });
 });
 
@@ -1072,6 +1114,43 @@ app.post('/api/atendimento/numero', exigirAtendimento, async (req, res) => {
   if (!agora) return res.status(404).json({ erro: 'conta nao encontrada' });
   log.info('atendimento.numero_pedido', { conta_id: req.conta.id });
   res.json({ solicitado: agora.numero_solicitado });
+});
+
+/*
+ * Os atendimentos no painel.
+ *
+ * Tudo filtrado por req.conta.id, inclusive a abertura de um atendimento
+ * pelo id: o id na URL diz qual conversa, nunca de quem ela e.
+ */
+app.get('/api/atendimentos', exigirAtendimento, async (req, res) => {
+  const [lista, contagem] = await Promise.all([
+    repo.listarAtendimentos(req.conta.id, { limite: req.query.limite }),
+    repo.contarAtendimentos(req.conta.id),
+  ]);
+  res.json({ atendimentos: lista, contagem });
+});
+
+app.get('/api/atendimentos/:id', exigirAtendimento, async (req, res) => {
+  const achado = await repo.atendimentoComFalas(req.conta.id, req.params.id);
+  if (!achado) return res.status(404).json({ erro: 'nao encontrado' });
+  res.json(achado);
+});
+
+/**
+ * Assumir e devolver uma conversa.
+ *
+ * Assumir nao manda mensagem nenhuma: o lojista responde pelo WhatsApp dele,
+ * como ja faria. O que muda aqui e que o agente para de responder NAQUELA
+ * conversa, e so nela, em vez de o lojista ter que pausar a loja inteira
+ * para atender um cliente.
+ */
+app.post('/api/atendimentos/:id/estado', exigirAtendimento, async (req, res) => {
+  const estado = String((req.body || {}).estado || '');
+  if (!repo.ehEstadoAtendimento(estado)) return res.status(400).json({ erro: 'estado invalido' });
+  const agora = await repo.definirEstadoAtendimento(req.conta.id, req.params.id, estado);
+  if (!agora) return res.status(404).json({ erro: 'nao encontrado' });
+  log.info('atendimento.estado', { conta_id: req.conta.id, atendimento_id: agora.id, estado });
+  res.json(agora);
 });
 
 app.post('/api/atendimento/pausa', exigirAtendimento, async (req, res) => {

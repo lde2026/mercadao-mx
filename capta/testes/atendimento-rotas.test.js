@@ -456,6 +456,112 @@ test('pausar exige o modulo, e nao se pausa pela rota interna', async () => {
 });
 
 /*
+ * Os atendimentos que chegam pelo WhatsApp.
+ *
+ * Aqui mora o risco que o resto do projeto nao tem: o agente manda a conversa
+ * de um cliente final pela rota interna, e um id de conversa na URL do painel
+ * nao pode servir de autorizacao. Loja B abrindo a conversa da loja A nao e
+ * vazamento de tela, e a conversa de um consumidor com outra empresa.
+ */
+test('o agente registra a fala e o painel da conta ve, so a dona', async () => {
+  const entrou = await pedir(`/interno/atendimentos/${contaA.id}`, {
+    metodo: 'POST',
+    cabecalhos: { Authorization: `Bearer ${process.env.CHAVE_SERVICO}` },
+    corpo: { cliente: '41988887777', nome: 'Joana', direcao: 'cliente', texto: 'Voces tem o quadriciclo 49cc?' },
+  });
+  assert.equal(entrou.status, 200);
+  assert.equal(entrou.json.responder, true, 'conversa nova e da IA');
+  const id = entrou.json.id;
+
+  await pedir(`/interno/atendimentos/${contaA.id}`, {
+    metodo: 'POST',
+    cabecalhos: { Authorization: `Bearer ${process.env.CHAVE_SERVICO}` },
+    corpo: { cliente: '41988887777', direcao: 'agente', texto: 'Temos sim, em tres cores.' },
+  });
+
+  const minha = await pedir('/api/atendimentos', { cookie: contaA.cookie });
+  assert.equal(minha.status, 200);
+  assert.equal(minha.json.atendimentos.length, 1, 'duas falas, um atendimento so');
+  assert.equal(minha.json.atendimentos[0].falas, 2);
+  assert.equal(minha.json.atendimentos[0].nome, 'Joana');
+  assert.equal(minha.json.contagem.total, 1);
+
+  // A vizinha nao ve a conversa na lista nem alcanca pelo id.
+  const dela = await pedir('/api/atendimentos', { cookie: contaB.cookie });
+  assert.equal(dela.json.atendimentos.length, 0);
+  const espiando = await pedir(`/api/atendimentos/${id}`, { cookie: contaB.cookie });
+  assert.equal(espiando.status, 404, 'conta B tinha que receber 404 na conversa da conta A');
+
+  const aberta = await pedir(`/api/atendimentos/${id}`, { cookie: contaA.cookie });
+  assert.equal(aberta.status, 200);
+  assert.equal(aberta.json.falas.length, 2);
+  assert.equal(aberta.json.falas[0].direcao, 'cliente');
+});
+
+test('assumir cala o agente naquela conversa, e so nela', async () => {
+  const lista = await pedir('/api/atendimentos', { cookie: contaA.cookie });
+  const id = lista.json.atendimentos[0].id;
+
+  // Uma segunda conversa, para provar que a pausa e por cliente e nao da loja.
+  await pedir(`/interno/atendimentos/${contaA.id}`, {
+    metodo: 'POST',
+    cabecalhos: { Authorization: `Bearer ${process.env.CHAVE_SERVICO}` },
+    corpo: { cliente: '41977776666', direcao: 'cliente', texto: 'Qual o prazo para Curitiba?' },
+  });
+
+  const assumiu = await pedir(`/api/atendimentos/${id}/estado`, {
+    metodo: 'POST', cookie: contaA.cookie, corpo: { estado: 'humano' },
+  });
+  assert.equal(assumiu.status, 200);
+  assert.equal(assumiu.json.estado, 'humano');
+
+  const voltou = await pedir(`/interno/atendimentos/${contaA.id}`, {
+    metodo: 'POST',
+    cabecalhos: { Authorization: `Bearer ${process.env.CHAVE_SERVICO}` },
+    corpo: { cliente: '41988887777', direcao: 'cliente', texto: 'Oi, ainda esta ai?' },
+  });
+  assert.equal(voltou.json.responder, false, 'o agente tem que calar na conversa assumida');
+  assert.equal(voltou.json.estado, 'humano', 'mensagem nova nao devolve a conversa para a IA');
+
+  const outra = await pedir(`/interno/atendimentos/${contaA.id}`, {
+    metodo: 'POST',
+    cabecalhos: { Authorization: `Bearer ${process.env.CHAVE_SERVICO}` },
+    corpo: { cliente: '41977776666', direcao: 'cliente', texto: 'Alo?' },
+  });
+  assert.equal(outra.json.responder, true, 'a outra conversa segue com a IA');
+
+  const devolveu = await pedir(`/api/atendimentos/${id}/estado`, {
+    metodo: 'POST', cookie: contaA.cookie, corpo: { estado: 'ia' },
+  });
+  assert.equal(devolveu.json.estado, 'ia');
+  assert.equal(devolveu.json.assumido_em, null);
+});
+
+test('a conta vizinha nao escreve na conversa pela rota interna sem a chave', async () => {
+  const semChave = await pedir(`/interno/atendimentos/${contaA.id}`, {
+    metodo: 'POST', corpo: { cliente: '41911112222', direcao: 'cliente', texto: 'oi' },
+  });
+  assert.equal(semChave.status, 401);
+
+  const comCookie = await pedir(`/interno/atendimentos/${contaA.id}`, {
+    metodo: 'POST', cookie: contaB.cookie, corpo: { cliente: '41911112222', direcao: 'cliente', texto: 'oi' },
+  });
+  assert.equal(comCookie.status, 401, 'cookie de lojista nao vale como chave de servico');
+
+  const semModulo = await pedir(`/interno/atendimentos/${contaA.id}`, {
+    metodo: 'POST',
+    cabecalhos: { Authorization: `Bearer ${process.env.CHAVE_SERVICO}` },
+    corpo: { cliente: '', direcao: 'cliente', texto: 'oi' },
+  });
+  assert.equal(semModulo.status, 400, 'sem numero de cliente nao se cria conversa');
+
+  const estadoTorto = await pedir('/api/atendimentos/00000000-0000-0000-0000-000000000000/estado', {
+    metodo: 'POST', cookie: contaA.cookie, corpo: { estado: 'inventado' },
+  });
+  assert.equal(estadoTorto.status, 400);
+});
+
+/*
  * A receita do Atende Ai no Admin.
  *
  * Ela nao sai de assinaturas, e sim da faixa gravada na conta, entao nenhum

@@ -497,3 +497,40 @@ create table if not exists consumo_atendimento (
   atualizado_em timestamptz not null default now(),
   primary key (conta_id, competencia)
 );
+
+/*
+ * Os atendimentos que chegam pelo WhatsApp.
+ *
+ * O agente roda fora daqui e e ele quem fala com o cliente final. Isto e o
+ * espelho dessas conversas no painel, e existe por um motivo so: sem ele o
+ * lojista nao sabe quem ja foi atendido, quem ficou pela metade e em quem
+ * ele precisa entrar. O numero do cliente fica aqui porque e a chave da
+ * conversa, mas ele nunca vai para log.
+ */
+create table if not exists atendimentos (
+  id uuid primary key default gen_random_uuid(),
+  conta_id uuid not null references contas(id) on delete cascade,
+  cliente text not null,
+  nome text,
+  estado text not null default 'ia',
+  ultima_fala text,
+  ultima_em timestamptz not null default now(),
+  falas integer not null default 0,
+  aberto_em timestamptz not null default now(),
+  assumido_em timestamptz
+);
+create unique index if not exists atendimentos_conta_cliente_idx
+  on atendimentos (conta_id, cliente);
+create index if not exists atendimentos_conta_ultima_idx
+  on atendimentos (conta_id, ultima_em desc);
+
+create table if not exists atendimento_falas (
+  id uuid primary key default gen_random_uuid(),
+  atendimento_id uuid not null references atendimentos(id) on delete cascade,
+  conta_id uuid not null references contas(id) on delete cascade,
+  direcao text not null,
+  texto text not null,
+  criado_em timestamptz not null default now()
+);
+create index if not exists atendimento_falas_idx
+  on atendimento_falas (atendimento_id, criado_em);

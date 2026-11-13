@@ -72,6 +72,9 @@
     pedido: '<path d="M6 2h12l2 6H4z"/><path d="M5 8v12h14V8"/>',
     plano: '<path d="M4 4h16v16H4z"/><path d="M8 9h8"/><path d="M8 13h5"/>',
     relogio: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    // Faltava: os cartoes do Atende Ai ja pediam 'chat' e vinham com a bolha
+    // vazia, um circulo sem desenho nenhum no meio do painel.
+    chat: '<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8"/><path d="M8 12h5"/>',
   };
 
   function icone(nome) {
@@ -2797,6 +2800,145 @@
     return cartao;
   }
 
+  /*
+   * Os atendimentos que chegaram pelo WhatsApp.
+   *
+   * Sem esta tela o lojista nao tem como saber quem a IA ja atendeu, quem
+   * ficou pela metade e onde ele precisa entrar: a conversa acontece no
+   * celular dele e some na lista do WhatsApp junto com todo o resto.
+   */
+  function verAtendimentos() {
+    var alvo = pintar('Atendimentos', 'As conversas que o agente teve no seu WhatsApp.');
+    var corpo = el('div');
+    alvo.appendChild(corpo);
+    corpo.appendChild(el('p', 'Carregando...', 'vazio'));
+
+    api('/atendimentos').then(function (dados) {
+      corpo.textContent = '';
+      var c = dados.contagem || {};
+
+      var grade = el('div', null, 'grade-num');
+      grade.appendChild(cartaoNumero({
+        rotulo: 'Conversas hoje', valor: String(c.hoje || 0), nomeIcone: 'chat', tom: 'acento',
+        detalhe: (c.total || 0) + ' no total',
+      }));
+      grade.appendChild(cartaoNumero({
+        rotulo: 'Com você', valor: String(c.comigo || 0), nomeIcone: 'alerta',
+        tom: c.comigo ? 'ruim' : 'bom',
+        detalhe: c.comigo ? 'o agente parou nessas' : 'nenhuma esperando você',
+      }));
+      corpo.appendChild(grade);
+
+      if (!dados.atendimentos.length) {
+        corpo.appendChild(el('p', 'Nenhuma conversa ainda. Assim que o seu número estiver atendendo, elas aparecem aqui.', 'vazio'));
+        return;
+      }
+
+      var lista = el('div', null, 'conversas');
+      dados.atendimentos.forEach(function (a) {
+        lista.appendChild(cartaoDaConversa(a));
+      });
+      corpo.appendChild(lista);
+    }).catch(function (e) {
+      corpo.textContent = '';
+      corpo.appendChild(el('p', e.message, 'vazio'));
+    });
+  }
+
+  var SELO_ATENDIMENTO = {
+    ia: ['IA respondendo', 'criado'],
+    humano: ['Você assumiu', 'pendente'],
+    fechado: ['Fechado', 'manual'],
+  };
+
+  function cartaoDaConversa(a) {
+    var cartao = el('button', null, 'conversa');
+    cartao.type = 'button';
+    var topo = el('div', null, 'conversa-topo');
+    topo.appendChild(el('strong', a.nome || numeroBonito(a.cliente)));
+    var marca = SELO_ATENDIMENTO[a.estado] || SELO_ATENDIMENTO.ia;
+    topo.appendChild(selo(marca[0], marca[1]));
+    cartao.appendChild(topo);
+    cartao.appendChild(el('p', a.ultima_fala || '', 'conversa-fala'));
+    var pe = el('div', null, 'conversa-pe');
+    pe.appendChild(el('span', quando(a.ultima_em), 'hora'));
+    pe.appendChild(el('span', a.falas + (a.falas === 1 ? ' mensagem' : ' mensagens'), 'hora'));
+    cartao.appendChild(pe);
+    cartao.addEventListener('click', function () { location.hash = '#/conversa/' + a.id; });
+    return cartao;
+  }
+
+  /*
+   * Uma conversa aberta.
+   *
+   * Assumir nao manda mensagem: o lojista responde pelo WhatsApp dele, como
+   * ja faria. O que este botao faz e calar o agente naquela conversa, e so
+   * nela, em vez de parar a loja inteira para atender um cliente.
+   */
+  function verConversa(id) {
+    var alvo = pintar('Conversa', 'O que o agente falou com esse cliente.');
+    var corpo = el('div');
+    alvo.appendChild(corpo);
+    corpo.appendChild(el('p', 'Carregando...', 'vazio'));
+
+    api('/atendimentos/' + id).then(function (a) {
+      corpo.textContent = '';
+
+      var voltar = el('button', 'Voltar para os atendimentos', 'secundario');
+      voltar.type = 'button';
+      voltar.addEventListener('click', function () { location.hash = '#/atendimentos'; });
+      corpo.appendChild(voltar);
+
+      var cabeca = el('div', null, 'cartao conversa-cab');
+      var linha = el('div', null, 'conversa-topo');
+      linha.appendChild(el('strong', a.nome || numeroBonito(a.cliente)));
+      var marca = SELO_ATENDIMENTO[a.estado] || SELO_ATENDIMENTO.ia;
+      linha.appendChild(selo(marca[0], marca[1]));
+      cabeca.appendChild(linha);
+      cabeca.appendChild(el('p', a.nome ? numeroBonito(a.cliente) : '', 'hora'));
+
+      var acoes = el('div', null, 'conversa-acoes');
+      if (a.estado === 'humano') {
+        acoes.appendChild(el('p', 'O agente não responde este cliente enquanto estiver com você.', 'legenda'));
+        acoes.appendChild(botaoDeEstado(a, 'ia', 'Devolver para a IA', ''));
+      } else {
+        acoes.appendChild(botaoDeEstado(a, 'humano', 'Assumir este atendimento', ''));
+        acoes.appendChild(botaoDeEstado(a, 'fechado', 'Marcar como fechado', 'secundario'));
+      }
+      cabeca.appendChild(acoes);
+      corpo.appendChild(cabeca);
+
+      var falas = el('div', null, 'falas');
+      if (!a.falas.length) {
+        falas.appendChild(el('p', 'Sem mensagens guardadas nesta conversa.', 'vazio'));
+      }
+      a.falas.forEach(function (f) {
+        var caixa = el('div', null, 'fala ' + f.direcao);
+        caixa.appendChild(el('div', f.texto, 'fala-texto'));
+        caixa.appendChild(el('div', (f.direcao === 'cliente' ? 'Cliente'
+          : f.direcao === 'humano' ? 'Você' : 'Agente') + ' · ' + quando(f.criado_em), 'hora'));
+        falas.appendChild(caixa);
+      });
+      corpo.appendChild(falas);
+    }).catch(function (e) {
+      corpo.textContent = '';
+      corpo.appendChild(el('p', e.message === 'nao encontrado'
+        ? 'Essa conversa não existe nesta conta.' : e.message, 'vazio'));
+    });
+  }
+
+  function botaoDeEstado(a, estado, rotulo, classe) {
+    var b = el('button', rotulo, classe);
+    b.type = 'button';
+    b.addEventListener('click', function () {
+      b.disabled = true;
+      api('/atendimentos/' + a.id + '/estado', { method: 'POST', corpo: { estado: estado } })
+        .then(function () { verConversa(a.id); })
+        .catch(function (e) { b.disabled = false; alert(e.message); });
+    });
+    return b;
+  }
+
   function verAtendimento() {
     var alvo = pintar('Atende Aí', 'A base que o Atende Aí usa para responder os seus clientes no WhatsApp.');
     var corpo = el('div');
@@ -3664,7 +3806,7 @@
     // antigo salvo nao pode cair numa tela em branco por causa de um rotulo.
     '#/resumo': verHoje, '#/hoje': verHoje, '#/leads': verLeads, '#/chat': verChat,
     '#/integracoes': verIntegracoes, '#/financeiro': verFinanceiro, '#/admin': verAdmin,
-    '#/comecar': verComecar,
+    '#/comecar': verComecar, '#/atendimentos': verAtendimentos,
     '#/atendimento': verAtendimento, '#/assistente': verAssistente,
     '#/configuracoes': verConfiguracoes,
   };
@@ -3676,6 +3818,7 @@
       a.classList.toggle('ativo', a.getAttribute('href') === hash);
     });
     if (hash.indexOf('#/lead/') === 0) return verLead(hash.slice(7));
+    if (hash.indexOf('#/conversa/') === 0) return verConversa(hash.slice(11));
     if (hash !== '#/leads') cacheLeads = null;
     (ROTAS[hash] || verHoje)();
   }
@@ -3711,6 +3854,7 @@
       // O Comecar some sozinho quando a ativacao termina: item de menu que
       // continua la depois de pronto vira lembrete de tarefa ja feita.
       document.getElementById('menu-comecar').hidden = !(dados.atendeAi && !dados.atendeAi.ativado);
+      document.getElementById('menu-atendimentos').hidden = !(dados.modulos && dados.modulos.atendimento);
       document.getElementById('menu-assistente').hidden = !(dados.modulos && dados.modulos.atendimento);
       // Quem assina so o Atende Ai nao tem loja conectada: tela de widget e
       // de cupom ali e menu que nunca leva a lugar nenhum.
