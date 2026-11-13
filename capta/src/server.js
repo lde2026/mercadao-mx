@@ -313,6 +313,23 @@ app.get(/^\/atendeai\/app\//, (_req, res) => (
 // eles saem: nao ha nada a reescrever.
 app.use(PREFIXO_ATENDEAI, estaticoAtendeAi);
 
+/**
+ * Termos e privacidade respondem em qualquer dominio.
+ *
+ * Elas sao linkadas de fora: da pagina de venda do Captapp, da do Atende Ai e
+ * do aceite no cadastro. Amarrar as duas a um dominio so significa que o dia
+ * em que esse dominio sair do ar, ou deixar de ser pago, e o dia em que a
+ * loja fica sem contrato publicado, e isso e obrigacao legal, nao enfeite.
+ *
+ * Os arquivos continuam morando na pasta da landing: e uma copia so, servida
+ * de varios lugares, e nao varias copias para desencontrar.
+ */
+for (const [caminho, arquivo] of Object.entries(PAGINAS_LANDING)) {
+  if (caminho === '/') continue;
+  app.get(caminho, (_req, res) => res.sendFile(path.join(PASTA_LANDING, arquivo)));
+}
+app.get('/legal.css', (_req, res) => res.sendFile(path.join(PASTA_LANDING, 'legal.css')));
+
 /** Para o Railway e para o monitoramento. Confere o banco, nao so o processo. */
 app.get('/saude', async (_req, res) => {
   try {

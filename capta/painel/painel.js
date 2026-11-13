@@ -26,6 +26,15 @@
     var marcas = document.querySelectorAll('.marca-grande, .marca');
     for (var i = 0; i < marcas.length; i += 1) marcas[i].textContent = MARCA;
     document.title = MARCA === 'captapp' ? 'Captapp' : 'Atende Aí';
+
+    // O icone da aba segue a marca junto. No dominio proprio o /favicon.svg
+    // ja e o verde do Atende Ai; embaixo do /atendeai ele viria da pasta do
+    // painel, que e o laranja do Captapp, e a aba contaria outra historia da
+    // que a tela conta.
+    if (CAMINHO.indexOf('/atendeai/') === 0) {
+      var icone = document.querySelector('link[rel="icon"]');
+      if (icone) icone.href = '/atendeai/favicon.svg';
+    }
   }
 
   var eu = null;

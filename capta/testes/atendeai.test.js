@@ -231,6 +231,32 @@ test('o dominio da landing nao serve o Atende Ai', async () => {
   assert.equal(r.destino, '/');
 });
 
+/*
+ * As juridicas sao linkadas de fora e sao obrigacao legal, nao enfeite.
+ * Amarrar as duas a um dominio so significa que o dia em que esse dominio
+ * sair do ar e o dia em que a loja fica sem contrato publicado.
+ */
+test('termos e privacidade respondem em qualquer dominio', async () => {
+  for (const host of ['atendeai.teste', 'captapp.teste', 'capta.teste']) {
+    for (const caminho of ['/termos', '/privacidade']) {
+      const r = await pedir(caminho, host);
+      assert.equal(r.status, 200, `${host}${caminho}`);
+      assert.match(r.corpo, /[Tt]ermos|[Pp]rivacidade/);
+    }
+    const css = await pedir('/legal.css', host);
+    assert.equal(css.status, 200, `${host}/legal.css`);
+  }
+});
+
+test('a pagina do Atende Ai linka as juridicas do proprio dominio', async () => {
+  // Link absoluto para outro dominio morre junto com aquele dominio, e um
+  // deles pode sair para liberar vaga no plano.
+  const pagina = await pedir('/atendeai/', 'captapp.teste');
+  assert.doesNotMatch(pagina.corpo, /capta\.lojadoecommerce\.com\.br/);
+  assert.match(pagina.corpo, /href="\/termos"/);
+  assert.match(pagina.corpo, /href="\/privacidade"/);
+});
+
 test('os outros dominios nao mudaram de lado', async () => {
   const capta = await pedir('/', 'capta.teste');
   assert.equal(capta.status, 200);
