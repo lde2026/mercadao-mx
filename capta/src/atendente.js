@@ -95,6 +95,36 @@ const INSTRUCOES = [
   'Português do Brasil, direto, sem emoji e sem travessão.',
 ].join('\n');
 
+/*
+ * O modo de ativacao: a base esta vazia e esta conversa e que vai preenche-la.
+ *
+ * Sem isto o assistente trata a primeira frase do lojista como um pedido de
+ * alteracao e devolve uma proposta de um campo so, deixando a loja no ar com
+ * a base pela metade. O que a ativacao muda e o ritmo: ele conduz, junta o
+ * que ja ouviu e so propoe quando tem o basico para o agente nao inventar
+ * resposta no WhatsApp.
+ *
+ * As regras de cima continuam valendo inteiras, esta parte so vem depois.
+ */
+const INSTRUCOES_ATIVACAO = [
+  '',
+  'ATIVAÇÃO: a base desta loja ainda está vazia, e esta conversa é a que vai',
+  'preenchê-la. Além das regras acima, vale isto:',
+  '- Conduza você. Faça de duas a três perguntas por vez, nunca uma lista inteira',
+  '  de uma vez, e comece pelo nome da loja, pelo que ela vende e pelo link do site.',
+  '- Depois pergunte horário de atendimento, prazo de entrega, formas de pagamento',
+  '  e política de troca. É esse o mínimo para o atendimento responder sem inventar.',
+  '- Aproveite tudo o que ele já disse. Não pergunte de novo o que já está na',
+  '  conversa, e não peça confirmação de algo que ele acabou de dizer.',
+  '- Se ele mandar o link da loja, diga que vai ler a página e peça para ele mandar',
+  '  o link sozinho numa mensagem, para você ler o conteúdo.',
+  '- Quando já tiver o mínimo, pare de perguntar e proponha de uma vez todos os',
+  '  campos que você conseguiu, numa proposta só. O que faltar você pergunta depois',
+  '  da confirmação dele.',
+  '- Não proponha campo por campo durante a ativação: proposta de um campo só faz',
+  '  o lojista confirmar sete vezes para começar.',
+].join('\n');
+
 function recortarJson(texto) {
   const inicio = texto.indexOf('{');
   const fim = texto.lastIndexOf('}');
@@ -111,7 +141,7 @@ function recortarJson(texto) {
  * pergunta, porque e isso que ela e na pratica.
  */
 export async function interpretar({
-  pedido, base, conversa = [], contaId = null, pagina = null,
+  pedido, base, conversa = [], contaId = null, pagina = null, ativacao = false,
 }) {
   if (!temAssistente()) throw new Error('assistente nao configurado');
 
@@ -123,7 +153,7 @@ export async function interpretar({
   const corpo = {
     model: MODELO,
     max_tokens: 1500,
-    system: INSTRUCOES,
+    system: ativacao ? INSTRUCOES + INSTRUCOES_ATIVACAO : INSTRUCOES,
     // Esforco medio, e nao baixo como no redator: la o pior caso e uma
     // pergunta sem graca que o lojista reescreve. Aqui o pior caso e uma
     // proposta que parece certa, passa pela conferencia dele no automatico e

@@ -903,6 +903,19 @@ app.use('/api', (req, _res, proximo) => {
 
 app.get('/api/eu', async (req, res) => {
   const assinatura = await repo.assinaturaDaConta(req.conta.id);
+  /*
+   * O estado da ativacao vem junto do /eu porque e ele que decide a primeira
+   * tela. Buscar isso depois, numa segunda chamada, faria o painel abrir no
+   * Resumo e so entao pular para o Comecar, com a tela piscando na cara de
+   * quem esta entrando pela primeira vez.
+   */
+  const atendeAi = req.conta.moduloAtendimento
+    ? {
+      numero: Boolean(req.conta.numeroAtendimento),
+      solicitado: Boolean(req.conta.numeroSolicitado),
+      base: baseDaParaAtender(await atendimento.base(req.conta.id)),
+    }
+    : null;
   res.json({
     conta: { ...req.conta, operador: ehOperador(req.conta.email) },
     assinatura,
@@ -923,6 +936,15 @@ app.get('/api/eu', async (req, res) => {
      * precisa ver tela de widget e de cupom. Conta antiga, sem o modulo novo,
      * ve tudo como sempre viu.
      */
+    /*
+     * Ativado quer dizer: numero entregue a nos e base com o minimo. Enquanto
+     * nao estiver, o painel abre no Comecar, porque qualquer outra tela seria
+     * um numero zerado de um atendimento que ainda nao existe.
+     */
+    atendeAi: atendeAi && {
+      ...atendeAi,
+      ativado: (atendeAi.numero || atendeAi.solicitado) && atendeAi.base,
+    },
     modulos: {
       atendimento: Boolean(req.conta.moduloAtendimento),
       capta: !req.conta.moduloAtendimento || (await repo.contarConexoes(req.conta.id)) > 0,
@@ -938,6 +960,19 @@ app.get('/api/eu', async (req, res) => {
  * topo da pagina aparecerem em momentos diferentes.
  */
 /** A mensagem como a tela le: mesmo nome de campo que o resto do painel. */
+/*
+ * A base ja da para o agente responder?
+ *
+ * Quatro campos preenchidos e o corte, e ele aparece em dois lugares: na
+ * lista de prontidao do painel e na decisao de o assistente conduzir a
+ * ativacao. Os dois tem que concordar, senao a tela diz que falta base
+ * enquanto o assistente ja trata a conversa como manutencao.
+ */
+function baseDaParaAtender(linha) {
+  return Object.values(atendimento.conteudo(linha))
+    .filter((v) => (Array.isArray(v) ? v.length : v !== '' && v !== null)).length >= 4;
+}
+
 function mensagemParaTela(m) {
   return {
     id: m.id, papel: m.papel, texto: m.texto,
@@ -982,8 +1017,7 @@ app.get('/api/atendimento', exigirAtendimento, async (req, res) => {
     prontidao: {
       numero: req.conta.numeroAtendimento,
       solicitado: req.conta.numeroSolicitado,
-      base: Object.values(atendimento.conteudo(linha))
-        .filter((v) => (Array.isArray(v) ? v.length : v !== '' && v !== null)).length >= 4,
+      base: baseDaParaAtender(linha),
       atendendo: Boolean(consumo.atualizado_em),
     },
     assistente: temAssistente(),
@@ -1074,18 +1108,31 @@ app.post('/api/atendimento/chat', exigirAtendimento, async (req, res) => {
    * proprio porque ela sai do nosso servidor para um endereco que quem esta
    * do outro lado escolheu, e isso se mede separado.
    */
+  /*
+   * A base e lida antes do link porque ela muda o que dizer quando a pagina
+   * nao abre. Na ativacao o lojista acabou de ser convidado a mandar o site:
+   * responder "me conte o que mudou" ali e mandar ele adivinhar o que fazer
+   * numa conversa que mal comecou.
+   */
+  const linhaBase = await atendimento.base(req.conta.id);
+  const atual = atendimento.conteudo(linhaBase);
+  const ativacao = !baseDaParaAtender(linhaBase);
+  const saidaDoErro = ativacao
+    ? ' Me conte por aqui mesmo: nome da loja, o que ela vende, horário de atendimento,'
+      + ' prazo de entrega, formas de pagamento e política de troca.'
+    : ' Me conte aqui o que mudou e eu monto a alteração.';
+
   const link = acharLink(pedido);
   let pagina = null;
   let recado = null;
   if (link) {
     const cabePagina = await repo.consumirLimite(`pagina:${req.conta.id}`, 86400, 10);
     if (!cabePagina) {
-      recado = 'Já abri dez páginas por aqui hoje. Me conte o que mudou e eu monto a alteração.';
+      recado = 'Já abri dez páginas por aqui hoje.' + saidaDoErro;
     } else {
       const lida = await lerPagina(link, { contaId: req.conta.id });
       if (lida.erro) {
-        recado = `Não consegui ler ${link}: ${lida.erro}.`
-          + ' Me conte aqui o que mudou e eu monto a alteração.';
+        recado = `Não consegui ler ${link}: ${lida.erro}.` + saidaDoErro;
       } else {
         pagina = lida;
       }
@@ -1114,7 +1161,6 @@ app.post('/api/atendimento/chat', exigirAtendimento, async (req, res) => {
     return res.json({ minha: mensagemParaTela(minha), resposta: mensagemParaTela(aviso) });
   }
 
-  const atual = atendimento.conteudo(await atendimento.base(req.conta.id));
   let leitura;
   try {
     leitura = await interpretar({
@@ -1123,6 +1169,10 @@ app.post('/api/atendimento/chat', exigirAtendimento, async (req, res) => {
       conversa: await atendimento.mensagens(req.conta.id, 12),
       contaId: req.conta.id,
       pagina,
+      // Base vazia quer dizer que esta conversa e a ativacao, e nao uma
+      // manutencao: o assistente conduz as perguntas em vez de esperar um
+      // pedido de alteracao que o lojista novo nao sabe que tem que fazer.
+      ativacao,
     });
   } catch (erro) {
     log.aviso('assistente.falhou', { conta_id: req.conta.id, motivo: erro.message });

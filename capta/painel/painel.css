@@ -620,3 +620,45 @@ pre{background:var(--escuro);color:var(--superficie);padding:13px;border-radius:
 .conectar input{margin:0;width:auto;min-width:190px;flex:0 1 230px}
 .conectar button{flex:none}
 .conectar .erro{margin:8px 0 0}
+
+/* ------------------------------------------------------------- começar ---
+ * Os dois passos da ativação. Cartões largos e numerados: quem acabou de
+ * assinar precisa ver onde está e quanto falta, e não uma lista de tarefas
+ * misturada com medidor de consumo.
+ */
+.passos{display:flex;flex-direction:column;gap:16px;max-width:860px;margin-inline:auto}
+.passo{border:1px solid var(--linha);border-radius:14px;background:var(--superficie);
+  padding:20px 22px;box-shadow:var(--sombra)}
+.passo.travado{opacity:.6}
+.passo.feito{border-color:var(--bom)}
+.passo-cab{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+.passo-n{flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;
+  background:var(--acento-suave);color:var(--acento-texto);font-weight:700;font-size:14px}
+.passo-n.feito{background:var(--bom-fundo);color:var(--bom)}
+.passo-rot{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--fraco)}
+.passo-tit{font-size:18px;font-weight:700;line-height:1.25}
+.passo-selo{margin-left:auto;font-size:12px;color:var(--fraco);border:1px solid var(--linha);
+  border-radius:999px;padding:3px 10px}
+.passo .legenda{margin:2px 0 14px}
+.passo-linha{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.passo-linha input{margin:0;flex:1;min-width:220px}
+.passo-linha button{flex:none}
+/* A barra enche de verdade: a largura muda com a resposta do servidor, e a
+   transição é só o desenho disso. Ela nunca chega a 100% antes de gravar. */
+.passo-barra{margin-top:14px;height:6px;border-radius:999px;background:var(--linha);overflow:hidden}
+.passo-barra span{display:block;height:100%;width:0;border-radius:999px;background:var(--acento);
+  transition:width .45s ease}
+.passo .assistente-chat.grande{margin:0;max-width:none;height:min(58vh,520px);min-height:360px}
+.passo-fim{max-width:860px;margin:18px auto 0;border:1px solid var(--bom);border-radius:14px;
+  background:var(--bom-fundo);padding:18px 22px}
+.passo-fim .rotulo{color:var(--bom);margin:0}
+.passo-fim .legenda{margin:4px 0 12px}
+@media (max-width:720px){
+  .passo{padding:16px}
+  .passo-tit{font-size:16px}
+  .passo-selo{display:none}
+}
+/* Dentro do passo, o cabeçalho do chat repetiria o título do cartão, e o
+   subtítulo falaria em "alteração" para quem ainda está respondendo as
+   primeiras perguntas. */
+.passo .assistente-chat .cab{display:none}

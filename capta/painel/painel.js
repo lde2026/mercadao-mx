@@ -416,11 +416,20 @@
           alvo.appendChild(faixa);
         }
 
-        // Sem numero nao existe produto: o Atende Ai e so WhatsApp. Entao
-        // conectar vem antes de qualquer numero de desempenho.
-        if (atende && !(atende.prontidao || {}).numero) {
-          atendimento = atende;
-          alvo.appendChild(conectarWhatsapp(function () { verHoje(); }));
+        // Ativacao por terminar vem antes de qualquer numero de desempenho:
+        // sem numero e sem base, todo cartao abaixo e zero. A tela propria e
+        // que conduz; aqui so fica o caminho para ela, para nao existirem
+        // dois lugares de conectar o mesmo WhatsApp.
+        if (eu.atendeAi && !eu.atendeAi.ativado) {
+          var pendente = el('div', null, 'faixa-aviso');
+          pendente.appendChild(el('span', eu.atendeAi.numero || eu.atendeAi.solicitado
+            ? 'Falta contar para o assistente como a sua loja funciona.'
+            : 'O seu WhatsApp ainda não está conectado.'));
+          var irComecar = el('button', 'Terminar a ativação', 'secundario');
+          irComecar.type = 'button';
+          irComecar.addEventListener('click', function () { location.hash = '#/comecar'; });
+          pendente.appendChild(irComecar);
+          alvo.appendChild(pendente);
         }
 
         var grade = el('div', null, 'grade-num');
@@ -2610,6 +2619,184 @@
    */
   var atendimento = null;
 
+  /*
+   * A tela de ativacao: dois passos, e nada alem deles.
+   *
+   * Quem acabou de assinar nao quer painel: quer o WhatsApp respondendo. A
+   * tela anterior misturava conectar o numero, formulario de base, medidor
+   * de consumo e historico de versoes, e a pessoa nao sabia por onde
+   * comecar. Aqui so existem dois cartoes, e o segundo so abre depois do
+   * primeiro.
+   */
+  function verComecar() {
+    var alvo = pintar('Começar', 'Dois passos e o seu WhatsApp começa a atender.');
+    var corpo = el('div');
+    alvo.appendChild(corpo);
+    corpo.appendChild(el('p', 'Carregando...', 'vazio'));
+
+    api('/atendimento').then(function (dados) {
+      atendimento = dados;
+      desenharComecar(corpo);
+    }).catch(function (e) {
+      corpo.textContent = '';
+      corpo.appendChild(el('p', e.message, 'vazio'));
+    });
+  }
+
+  function desenharComecar(corpo) {
+    corpo.textContent = '';
+    var p = atendimento.prontidao || {};
+    var passo1 = Boolean(p.numero || p.solicitado);
+    var passo2 = Boolean(p.base);
+
+    var passos = el('div', null, 'passos');
+    passos.appendChild(passoUm(corpo, p, passo1));
+    passos.appendChild(passoDois(corpo, passo1, passo2));
+    corpo.appendChild(passos);
+
+    // Terminou os dois: a tela diz para onde ir, em vez de ficar sendo a
+    // primeira tela de uma conta que ja esta no ar.
+    if (passo1 && passo2) {
+      var fim = el('div', null, 'passo-fim');
+      fim.appendChild(el('div', 'Pronto. A sua loja está ativada.', 'rotulo'));
+      fim.appendChild(el('p', p.numero
+        ? 'O agente está respondendo no ' + numeroBonito(p.numero) + '.'
+        : 'Assim que terminarmos a verificação do número com a Meta, o agente começa a responder.', 'legenda'));
+      var ir = el('button', 'Ir para o Assistente');
+      ir.type = 'button';
+      ir.addEventListener('click', function () { location.hash = '#/assistente'; });
+      fim.appendChild(ir);
+      corpo.appendChild(fim);
+    }
+  }
+
+  function cabecaDoPasso(numero, titulo, feito, travado) {
+    var cab = el('div', null, 'passo-cab');
+    cab.appendChild(el('span', feito ? '✓' : String(numero), 'passo-n' + (feito ? ' feito' : '')));
+    var textos = el('div');
+    textos.appendChild(el('div', 'Passo ' + numero, 'passo-rot'));
+    textos.appendChild(el('div', titulo, 'passo-tit'));
+    cab.appendChild(textos);
+    if (travado) cab.appendChild(el('span', 'Depois do passo 1', 'passo-selo'));
+    return cab;
+  }
+
+  /*
+   * Passo 1: o numero.
+   *
+   * A barra enche de verdade enquanto a chamada acontece e para no estado
+   * real. Ela nao vai ate "conectado" sozinha porque conectado quem decide e
+   * a verificacao com a Meta, do nosso lado: barra que completa aqui faria o
+   * lojista mandar mensagem para um numero que ainda nao atende e achar que
+   * o produto esta quebrado.
+   */
+  function passoUm(corpo, p, feito) {
+    var cartao = el('div', null, 'passo' + (feito ? ' feito' : ''));
+    cartao.appendChild(cabecaDoPasso(1, 'Conecte o seu WhatsApp', feito, false));
+
+    if (p.numero) {
+      cartao.appendChild(el('p', 'Conectado: ' + numeroBonito(p.numero)
+        + '. É esse número que atende os seus clientes.', 'legenda'));
+      return cartao;
+    }
+
+    if (p.solicitado) {
+      cartao.appendChild(el('p', 'Recebemos o ' + numeroBonito(p.solicitado)
+        + '. Estamos fazendo a verificação com a Meta e avisamos quando ele estiver atendendo.'
+        + ' Você já pode seguir para o passo 2.', 'legenda'));
+      var trocar = el('button', 'Informar outro número', 'secundario');
+      trocar.type = 'button';
+      trocar.addEventListener('click', function () {
+        atendimento.prontidao.solicitado = null;
+        desenharComecar(corpo);
+      });
+      cartao.appendChild(trocar);
+      return cartao;
+    }
+
+    cartao.appendChild(el('p', 'É o número que vai responder os seus clientes. Informe aqui e a gente cuida da verificação com a Meta.', 'legenda'));
+    var linha = el('div', null, 'passo-linha');
+    var campo = el('input');
+    campo.type = 'tel';
+    campo.placeholder = 'WhatsApp com DDD, ex: 41 99999-8888';
+    campo.autocomplete = 'tel';
+    var botao = el('button', 'Conectar');
+    botao.type = 'button';
+    linha.appendChild(campo);
+    linha.appendChild(botao);
+    cartao.appendChild(linha);
+
+    var erro = el('p', null, 'erro');
+    erro.hidden = true;
+    cartao.appendChild(erro);
+
+    var barra = el('div', null, 'passo-barra');
+    var dentro = el('span');
+    barra.appendChild(dentro);
+    barra.hidden = true;
+    cartao.appendChild(barra);
+
+    function enviar() {
+      erro.hidden = true;
+      botao.disabled = true;
+      campo.disabled = true;
+      barra.hidden = false;
+      // Enche ate 90% enquanto espera: o resto so depois da resposta, para a
+      // barra nunca dizer "pronto" antes de o servidor ter gravado.
+      dentro.style.width = '12%';
+      var passo = setTimeout(function () { dentro.style.width = '90%'; }, 60);
+      api('/atendimento/numero', { method: 'POST', corpo: { numero: campo.value } })
+        .then(function (r) {
+          clearTimeout(passo);
+          dentro.style.width = '100%';
+          atendimento.prontidao.solicitado = r.solicitado;
+          setTimeout(function () { desenharComecar(corpo); }, 450);
+        })
+        .catch(function (e) {
+          clearTimeout(passo);
+          barra.hidden = true;
+          dentro.style.width = '0%';
+          botao.disabled = false;
+          campo.disabled = false;
+          erro.textContent = e.dados && e.dados.explicacao ? e.dados.explicacao : e.message;
+          erro.hidden = false;
+          campo.focus();
+        });
+    }
+
+    botao.addEventListener('click', enviar);
+    campo.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Enter') { ev.preventDefault(); enviar(); }
+    });
+    return cartao;
+  }
+
+  /*
+   * Passo 2: o assistente pergunta.
+   *
+   * Nao e formulario. O lojista conta a loja dele escrevendo, e o assistente
+   * propoe a base no fim, com a confirmacao de sempre. Formulario de onze
+   * campos na segunda tela de uso e onde a ativacao morre.
+   */
+  function passoDois(corpo, liberado, feito) {
+    var cartao = el('div', null, 'passo' + (feito ? ' feito' : '') + (liberado ? '' : ' travado'));
+    cartao.appendChild(cabecaDoPasso(2, 'Conte como a sua loja funciona', feito, !liberado));
+
+    if (!liberado) {
+      cartao.appendChild(el('p', 'Assim que o número estiver com a gente, o assistente começa a te perguntar sobre a loja.', 'legenda'));
+      return cartao;
+    }
+
+    if (feito) {
+      cartao.appendChild(el('p', 'O assistente já tem o básico da sua loja. Daqui para a frente é só ir ajustando por aqui mesmo.', 'legenda'));
+    } else {
+      cartao.appendChild(el('p', 'Responda o que o assistente perguntar. No fim ele mostra tudo o que entendeu e você confirma antes de gravar.', 'legenda'));
+    }
+
+    cartao.appendChild(chatDoAssistente(corpo, true, function () { verComecar(); }));
+    return cartao;
+  }
+
   function verAtendimento() {
     var alvo = pintar('Atende Aí', 'A base que o Atende Aí usa para responder os seus clientes no WhatsApp.');
     var corpo = el('div');
@@ -3083,9 +3270,13 @@
    * consegue pegar o modelo entendendo "7 dias" como "7 meses" antes de o
    * atendimento comecar a responder isso para cliente de verdade.
    */
-  function chatDoAssistente(corpo, grande) {
+  function chatDoAssistente(corpo, grande, aoMudar) {
     var caixa = el('div', null, 'assistente-chat' + (grande ? ' grande' : ''));
-    function redesenhar() { if (grande) verAssistente(); else desenharAtendimento(corpo); }
+    function redesenhar() {
+      if (aoMudar) return aoMudar();
+      if (grande) return verAssistente();
+      return desenharAtendimento(corpo);
+    }
     var cab = el('div', null, 'cab');
     cab.appendChild(el('div', 'Assistente', 'rotulo'));
     cab.appendChild(el('div', 'Descreva a mudança e confirme antes de gravar.', 'hora'));
@@ -3096,7 +3287,11 @@
 
     var pe = el('div', null, 'ac-pe');
     var campo = el('textarea');
-    campo.placeholder = 'Diga o que mudou, cole o link da loja, ou mande parar o atendimento';
+    // Na ativacao o lojista esta respondendo pergunta, nao pedindo alteracao:
+    // "diga o que mudou" ali nao faz sentido nenhum para quem acabou de entrar.
+    campo.placeholder = (atendimento.prontidao || {}).base
+      ? 'Diga o que mudou, cole o link da loja, ou mande parar o atendimento'
+      : 'Responda aqui, ou cole o link da sua loja';
     campo.maxLength = 8000;
     var enviar = el('button', 'Enviar');
     enviar.type = 'button';
@@ -3127,7 +3322,21 @@
       mensagens.textContent = '';
       var conversa = atendimento.conversa || [];
       if (!conversa.length) {
-        mensagens.appendChild(el('p', 'Cole o link da sua loja e eu leio o site para adiantar o que der. Ou escreva o que mudou. Você confirma antes de gravar.', 'ac-vazio'));
+        /*
+         * Com a base vazia, quem comeca a conversa e o assistente.
+         *
+         * Lojista que acabou de conectar o numero nao sabe que tem que pedir
+         * alguma coisa: ele olharia um campo em branco e sairia. Esta fala e
+         * nossa, nao do modelo, entao ela nao custa chamada nem demora, e e
+         * sempre a mesma primeira pergunta.
+         */
+        if (!(atendimento.prontidao || {}).base) {
+          mensagens.appendChild(el('div', 'Oi! Vou montar o atendimento da sua loja.'
+            + ' Para começar: qual é o nome da loja, o que ela vende, e qual é o link do site?',
+          'ac-bb assistente'));
+        } else {
+          mensagens.appendChild(el('p', 'Cole o link da sua loja e eu leio o site para adiantar o que der. Ou escreva o que mudou. Você confirma antes de gravar.', 'ac-vazio'));
+        }
       }
       conversa.forEach(function (m) {
         mensagens.appendChild(el('div', m.texto, 'ac-bb ' + m.papel));
@@ -3455,6 +3664,7 @@
     // antigo salvo nao pode cair numa tela em branco por causa de um rotulo.
     '#/resumo': verHoje, '#/hoje': verHoje, '#/leads': verLeads, '#/chat': verChat,
     '#/integracoes': verIntegracoes, '#/financeiro': verFinanceiro, '#/admin': verAdmin,
+    '#/comecar': verComecar,
     '#/atendimento': verAtendimento, '#/assistente': verAssistente,
     '#/configuracoes': verConfiguracoes,
   };
@@ -3498,6 +3708,9 @@
       // Modulo vendido a parte: quem nao assina nao ve o item no menu, e a
       // rota responde 404 de qualquer jeito.
       document.getElementById('menu-atendimento').hidden = !(dados.modulos && dados.modulos.atendimento);
+      // O Comecar some sozinho quando a ativacao termina: item de menu que
+      // continua la depois de pronto vira lembrete de tarefa ja feita.
+      document.getElementById('menu-comecar').hidden = !(dados.atendeAi && !dados.atendeAi.ativado);
       document.getElementById('menu-assistente').hidden = !(dados.modulos && dados.modulos.atendimento);
       // Quem assina so o Atende Ai nao tem loja conectada: tela de widget e
       // de cupom ali e menu que nunca leva a lugar nenhum.
@@ -3530,6 +3743,11 @@
         badge.hidden = alertas.length === 0;
       }).catch(function () {});
 
+      // Quem entra sem endereco e ainda nao ativou cai no Comecar. Quem
+      // digitou um endereco vai para onde pediu: a tela nao sequestra.
+      if (!location.hash && dados.atendeAi && !dados.atendeAi.ativado) {
+        location.hash = '#/comecar';
+      }
       navegar();
     }).catch(function () { /* mostrarEntrada ja foi chamado no 401 */ });
   }
