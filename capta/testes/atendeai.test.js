@@ -59,7 +59,7 @@ test('a raiz do atendeai e a pagina de venda do Atende Ai', async () => {
 test('/app abre o painel, com a barra que os arquivos dele precisam', async () => {
   const semBarra = await pedir('/app', 'atendeai.teste');
   assert.equal(semBarra.status, 302);
-  assert.equal(semBarra.destino, '/app/#/atendimento');
+  assert.equal(semBarra.destino, '/app/');
 
   const comBarra = await pedir('/app/', 'atendeai.teste');
   assert.equal(comBarra.status, 200);
@@ -197,7 +197,7 @@ test('o Atende Ai tambem atende por caminho no dominio do painel', async () => {
 test('o painel do Atende Ai abre embaixo do caminho', async () => {
   const semBarra = await pedir('/atendeai/app', 'captapp.teste');
   assert.equal(semBarra.status, 302);
-  assert.equal(semBarra.destino, '/atendeai/app/#/atendimento');
+  assert.equal(semBarra.destino, '/atendeai/app/');
 
   const comBarra = await pedir('/atendeai/app/', 'captapp.teste');
   assert.equal(comBarra.status, 200);

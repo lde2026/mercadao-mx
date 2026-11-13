@@ -271,7 +271,11 @@ app.use((req, res, proximo) => {
 
   // Sem a barra o painel nao acharia os proprios arquivos, e quem entrou pelo
   // Atende Ai quer a base, nao o resumo de leads.
-  if (req.path === '/app') return res.redirect(302, '/app/#/atendimento');
+  // Sem destino fixo: o painel decide a primeira tela, e conta nova vai
+  // para o Comecar. Com "#/atendimento" aqui, o endereco que o visitante
+  // pediu, como o "#/criar" do botao da landing, era jogado fora no
+  // redirecionamento e ele caia no login em vez do cadastro.
+  if (req.path === '/app') return res.redirect(302, '/app/');
   if (req.path.startsWith('/app/')) return res.sendFile(path.join(PASTA_PAINEL, 'index.html'));
 
   const caminho = req.path.replace(/\/+$/, '') || '/';
@@ -307,7 +311,7 @@ const PREFIXO_ATENDEAI = '/atendeai';
 app.get(/^\/atendeai$/, (_req, res) => res.redirect(302, `${PREFIXO_ATENDEAI}/`));
 
 app.get(/^\/atendeai\/app$/, (_req, res) => (
-  res.redirect(302, `${PREFIXO_ATENDEAI}/app/#/atendimento`)
+  res.redirect(302, `${PREFIXO_ATENDEAI}/app/`)
 ));
 app.get(/^\/atendeai\/app\//, (_req, res) => (
   res.sendFile(path.join(PASTA_PAINEL, 'index.html'))
@@ -1059,6 +1063,10 @@ app.get('/api/atendimento', exigirAtendimento, async (req, res) => {
     prontidao: {
       numero: req.conta.numeroAtendimento,
       solicitado: req.conta.numeroSolicitado,
+      // O WhatsApp do cadastro adianta o campo do passo 1. Quase sempre e o
+      // mesmo numero, e quando nao for ele troca: melhor que digitar de novo
+      // o que acabou de digitar na tela anterior.
+      sugerido: req.conta.whatsapp || null,
       base: baseDaParaAtender(linha),
       atendendo: Boolean(consumo.atualizado_em),
     },

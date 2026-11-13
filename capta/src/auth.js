@@ -70,6 +70,7 @@ export async function carregarConta(req, _res, proximo) {
         numeroSolicitado: sessao.numero_solicitado || null,
         atendimentoPausado: Boolean(sessao.atendimento_pausado),
         atendimentoRecado: sessao.atendimento_recado || null,
+        whatsapp: sessao.whatsapp || null,
       };
       req.sessaoId = sessaoId;
       // Sessao de personificacao: quem investiga o log depois precisa saber

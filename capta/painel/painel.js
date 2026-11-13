@@ -248,6 +248,22 @@
     modoEntrada(!criando);
   });
 
+  /*
+   * A landing manda para /app#/criar.
+   *
+   * Sem isso o botao "Criar conta" do site caia numa tela de login, e o
+   * visitante tinha que achar o link pequeno embaixo para conseguir se
+   * cadastrar. O endereco sai da barra assim que lido, para um F5 depois de
+   * criar a conta nao devolver o formulario de cadastro.
+   */
+  function abrirCadastroSePedido() {
+    if (location.hash !== '#/criar') return false;
+    history.replaceState(null, '', location.pathname);
+    modoEntrada(true);
+    mostrarFormularioDeEntrada('form-entrada');
+    return true;
+  }
+
   document.getElementById('form-entrada').addEventListener('submit', function (evento) {
     evento.preventDefault();
     var dados = new FormData(this);
@@ -2857,6 +2873,7 @@
     campo.type = 'tel';
     campo.placeholder = 'WhatsApp com DDD, ex: 41 99999-8888';
     campo.autocomplete = 'tel';
+    if (p.sugerido) campo.value = numeroBonito(p.sugerido);
     var botao = el('button', 'Conectar');
     botao.type = 'button';
     linha.appendChild(campo);
@@ -3975,6 +3992,7 @@
 
   function iniciar() {
     if (abrirNovaSenhaSePedido()) return;
+    if (abrirCadastroSePedido()) return;
     api('/eu').then(function (dados) {
       eu = dados;
       document.getElementById('entrada').hidden = true;

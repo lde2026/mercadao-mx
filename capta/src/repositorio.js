@@ -361,7 +361,8 @@ export async function buscarSessao(id) {
   const { rows } = await consultar(
     `select s.conta_id, s.operador_id, c.nome, c.email, c.teste_ate,
             c.modulo_atendimento, c.faixa_atendimento, c.numero_atendimento,
-            c.numero_solicitado, c.atendimento_pausado, c.atendimento_recado
+            c.numero_solicitado, c.atendimento_pausado, c.atendimento_recado,
+            c.whatsapp
        from sessoes s join contas c on c.id = s.conta_id
       where s.id = $1 and s.expira_em > now()`,
     [id],
