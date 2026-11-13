@@ -85,6 +85,39 @@ POST /interno/base/<conta_id>/consumo
 É o que alimenta o medidor do plano e o excedente da fatura. Conta **mensagem
 que o agente enviou**, que é o que a Meta cobra. De 1 a 500 por chamada.
 
+## 4. Enviar o que o lojista escreveu no painel
+
+Quando o lojista assume uma conversa e responde pelo painel, a mensagem entra
+numa fila. É o agente que envia.
+
+```
+GET /interno/saida/<conta_id>
+```
+
+```json
+{ "fila": [
+  { "id": "uuid", "atendimento_id": "uuid", "cliente": "5541988887777",
+    "texto": "Oi Joana, aqui é o Pierre.", "criado_em": "..." }
+] }
+```
+
+Depois de enviar de verdade:
+
+```
+POST /interno/saida/<conta_id>/<id>/entregue
+```
+
+São duas rotas e não uma de propósito: enviar pode falhar no meio. O agente
+pega, envia e só então confirma. Se ele morrer entre as duas, a mensagem
+continua na fila e sai na próxima rodada, que é melhor do que sumir.
+
+A confirmação é que transforma a mensagem em fala da conversa: até lá o painel
+mostra "aguardando envio". Confirmar duas vezes devolve `404` e não duplica
+nada.
+
+Convém consultar essa fila a cada 10 ou 20 segundos, ou junto de cada mensagem
+recebida.
+
 ## Ordem sugerida por mensagem recebida
 
 1. `POST /interno/atendimentos/<conta_id>` com a fala do cliente.
@@ -104,3 +137,4 @@ conversa mesmo se a geração da resposta falhar.
   painel, confirmando campo por campo.
 - Não liga nem desliga a pausa. Ele lê, não escreve.
 - Não decide sozinho que deve responder: isso vem de `responder`.
+- Não marca a fila como entregue antes de o WhatsApp ter aceitado a mensagem.

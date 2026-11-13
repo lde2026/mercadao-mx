@@ -569,3 +569,22 @@ alter table cobrancas add constraint cobrancas_tipo_check
  * faturas por dia do mesmo excedente.
  */
 alter table consumo_atendimento add column if not exists excedente_cobrado boolean not null default false;
+
+/*
+ * A fila de saida: o que o lojista escreveu no painel e ainda nao foi enviado.
+ *
+ * Ela existe porque quem fala com o cliente final e o agente, nao o painel.
+ * O painel enfileira e o agente envia. Enquanto nao sair, a mensagem aparece
+ * como aguardando: dizer "enviado" antes de o WhatsApp ter recebido faria o
+ * lojista achar que respondeu quando nao respondeu.
+ */
+create table if not exists atendimento_saida (
+  id uuid primary key default gen_random_uuid(),
+  conta_id uuid not null references contas(id) on delete cascade,
+  atendimento_id uuid not null references atendimentos(id) on delete cascade,
+  texto text not null,
+  criado_em timestamptz not null default now(),
+  entregue_em timestamptz
+);
+create index if not exists atendimento_saida_fila_idx
+  on atendimento_saida (conta_id, criado_em) where entregue_em is null;

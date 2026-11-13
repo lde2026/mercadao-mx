@@ -1221,3 +1221,53 @@ export async function marcarExcedenteCobrado(contaId, competencia) {
     [contaId, competencia],
   );
 }
+
+/** Enfileira uma resposta escrita no painel. Quem envia e o agente. */
+export async function enfileirarSaida(contaId, atendimentoId, texto) {
+  const fala = String(texto ?? '').trim().slice(0, 4000);
+  if (!fala) return null;
+  const dono = await consultar(
+    `select id from atendimentos where conta_id = $1 and id = $2`,
+    [contaId, atendimentoId],
+  );
+  if (!dono.rows[0]) return null;
+  const { rows } = await consultar(
+    `insert into atendimento_saida (conta_id, atendimento_id, texto)
+          values ($1, $2, $3) returning id, texto, criado_em`,
+    [contaId, atendimentoId, fala],
+  );
+  return rows[0];
+}
+
+export async function filaDaConversa(contaId, atendimentoId) {
+  const { rows } = await consultar(
+    `select id, texto, criado_em from atendimento_saida
+      where conta_id = $1 and atendimento_id = $2 and entregue_em is null
+      order by criado_em asc`,
+    [contaId, atendimentoId],
+  );
+  return rows;
+}
+
+/** O que o agente tem para enviar. Mais antigo primeiro. */
+export async function saidaPendente(contaId, limite = 20) {
+  const { rows } = await consultar(
+    `select s.id, s.texto, s.criado_em, s.atendimento_id, a.cliente
+       from atendimento_saida s join atendimentos a on a.id = s.atendimento_id
+      where s.conta_id = $1 and s.entregue_em is null
+      order by s.criado_em asc
+      limit $2`,
+    [contaId, Math.min(Math.max(Number(limite) || 20, 1), 100)],
+  );
+  return rows;
+}
+
+export async function marcarSaidaEntregue(contaId, id) {
+  const { rows } = await consultar(
+    `update atendimento_saida set entregue_em = now()
+      where conta_id = $1 and id = $2 and entregue_em is null
+      returning id, atendimento_id, texto`,
+    [contaId, id],
+  );
+  return rows[0] || null;
+}

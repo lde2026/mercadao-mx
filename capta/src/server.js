@@ -806,6 +806,39 @@ app.post('/interno/atendimentos/:contaId', limitarPor('atendimento-interno', 60,
   });
 });
 
+/*
+ * O que o agente tem para enviar, e a confirmacao de que enviou.
+ *
+ * Duas rotas e nao uma porque entregar mensagem pode falhar no meio: o
+ * agente pega a fila, envia, e so entao confirma. Se ele morrer entre as
+ * duas, a mensagem continua na fila e sai na proxima rodada, que e melhor
+ * que sumir.
+ */
+app.get('/interno/saida/:contaId', limitarPor('saida-interna', 60, 1800), async (req, res) => {
+  if (!chaveDeServicoOk(req)) return res.status(401).json({ erro: 'nao autorizado' });
+  const conta = await repo.buscarConta(req.params.contaId);
+  if (!conta || !conta.modulo_atendimento) return res.status(404).json({ erro: 'nao encontrada' });
+  const fila = await repo.saidaPendente(conta.id, req.query.limite);
+  res.set('Cache-Control', 'no-store').json({ fila });
+});
+
+app.post('/interno/saida/:contaId/:id/entregue', limitarPor('saida-interna', 60, 1800), async (req, res) => {
+  if (!chaveDeServicoOk(req)) return res.status(401).json({ erro: 'nao autorizado' });
+  const conta = await repo.buscarConta(req.params.contaId);
+  if (!conta || !conta.modulo_atendimento) return res.status(404).json({ erro: 'nao encontrada' });
+
+  const saiu = await repo.marcarSaidaEntregue(conta.id, req.params.id);
+  if (!saiu) return res.status(404).json({ erro: 'nao encontrada' });
+
+  // So agora vira fala da conversa: a tela do lojista passa de "aguardando
+  // envio" para a mensagem entregue de verdade.
+  const dono = await repo.atendimentoComFalas(conta.id, saiu.atendimento_id);
+  await repo.registrarFala(conta.id, {
+    cliente: dono.cliente, direcao: 'humano', texto: saiu.texto,
+  });
+  res.json({ id: saiu.id, entregue: true });
+});
+
 app.use(carregarConta);
 
 /** Sem teto, o login e forca bruta livre. Dez por minuto por IP e folgado para gente e apertado para robo. */
@@ -1141,7 +1174,35 @@ app.get('/api/atendimentos', exigirAtendimento, async (req, res) => {
 app.get('/api/atendimentos/:id', exigirAtendimento, async (req, res) => {
   const achado = await repo.atendimentoComFalas(req.conta.id, req.params.id);
   if (!achado) return res.status(404).json({ erro: 'nao encontrado' });
-  res.json(achado);
+  // A fila vem junto: e o que ele escreveu e ainda nao saiu. Sem ela, a
+  // mensagem some da tela entre o clique e a entrega.
+  const fila = await repo.filaDaConversa(req.conta.id, req.params.id);
+  res.json({ ...achado, fila });
+});
+
+/*
+ * Responder pelo painel.
+ *
+ * O painel nao fala com o WhatsApp: quem fala e o agente. Entao aqui a
+ * mensagem so entra na fila, e ela aparece como aguardando ate o agente
+ * confirmar a entrega. Escrever "enviado" antes disso faria o lojista achar
+ * que respondeu um cliente que nao recebeu nada.
+ *
+ * Mandar uma resposta assume a conversa: quem esta escrevendo a mao nao quer
+ * a IA respondendo por cima no segundo seguinte.
+ */
+app.post('/api/atendimentos/:id/mensagem', exigirAtendimento, async (req, res) => {
+  const texto = String((req.body || {}).texto || '').trim().slice(0, 4000);
+  if (texto.length < 1) return res.status(400).json({ erro: 'escreva a mensagem' });
+
+  const naFila = await repo.enfileirarSaida(req.conta.id, req.params.id, texto);
+  if (!naFila) return res.status(404).json({ erro: 'nao encontrado' });
+  await repo.definirEstadoAtendimento(req.conta.id, req.params.id, 'humano');
+
+  log.info('atendimento.resposta_enfileirada', {
+    conta_id: req.conta.id, atendimento_id: req.params.id,
+  });
+  res.json({ fila: naFila, estado: 'humano' });
 });
 
 /**

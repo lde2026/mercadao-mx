@@ -3060,7 +3060,7 @@
       corpo.appendChild(cabeca);
 
       var falas = el('div', null, 'falas');
-      if (!a.falas.length) {
+      if (!a.falas.length && !(a.fila || []).length) {
         falas.appendChild(el('p', 'Sem mensagens guardadas nesta conversa.', 'vazio'));
       }
       a.falas.forEach(function (f) {
@@ -3070,12 +3070,65 @@
           : f.direcao === 'humano' ? 'Você' : 'Agente') + ' · ' + quando(f.criado_em), 'hora'));
         falas.appendChild(caixa);
       });
+      // O que esta na fila ainda nao chegou no cliente. Fica marcado assim
+      // ate o agente confirmar a entrega.
+      (a.fila || []).forEach(function (f) {
+        var caixa = el('div', null, 'fala humano aguardando');
+        caixa.appendChild(el('div', f.texto, 'fala-texto'));
+        caixa.appendChild(el('div', 'Você · aguardando envio', 'hora'));
+        falas.appendChild(caixa);
+      });
       corpo.appendChild(falas);
+
+      corpo.appendChild(responderNaConversa(a));
     }).catch(function (e) {
       corpo.textContent = '';
       corpo.appendChild(el('p', e.message === 'nao encontrado'
         ? 'Essa conversa não existe nesta conta.' : e.message, 'vazio'));
     });
+  }
+
+  /*
+   * Escrever para o cliente de dentro do painel.
+   *
+   * Quem envia e o agente: isto enfileira. Por isso o botao diz "Enviar pelo
+   * agente" e nao "Enviar", e a mensagem aparece como aguardando ate sair de
+   * verdade. Se o agente nao estiver ligado, a fila acumula e o lojista ve
+   * que nada saiu, em vez de achar que respondeu.
+   */
+  function responderNaConversa(a) {
+    var caixa = el('div', null, 'cartao responder');
+    caixa.appendChild(el('div', 'Responder este cliente', 'rotulo'));
+    caixa.appendChild(el('p', 'A mensagem sai pelo WhatsApp da loja, pelo mesmo agente. Ao enviar, o atendimento passa para você.', 'legenda'));
+
+    var linha = el('div', null, 'responder-linha');
+    var campo = el('textarea');
+    campo.placeholder = 'Escreva a resposta';
+    campo.maxLength = 4000;
+    var enviar = el('button', 'Enviar pelo agente');
+    enviar.type = 'button';
+    linha.appendChild(campo);
+    linha.appendChild(enviar);
+    caixa.appendChild(linha);
+
+    var erro = el('p', null, 'erro');
+    erro.hidden = true;
+    caixa.appendChild(erro);
+
+    enviar.addEventListener('click', function () {
+      var texto = campo.value.trim();
+      if (!texto) return;
+      erro.hidden = true;
+      enviar.disabled = true;
+      api('/atendimentos/' + a.id + '/mensagem', { method: 'POST', corpo: { texto: texto } })
+        .then(function () { verConversa(a.id); })
+        .catch(function (e) {
+          enviar.disabled = false;
+          erro.textContent = e.dados && e.dados.explicacao ? e.dados.explicacao : e.message;
+          erro.hidden = false;
+        });
+    });
+    return caixa;
   }
 
   function botaoDeEstado(a, estado, rotulo, classe) {

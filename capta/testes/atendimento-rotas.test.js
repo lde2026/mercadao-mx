@@ -589,6 +589,63 @@ test('o Admin conta a recorrencia do Atende Ai pela faixa, separada do Capta', a
 });
 
 /*
+ * Responder pelo painel.
+ *
+ * O painel nao fala com o WhatsApp: ele enfileira e o agente envia. O que se
+ * prova aqui e que a mensagem so vira fala da conversa depois da entrega
+ * confirmada, e que a fila de uma loja nao aparece para a outra.
+ */
+test('a resposta do painel entra na fila e so vira fala quando o agente entrega', async () => {
+  const lista = await pedir('/api/atendimentos', { cookie: contaA.cookie });
+  const alvo = lista.json.atendimentos.find((a) => a.cliente === '5541988887777');
+
+  const mandou = await pedir(`/api/atendimentos/${alvo.id}/mensagem`, {
+    metodo: 'POST', cookie: contaA.cookie, corpo: { texto: 'Oi Joana, aqui e o Pierre, eu assumo daqui.' },
+  });
+  assert.equal(mandou.status, 200);
+  assert.equal(mandou.json.estado, 'humano', 'responder a mao assume a conversa');
+
+  const antes = await pedir(`/api/atendimentos/${alvo.id}`, { cookie: contaA.cookie });
+  assert.equal(antes.json.fila.length, 1, 'fica na fila enquanto nao sai');
+  assert.ok(!antes.json.falas.some((f) => f.direcao === 'humano'),
+    'nao pode virar fala antes de o cliente receber');
+
+  // A loja vizinha nao enxerga a fila da outra.
+  const dela = await pedir(`/interno/saida/${contaB.id}`, {
+    cabecalhos: { Authorization: `Bearer ${process.env.CHAVE_SERVICO}` },
+  });
+  assert.equal(dela.status, 404, 'conta B esta sem o modulo e nem fila tem');
+
+  const fila = await pedir(`/interno/saida/${contaA.id}`, {
+    cabecalhos: { Authorization: `Bearer ${process.env.CHAVE_SERVICO}` },
+  });
+  assert.equal(fila.status, 200);
+  assert.equal(fila.json.fila.length, 1);
+  assert.equal(fila.json.fila[0].cliente, '5541988887777', 'o agente precisa saber para quem enviar');
+
+  const entregou = await pedir(`/interno/saida/${contaA.id}/${fila.json.fila[0].id}/entregue`, {
+    metodo: 'POST', cabecalhos: { Authorization: `Bearer ${process.env.CHAVE_SERVICO}` },
+  });
+  assert.equal(entregou.status, 200);
+
+  const depois = await pedir(`/api/atendimentos/${alvo.id}`, { cookie: contaA.cookie });
+  assert.equal(depois.json.fila.length, 0);
+  assert.ok(depois.json.falas.some((f) => f.direcao === 'humano'), 'entregue vira fala');
+
+  // Confirmar duas vezes nao duplica a mensagem na conversa.
+  const denovo = await pedir(`/interno/saida/${contaA.id}/${fila.json.fila[0].id}/entregue`, {
+    metodo: 'POST', cabecalhos: { Authorization: `Bearer ${process.env.CHAVE_SERVICO}` },
+  });
+  assert.equal(denovo.status, 404);
+  const final = await pedir(`/api/atendimentos/${alvo.id}`, { cookie: contaA.cookie });
+  assert.equal(final.json.falas.filter((f) => f.direcao === 'humano').length, 1);
+
+  await pedir(`/api/atendimentos/${alvo.id}/estado`, {
+    metodo: 'POST', cookie: contaA.cookie, corpo: { estado: 'ia' },
+  });
+});
+
+/*
  * Ligar a cobranca do Atende Ai.
  *
  * O Asaas e trocado por um servidor local: o que se testa aqui e a nossa
