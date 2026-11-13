@@ -589,6 +589,58 @@ test('o Admin conta a recorrencia do Atende Ai pela faixa, separada do Capta', a
 });
 
 /*
+ * Conversa fechada que volta.
+ *
+ * Fechar quer dizer "este assunto acabou", nao "nunca mais fale com esta
+ * pessoa". Sem reabrir, o mesmo cliente escrevendo uma semana depois
+ * encontraria a loja muda para sempre, e ninguem perceberia: a conversa nem
+ * apareceria como esperando resposta.
+ */
+test('conversa fechada reabre quando o cliente escreve de novo', async () => {
+  const lista = await pedir('/api/atendimentos', { cookie: contaA.cookie });
+  const alvo = lista.json.atendimentos.find((a) => a.cliente === '5541977776666');
+
+  await pedir(`/api/atendimentos/${alvo.id}/estado`, {
+    metodo: 'POST', cookie: contaA.cookie, corpo: { estado: 'fechado' },
+  });
+
+  const voltou = await pedir(`/interno/atendimentos/${contaA.id}`, {
+    metodo: 'POST',
+    cabecalhos: { Authorization: `Bearer ${process.env.CHAVE_SERVICO}` },
+    corpo: { cliente: '41977776666', direcao: 'cliente', texto: 'Oi, uma semana depois, outra duvida' },
+  });
+  assert.equal(voltou.json.estado, 'ia', 'assunto novo e conversa nova');
+  assert.equal(voltou.json.responder, true, 'e o agente volta a responder');
+
+  // O que o agente manda nao reabre nada: so a fala do cliente.
+  await pedir(`/api/atendimentos/${alvo.id}/estado`, {
+    metodo: 'POST', cookie: contaA.cookie, corpo: { estado: 'fechado' },
+  });
+  const doAgente = await pedir(`/interno/atendimentos/${contaA.id}`, {
+    metodo: 'POST',
+    cabecalhos: { Authorization: `Bearer ${process.env.CHAVE_SERVICO}` },
+    corpo: { cliente: '41977776666', direcao: 'agente', texto: 'eco de uma mensagem antiga' },
+  });
+  assert.equal(doAgente.json.estado, 'fechado');
+
+  // E conversa assumida pelo lojista continua com ele, nao importa quem fale.
+  await pedir(`/api/atendimentos/${alvo.id}/estado`, {
+    metodo: 'POST', cookie: contaA.cookie, corpo: { estado: 'humano' },
+  });
+  const comLojista = await pedir(`/interno/atendimentos/${contaA.id}`, {
+    metodo: 'POST',
+    cabecalhos: { Authorization: `Bearer ${process.env.CHAVE_SERVICO}` },
+    corpo: { cliente: '41977776666', direcao: 'cliente', texto: 'alo?' },
+  });
+  assert.equal(comLojista.json.estado, 'humano', 'mensagem nova nao arranca a conversa de quem atende');
+  assert.equal(comLojista.json.responder, false);
+
+  await pedir(`/api/atendimentos/${alvo.id}/estado`, {
+    metodo: 'POST', cookie: contaA.cookie, corpo: { estado: 'ia' },
+  });
+});
+
+/*
  * O diagnostico de um numero.
  *
  * Ele existe para responder "mandei mensagem de teste e nao aconteceu nada".

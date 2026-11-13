@@ -1074,8 +1074,14 @@ export function ehEstadoAtendimento(estado) {
  * O upsert pela chave (conta, cliente) e o que mantem uma conversa por
  * cliente em vez de um card novo por mensagem.
  *
- * O estado NAO e tocado aqui de proposito: se o lojista assumiu a conversa,
- * a chegada de uma mensagem nova nao pode devolver o atendimento para a IA.
+ * Assumido pelo lojista, o estado nao muda: mensagem nova nao pode arrancar
+ * a conversa da mao de quem esta atendendo.
+ *
+ * Fechado e diferente. Fechado quer dizer "este assunto acabou", e nao "nunca
+ * mais fale com esta pessoa": quando o mesmo cliente escreve de novo, uma
+ * semana depois, e um assunto novo. Sem reabrir, a loja ficaria muda para ele
+ * para sempre, e ninguem perceberia, porque a conversa nem apareceria como
+ * esperando resposta.
  */
 export async function registrarFala(contaId, { cliente, nome = null, direcao, texto }) {
   const numero = numeroCanonico(cliente);
@@ -1091,9 +1097,13 @@ export async function registrarFala(contaId, { cliente, nome = null, direcao, te
         set ultima_fala = excluded.ultima_fala,
             ultima_em = now(),
             falas = atendimentos.falas + 1,
-            nome = coalesce(nullif($3, ''), atendimentos.nome)
+            nome = coalesce(nullif($3, ''), atendimentos.nome),
+            estado = case
+              when atendimentos.estado = 'fechado' and $5 = 'cliente' then 'ia'
+              else atendimentos.estado
+            end
       returning *`,
-    [contaId, numero, String(nome ?? '').trim().slice(0, 120), fala],
+    [contaId, numero, String(nome ?? '').trim().slice(0, 120), fala, lado],
   );
   const atend = rows[0];
   await consultar(
