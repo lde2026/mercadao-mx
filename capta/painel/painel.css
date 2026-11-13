@@ -697,3 +697,11 @@ pre{background:var(--escuro);color:var(--superficie);padding:13px;border-radius:
 .responder-linha{display:flex;gap:8px;align-items:flex-end}
 .responder-linha textarea{margin:0;min-height:62px;max-height:160px;resize:vertical;font-size:14px}
 .responder-linha button{flex:none}
+.ja-sei{display:flex;flex-direction:column;gap:3px;margin:-6px 0 14px;
+  border-left:3px solid var(--linha-forte);padding-left:11px}
+.diagnostico{margin-top:14px;border:1px solid var(--atencao);background:var(--atencao-fundo);
+  border-radius:12px;padding:14px 16px}
+.diagnostico .rotulo{color:var(--atencao);margin:0 0 10px;text-transform:none;letter-spacing:0;
+  font-size:14px;line-height:1.5}
+.diagnostico.bom{border-color:var(--bom);background:var(--bom-fundo)}
+.diagnostico.bom .rotulo{color:var(--bom)}

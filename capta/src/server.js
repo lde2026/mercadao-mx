@@ -2069,6 +2069,68 @@ app.post('/api/admin/contas/:id/cobranca', exigirOperador, async (req, res) => {
   }
 });
 
+/*
+ * O diagnostico de um numero.
+ *
+ * Responde a pergunta que aparece toda vez que uma ativacao nao funciona:
+ * "mandei mensagem de teste e nao aconteceu nada". Ela tem quatro respostas
+ * possiveis e so dava para descobrir qual olhando o banco na mao. Aqui o
+ * operador digita o numero e ve exatamente o que o agente veria.
+ *
+ * So operador, e sem segredo nenhum no corpo: diz se a chave de servico
+ * existe, nunca qual e.
+ */
+app.get('/api/admin/diagnostico', exigirOperador, async (req, res) => {
+  const numero = repo.numeroCanonico(req.query.numero || '');
+  if (!numero) return res.status(400).json({ erro: 'informe o numero' });
+
+  const conta = await repo.contaPorNumeroAtendimento(numero);
+  if (!conta) {
+    // O numero pode estar so informado pelo lojista, esperando confirmacao:
+    // e de longe o motivo mais comum, e dizer "nao achei" esconderia isso.
+    const pedido = await repo.contaComNumeroSolicitado(numero);
+    return res.json({
+      numero,
+      achou: false,
+      solicitado: pedido ? { id: pedido.id, nome: pedido.nome } : null,
+      chaveServico: Boolean(process.env.CHAVE_SERVICO),
+      diagnostico: pedido
+        ? `O número está informado pela conta ${pedido.nome}, mas ainda não foi confirmado. Confirme na lista de contas: enquanto isso, o agente recebe 404 e não responde ninguém.`
+        : 'Nenhuma conta tem este número. Confirme o número na lista de contas.',
+    });
+  }
+
+  const linha = await atendimento.base(conta.id);
+  const base = atendimento.conteudo(linha);
+  const camposCheios = Object.values(base)
+    .filter((v) => (Array.isArray(v) ? v.length : v !== '' && v !== null)).length;
+  const sinal = await repo.ultimoSinalDoAgente(conta.id);
+  const pronta = baseDaParaAtender(linha);
+
+  const problemas = [];
+  if (!conta.modulo_atendimento) problemas.push('O módulo Atende Aí está desligado nesta conta.');
+  if (!pronta) problemas.push(`A base tem ${camposCheios} campo(s) preenchido(s) e o agente responde pobre. Termine a ativação.`);
+  if (conta.atendimento_pausado) problemas.push('O atendimento está pausado pelo lojista.');
+  if (!sinal.ultima_fala && !sinal.ultimo_consumo) {
+    problemas.push('O agente nunca chamou estas rotas. Confira a URL e a CHAVE_SERVICO do lado dele.');
+  }
+
+  res.json({
+    numero,
+    achou: true,
+    conta: { id: conta.id, nome: conta.nome },
+    modulo: Boolean(conta.modulo_atendimento),
+    pausado: Boolean(conta.atendimento_pausado),
+    camposCheios,
+    basePronta: pronta,
+    conversas: sinal.conversas,
+    ultimaFala: sinal.ultima_fala,
+    ultimoConsumo: sinal.ultimo_consumo,
+    chaveServico: Boolean(process.env.CHAVE_SERVICO),
+    diagnostico: problemas.length ? problemas.join(' ') : 'Tudo certo deste lado: o agente recebe a base e pode responder.',
+  });
+});
+
 app.get('/api/admin/resumo', exigirOperador, async (_req, res) => {
   const resumo = await repo.resumoGeral();
   // Receita mensal recorrente: mensal conta o preco, anual conta um doze avos.

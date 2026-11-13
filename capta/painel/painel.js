@@ -386,12 +386,36 @@
       }));
     }
 
+    /*
+     * "No ar" so quando esta mesmo no ar.
+     *
+     * Antes este cartao olhava so a pausa, entao dizia "o agente responde com
+     * a sua base" para uma conta sem numero confirmado e sem base: o lojista
+     * mandava a mensagem de teste, nao recebia nada, e a tela continuava
+     * jurando que estava funcionando. Falta o numero ou falta a base, isto
+     * tem que dizer qual.
+     */
+    var p = dados.prontidao || {};
+    var falta = !p.numero ? 'numero' : !p.base ? 'base' : null;
     cartoes.push(cartaoNumero({
-      rotulo: 'Atendimento', valor: pausado ? 'Parado' : 'No ar',
-      nomeIcone: 'chat', tom: pausado ? 'ruim' : 'bom',
-      detalhe: pausado ? 'o agente não está respondendo' : 'o agente responde com a sua base',
-      rodape: { texto: pausado ? 'Voltar a atender' : 'Abrir o assistente', acao: 'Ir' },
-      aoClicarRodape: function () { location.hash = '#/assistente'; },
+      rotulo: 'Atendimento',
+      valor: pausado ? 'Parado' : falta ? 'Ainda não' : 'No ar',
+      nomeIcone: 'chat',
+      tom: pausado ? 'ruim' : falta ? '' : 'bom',
+      detalhe: pausado
+        ? 'o agente não está respondendo'
+        : falta === 'numero'
+          ? (p.solicitado
+            ? 'o número está em verificação, ainda não recebe mensagem'
+            : 'nenhum número de WhatsApp conectado')
+          : falta === 'base'
+            ? 'falta contar como a sua loja funciona'
+            : 'o agente responde com a sua base',
+      rodape: {
+        texto: pausado ? 'Voltar a atender' : falta ? 'Terminar a ativação' : 'Abrir o assistente',
+        acao: 'Ir',
+      },
+      aoClicarRodape: function () { location.hash = falta ? '#/comecar' : '#/assistente'; },
     }));
 
     if (!c.atualizadoEm) {
@@ -2302,6 +2326,72 @@
    * armadilha de clique. Aqui o operador escolhe a conta, a faixa, o ciclo e
    * a ativacao, ve o valor antes e confirma.
    */
+  /*
+   * Por que um numero nao esta atendendo.
+   *
+   * A pergunta "mandei mensagem de teste e nao aconteceu nada" tem quatro
+   * respostas possiveis, e todas moravam no banco: numero nao confirmado,
+   * modulo desligado, base vazia, ou o agente nunca tendo chamado a gente.
+   * Aqui o operador digita o numero e ve o que o agente veria.
+   */
+  function cartaoDiagnostico() {
+    var cartao = el('div', null, 'cartao');
+    cartao.appendChild(el('div', 'Por que um número não está atendendo', 'rotulo'));
+    cartao.appendChild(el('p', 'Digite o WhatsApp da loja e eu mostro exatamente o que o agente recebe quando uma mensagem chega nesse número.', 'legenda'));
+
+    var linha = el('div', null, 'passo-linha');
+    var campo = el('input');
+    campo.type = 'tel';
+    campo.placeholder = 'WhatsApp com DDD';
+    var botao = el('button', 'Conferir', 'secundario');
+    botao.type = 'button';
+    linha.appendChild(campo);
+    linha.appendChild(botao);
+    cartao.appendChild(linha);
+
+    var saida = el('div');
+    cartao.appendChild(saida);
+
+    function conferir() {
+      if (!campo.value.trim()) return;
+      botao.disabled = true;
+      saida.textContent = '';
+      api('/admin/diagnostico?numero=' + encodeURIComponent(campo.value))
+        .then(function (d) {
+          var caixa = el('div', null, 'diagnostico' + (d.achou && d.basePronta && d.modulo && !d.pausado ? ' bom' : ''));
+          caixa.appendChild(el('div', d.diagnostico, 'rotulo'));
+
+          var itens = [];
+          itens.push(['Número', d.numero]);
+          itens.push(['Conta', d.achou ? d.conta.nome : (d.solicitado ? d.solicitado.nome + ' (só informado, falta confirmar)' : 'nenhuma')]);
+          if (d.achou) {
+            itens.push(['Módulo', d.modulo ? 'ligado' : 'desligado']);
+            itens.push(['Pausado', d.pausado ? 'sim' : 'não']);
+            itens.push(['Base', d.camposCheios + ' campo(s), ' + (d.basePronta ? 'pronta' : 'incompleta')]);
+            itens.push(['Conversas registradas', String(d.conversas)]);
+            itens.push(['Última fala do agente', d.ultimaFala ? quando(d.ultimaFala) : 'nunca']);
+            itens.push(['Última contagem de mensagens', d.ultimoConsumo ? quando(d.ultimoConsumo) : 'nunca']);
+          }
+          itens.push(['CHAVE_SERVICO no servidor', d.chaveServico ? 'configurada' : 'FALTANDO']);
+
+          caixa.appendChild(tabela(['O quê', 'Como está'], itens.map(function (par) {
+            return { celulas: [par[0], par[1]] };
+          })));
+          saida.appendChild(caixa);
+        })
+        .catch(function (e) {
+          saida.appendChild(el('p', e.message, 'erro'));
+        })
+        .then(function () { botao.disabled = false; });
+    }
+
+    botao.addEventListener('click', conferir);
+    campo.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Enter') { ev.preventDefault(); conferir(); }
+    });
+    return cartao;
+  }
+
   function cartaoCobrancaAtendeAi(contas, faixas, ativacoes, aoAbrir) {
     var cartao = el('div', null, 'cartao');
     cartao.appendChild(el('div', 'Abrir cobrança do Atende Aí', 'rotulo'));
@@ -2524,6 +2614,8 @@
         rodape: { texto: 'Um por conta, na tela Resumo de cada uma' },
       }));
       alvo.appendChild(grade);
+
+      alvo.appendChild(cartaoDiagnostico());
 
       if (resumo.faixas && resumo.ativacoes) {
         alvo.appendChild(cartaoCobrancaAtendeAi(contas, resumo.faixas, resumo.ativacoes, function () { verAdmin(); }));
@@ -2823,6 +2915,38 @@
     }
   }
 
+  var MINIMO_DA_BASE = 4;
+
+  function preenchidos() {
+    var base = atendimento.base || {};
+    var campos = atendimento.campos || {};
+    return Object.keys(campos).filter(function (nome) {
+      var v = base[nome];
+      if (Array.isArray(v)) return v.length > 0;
+      return v !== '' && v !== null && v !== undefined;
+    });
+  }
+
+  function oQueJaSei() {
+    var campos = atendimento.campos || {};
+    var tem = preenchidos();
+    var caixa = el('div', null, 'ja-sei');
+    if (!tem.length) {
+      caixa.appendChild(el('span', 'Ainda não gravei nada da sua loja. O que o assistente propuser só entra depois que você confirmar.', 'hora'));
+      return caixa;
+    }
+    caixa.appendChild(el('span', 'Já gravei: ' + tem.map(function (n) {
+      return campos[n] ? campos[n].rotulo : n;
+    }).join(', ') + '.', 'hora'));
+    var faltam = MINIMO_DA_BASE - tem.length;
+    caixa.appendChild(el('span', faltam > 0
+      ? (faltam === 1
+        ? 'Falta mais uma informação para o atendimento começar.'
+        : 'Faltam mais ' + faltam + ' informações para o atendimento começar.')
+      : 'Já dá para começar.', 'hora'));
+    return caixa;
+  }
+
   function cabecaDoPasso(numero, titulo, feito, travado) {
     var cab = el('div', null, 'passo-cab');
     cab.appendChild(el('span', feito ? '✓' : String(numero), 'passo-n' + (feito ? ' feito' : '')));
@@ -2945,6 +3069,10 @@
       cartao.appendChild(el('p', 'O assistente já tem o básico da sua loja. Daqui para a frente é só ir ajustando por aqui mesmo.', 'legenda'));
     } else {
       cartao.appendChild(el('p', 'Responda o que o assistente perguntar. No fim ele mostra tudo o que entendeu e você confirma antes de gravar.', 'legenda'));
+      // Dizer o que ja entrou, e quanto falta, em vez de so repetir que
+      // falta: lojista que respondeu e confirmou e continua vendo "falta
+      // contar como a loja funciona" acha que a tela esta quebrada.
+      cartao.appendChild(oQueJaSei());
     }
 
     cartao.appendChild(chatDoAssistente(corpo, true, function () { verComecar(); }));

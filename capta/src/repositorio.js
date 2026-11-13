@@ -1271,3 +1271,32 @@ export async function marcarSaidaEntregue(contaId, id) {
   );
   return rows[0] || null;
 }
+
+/**
+ * O que o agente ja reportou desta conta, e quando.
+ *
+ * Serve para responder "mandei mensagem e nao aconteceu nada": se nunca
+ * chegou fala nem consumo, o agente nao esta chamando a gente, e o problema
+ * nao esta no painel.
+ */
+export async function ultimoSinalDoAgente(contaId) {
+  const { rows } = await consultar(
+    `select
+       (select max(criado_em) from atendimento_falas where conta_id = $1) as ultima_fala,
+       (select max(atualizado_em) from consumo_atendimento where conta_id = $1) as ultimo_consumo,
+       (select count(*)::int from atendimentos where conta_id = $1) as conversas`,
+    [contaId],
+  );
+  return rows[0];
+}
+
+/** A conta que informou este numero e ainda espera confirmacao. */
+export async function contaComNumeroSolicitado(numero) {
+  const alvo = numeroCanonico(numero);
+  if (!alvo) return null;
+  const { rows } = await consultar(
+    `select id, nome from contas where numero_solicitado = $1 limit 1`,
+    [alvo],
+  );
+  return rows[0] || null;
+}

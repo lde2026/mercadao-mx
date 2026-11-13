@@ -589,6 +589,40 @@ test('o Admin conta a recorrencia do Atende Ai pela faixa, separada do Capta', a
 });
 
 /*
+ * O diagnostico de um numero.
+ *
+ * Ele existe para responder "mandei mensagem de teste e nao aconteceu nada".
+ * O caso que mais acontece, e o que mais engana, e o numero informado pelo
+ * lojista e ainda nao confirmado: para o agente ele simplesmente nao existe.
+ */
+test('o diagnostico distingue numero confirmado de numero so informado', async () => {
+  const semDono = await pedir('/api/admin/diagnostico?numero=41900000000', { cookie: operador.cookie });
+  assert.equal(semDono.status, 200);
+  assert.equal(semDono.json.achou, false);
+  assert.equal(semDono.json.solicitado, null);
+
+  await pedir('/api/atendimento/numero', {
+    metodo: 'POST', cookie: contaA.cookie, corpo: { numero: '41955554444' },
+  });
+  const pedido = await pedir('/api/admin/diagnostico?numero=41955554444', { cookie: operador.cookie });
+  assert.equal(pedido.json.achou, false, 'informado nao e confirmado');
+  assert.ok(pedido.json.solicitado, 'mas o diagnostico tem que dizer de quem e');
+  assert.match(pedido.json.diagnostico, /ainda não foi confirmado/);
+
+  const confirmado = await pedir('/api/admin/diagnostico', {
+    cookie: operador.cookie,
+  });
+  assert.equal(confirmado.status, 400, 'sem numero nao ha o que diagnosticar');
+
+  // O numero da conta A ja esta confirmado por um teste anterior.
+  const daConta = await pedir('/api/admin/diagnostico?numero=41977776666x', { cookie: operador.cookie });
+  assert.equal(daConta.status, 200);
+
+  const lojista = await pedir('/api/admin/diagnostico?numero=41955554444', { cookie: contaA.cookie });
+  assert.equal(lojista.status, 403, 'diagnostico e do operador, nao do lojista');
+});
+
+/*
  * Responder pelo painel.
  *
  * O painel nao fala com o WhatsApp: ele enfileira e o agente envia. O que se
