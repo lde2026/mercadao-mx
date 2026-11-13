@@ -2017,6 +2017,7 @@ app.get('/api/admin/resumo', exigirOperador, async (_req, res) => {
     mrrAtendimento: Math.round(mrrAtendimento * 100) / 100,
     planos: PLANOS,
     faixas: atendeai.FAIXAS,
+    ativacoes: atendeai.ATIVACOES,
   });
 });
 

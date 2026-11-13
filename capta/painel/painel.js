@@ -351,10 +351,24 @@
    * pela fatura do mes seguinte e a pior hora de descobrir, entao o aviso sai
    * aos 80% e ja leva para onde se resolve.
    */
-  function cartoesDoAtendeAi(dados) {
+  function cartoesDoAtendeAi(dados, conversas) {
     var c = dados.consumo || {};
     var pausado = dados.pausa && dados.pausa.pausado;
     var cartoes = [];
+
+    // As conversas vem antes do consumo: quem precisa do lojista hoje e mais
+    // urgente que quanto sobrou do plano.
+    if (conversas) {
+      cartoes.push(cartaoNumero({
+        rotulo: 'Atendimentos hoje', valor: String(conversas.hoje || 0), nomeIcone: 'chat',
+        tom: conversas.comigo ? 'ruim' : 'acento',
+        detalhe: conversas.comigo
+          ? conversas.comigo + ' esperando você'
+          : (conversas.total || 0) + ' conversas no total',
+        rodape: { texto: 'Ver os atendimentos', acao: 'Abrir' },
+        aoClicarRodape: function () { location.hash = '#/atendimentos'; },
+      }));
+    }
 
     cartoes.push(cartaoNumero({
       rotulo: 'Atendimento', valor: pausado ? 'Parado' : 'No ar',
@@ -394,12 +408,14 @@
     Promise.all([
       api('/hoje'), api('/alertas'), api('/leads?situacao=a_contatar&limite=1'),
       comAtendeAi ? api('/atendimento').catch(function () { return null; }) : null,
+      comAtendeAi ? api('/atendimentos').catch(function () { return null; }) : null,
     ])
       .then(function (r) {
         var lojas = r[0].lojas || [];
         var alertas = r[1] || [];
         var contagem = r[2].contagem;
         var atende = r[3];
+        var conversas = r[4] ? r[4].contagem : null;
         var soma = function (c) { return lojas.reduce(function (t, l) { return t + Number(l[c] || 0); }, 0); };
 
         // O aviso de franquia perto do fim vem antes dos numeros: ele e o
@@ -437,7 +453,7 @@
 
         var grade = el('div', null, 'grade-num');
         if (atende) {
-          cartoesDoAtendeAi(atende).forEach(function (c) { grade.appendChild(c); });
+          cartoesDoAtendeAi(atende, conversas).forEach(function (c) { grade.appendChild(c); });
         }
         /*
          * Os cartoes de cupom e de loja so aparecem para quem tem loja
@@ -2262,6 +2278,120 @@
    * hora, em vez de mandar a pessoa se cadastrar sozinha. A senha é sorteada
    * pelo servidor e aparece uma vez só, aqui, para você copiar e mandar.
    */
+  /*
+   * Abrir a cobranca do Atende Ai de um cliente.
+   *
+   * Fica num cartao proprio, e nao num botao na linha da conta, porque a
+   * linha ja carrega modulo, faixa e numero e nao cabe mais nada sem virar
+   * armadilha de clique. Aqui o operador escolhe a conta, a faixa, o ciclo e
+   * a ativacao, ve o valor antes e confirma.
+   */
+  function cartaoCobrancaAtendeAi(contas, faixas, ativacoes, aoAbrir) {
+    var cartao = el('div', null, 'cartao');
+    cartao.appendChild(el('div', 'Abrir cobrança do Atende Aí', 'rotulo'));
+    cartao.appendChild(el('p', 'Cria o cliente no Asaas, abre a assinatura da faixa e lança a ativação. A ativação só é cobrada uma vez por conta.', 'legenda'));
+
+    var form = el('form', null, 'form-config');
+
+    var rotConta = el('label', 'Conta');
+    var conta = el('select');
+    contas.filter(function (c) { return c.modulo_atendimento; }).forEach(function (c) {
+      var op = el('option', c.nome + ' (' + c.email + ')');
+      op.value = c.id;
+      conta.appendChild(op);
+    });
+    rotConta.appendChild(conta);
+    form.appendChild(rotConta);
+
+    var rotFaixa = el('label', 'Faixa');
+    var faixa = el('select');
+    Object.keys(faixas).forEach(function (id) {
+      var op = el('option', faixas[id].nome + ' · ' + dinheiro(faixas[id].mensal) + '/mês · '
+        + faixas[id].mensagens.toLocaleString('pt-BR') + ' mensagens');
+      op.value = id;
+      faixa.appendChild(op);
+    });
+    rotFaixa.appendChild(faixa);
+    form.appendChild(rotFaixa);
+
+    var rotCiclo = el('label', 'Ciclo');
+    var ciclo = el('select');
+    [['mensal', 'Mensal'], ['anual', 'Anual, com 20% de desconto']].forEach(function (par) {
+      var op = el('option', par[1]);
+      op.value = par[0];
+      ciclo.appendChild(op);
+    });
+    rotCiclo.appendChild(ciclo);
+    form.appendChild(rotCiclo);
+
+    var rotAtiv = el('label', 'Ativação');
+    var ativacao = el('select');
+    [
+      ['simples', (ativacoes.simples || {}).nome + ' · ' + dinheiro((ativacoes.simples || {}).valor)],
+      ['acompanhada', (ativacoes.acompanhada || {}).nome + ' · ' + dinheiro((ativacoes.acompanhada || {}).valor)],
+      ['nenhuma', 'Sem ativação'],
+    ].forEach(function (par) {
+      var op = el('option', par[1]);
+      op.value = par[0];
+      ativacao.appendChild(op);
+    });
+    rotAtiv.appendChild(ativacao);
+    form.appendChild(rotAtiv);
+
+    var rotDoc = el('label', 'CPF ou CNPJ, se a conta ainda não tem');
+    var doc = el('input');
+    doc.type = 'text';
+    doc.placeholder = 'Só números';
+    rotDoc.appendChild(doc);
+    form.appendChild(rotDoc);
+
+    var erro = el('p', null, 'erro'); erro.hidden = true; form.appendChild(erro);
+    var pronto = el('p', null, 'ok'); pronto.hidden = true; form.appendChild(pronto);
+
+    var acoes = el('div', null, 'acoes');
+    var abrir = el('button', 'Abrir cobrança');
+    abrir.type = 'submit';
+    acoes.appendChild(abrir);
+    form.appendChild(acoes);
+
+    form.addEventListener('submit', function (evento) {
+      evento.preventDefault();
+      erro.hidden = true; pronto.hidden = true;
+      var nome = conta.options[conta.selectedIndex].textContent;
+      var aviso = 'Abrir cobrança para ' + nome + '?\n\n'
+        + faixas[faixa.value].nome + ', ' + ciclo.value
+        + (ativacao.value === 'nenhuma' ? ', sem ativação'
+          : ', com ' + dinheiro(ativacoes[ativacao.value].valor) + ' de ativação')
+        + '.\n\nIsso cria cobrança de verdade no Asaas.';
+      if (!confirm(aviso)) return;
+      abrir.disabled = true;
+      api('/admin/contas/' + conta.value + '/cobranca', {
+        method: 'POST',
+        corpo: {
+          faixa: faixa.value, ciclo: ciclo.value,
+          ativacao: ativacao.value, documento: doc.value,
+        },
+      })
+        .then(function (r) {
+          pronto.textContent = 'Cobrança aberta: ' + faixas[r.faixa].nome + ' ' + r.ciclo
+            + (r.ativacao ? ', com ativação de ' + dinheiro(r.ativacao.valor)
+              + ' vencendo em ' + r.ativacao.venceEm : ', sem nova ativação');
+          pronto.hidden = false;
+          doc.value = '';
+          if (aoAbrir) aoAbrir();
+        })
+        .catch(function (e) {
+          erro.textContent = e.dados && e.dados.explicacao
+            ? e.dados.explicacao + ' (' + e.message + ')' : e.message;
+          erro.hidden = false;
+        })
+        .then(function () { abrir.disabled = false; });
+    });
+
+    cartao.appendChild(form);
+    return cartao;
+  }
+
   function cartaoNovaConta(aoCriar) {
     var cartao = el('div', null, 'cartao');
     cartao.appendChild(el('div', 'Criar conta de cliente', 'rotulo'));
@@ -2378,6 +2508,10 @@
         rodape: { texto: 'Um por conta, na tela Resumo de cada uma' },
       }));
       alvo.appendChild(grade);
+
+      if (resumo.faixas && resumo.ativacoes) {
+        alvo.appendChild(cartaoCobrancaAtendeAi(contas, resumo.faixas, resumo.ativacoes, function () { verAdmin(); }));
+      }
 
       var porFaixa = el('div', null, 'cartao');
       porFaixa.appendChild(el('div', 'Atende Aí por faixa', 'rotulo'));
