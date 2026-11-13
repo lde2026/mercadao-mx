@@ -550,8 +550,41 @@ pre{background:var(--escuro);color:var(--superficie);padding:13px;border-radius:
 .freio.parado .rotulo{color:var(--atencao)}
 
 /* A tela que e so a conversa: ela ocupa a altura que tiver. */
-.assistente-chat.grande{position:static;max-width:860px;margin-inline:auto}
-.assistente-chat.grande .ac-ms{min-height:52vh;max-height:none;height:calc(100vh - 290px)}
+/*
+ * A tela do Assistente e clara nos dois temas, de proposito.
+ *
+ * Ela e uma conversa, e conversa se le em papel branco: balao do lojista de
+ * um lado, da IA do outro, e no meio o cartao de proposta com o valor de
+ * agora ao lado do valor novo. No escuro esses tres fundos ficavam quase o
+ * mesmo cinza, e a proposta, que e justamente onde o lojista tem que parar
+ * para conferir, era a que mais sumia. Aqui as variaveis voltam aos valores
+ * do tema claro, entao tudo que esta dentro, campo e botao inclusive, segue
+ * junto sem precisar de regra propria. Mesmo motivo de --previa-fundo ficar
+ * escura nos dois temas.
+ */
+.assistente-chat.grande{position:static;max-width:860px;margin-inline:auto;
+  --fundo:#f7f7f9; --superficie:#ffffff; --barra:#ffffff;
+  --linha:#e7e7ee; --linha-forte:#d9d9e3;
+  --tinta:#2c2c46; --fraco:#71718c;
+  --acento:#41bfbb; --acento-fundo:#41bfbb; --acento-tinta:#ffffff;
+  --acento-suave:#e6f7f6; --acento-texto:#2c8f8c;
+  --bom:#1f9d63; --bom-fundo:#e6f6ee;
+  --ruim:#cf3b32; --ruim-fundo:#fdecea;
+  --atencao:#9a6207; --atencao-fundo:#fdf3df;
+  --escuro:#22223a;
+  --sombra:0 1px 2px rgba(44,44,70,.06);
+  background:var(--superficie);color:var(--tinta);
+  height:calc(100vh - 260px);min-height:430px}
+/* No escuro a borda clara some contra o fundo da pagina, entao o que separa
+   a conversa do painel passa a ser a sombra. */
+@media (prefers-color-scheme: dark){
+  .assistente-chat.grande{box-shadow:0 2px 14px rgba(0,0,0,.45)}
+}
+/* A altura fica na caixa, e nao na lista de mensagens: com ela na lista, o
+   campo de escrever era empurrado para fora da janela e o lojista tinha que
+   rolar a pagina para responder. Agora a caixa cabe na tela e a lista encolhe
+   junto. */
+.assistente-chat.grande .ac-ms{min-height:0;max-height:none;height:auto;flex:1}
 .assistente-chat.grande .ac-bb{max-width:74%;font-size:14.5px}
 .assistente-chat.grande .ac-prop{max-width:74%}
 
