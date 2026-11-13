@@ -259,8 +259,12 @@ app.use((req, res, proximo) => {
   // uma e servir na outra entrega o produto errado.
   res.set('Vary', CABECALHO_MARCA);
 
-  // O que a aplicacao precisa que continue existindo neste host.
-  if (req.path === '/saude' || req.path.startsWith('/api/')) return proximo();
+  // O que a aplicacao precisa que continue existindo neste host. O /interno
+  // esta aqui porque o agente le a base pelo dominio que o lojista conhece:
+  // sem isto ele cairia na pagina de venda em vez da base, e o atendimento
+  // responderia com nada sem erro nenhum aparecer.
+  if (req.path === '/saude' || req.path.startsWith('/api/')
+      || req.path.startsWith('/interno/')) return proximo();
   if (req.path === '/painel.js' || req.path === '/painel.css') {
     return estaticoPainel(req, res, () => res.status(404).end());
   }
@@ -900,8 +904,18 @@ app.get('/api/eu', async (req, res) => {
     // O painel so desenha o assistente quando ele existe de verdade. Botao que
     // responde "nao configurado" e pior que botao nenhum.
     redator: temRedator(),
-    // Modulos ligados nesta conta. O menu se monta a partir disto.
-    modulos: { atendimento: Boolean(req.conta.moduloAtendimento) },
+    /*
+     * Modulos ligados nesta conta. O menu se monta a partir disto.
+     *
+     * "capta" nao e assinatura, e se a parte de captacao faz sentido para
+     * esta conta: quem assina so o Atende Ai nao tem loja conectada e nao
+     * precisa ver tela de widget e de cupom. Conta antiga, sem o modulo novo,
+     * ve tudo como sempre viu.
+     */
+    modulos: {
+      atendimento: Boolean(req.conta.moduloAtendimento),
+      capta: !req.conta.moduloAtendimento || (await repo.contarConexoes(req.conta.id)) > 0,
+    },
   });
 });
 
@@ -935,6 +949,12 @@ app.get('/api/atendimento', exigirAtendimento, async (req, res) => {
     })),
     campos: atendimento.CAMPOS,
     estruturados: atendimento.ESTRUTURADOS,
+    // A tabela de precos vem do codigo e nao escrita na tela: preco que a
+    // pagina mostra diferente do que a fatura cobra e problema de consumidor.
+    faixas: atendeai.FAIXAS,
+    ativacoes: atendeai.ATIVACOES,
+    excedente: atendeai.EXCEDENTE,
+    descontoAnual: atendeai.DESCONTO_ANUAL,
     conversa: conversa.map(mensagemParaTela),
     consumo: {
       enviadas: consumo.enviadas,

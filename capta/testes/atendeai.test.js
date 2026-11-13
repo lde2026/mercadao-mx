@@ -86,6 +86,18 @@ test('o painel neste dominio acha os proprios arquivos e a API', async () => {
   assert.equal(saude.status, 200);
 });
 
+test('o agente alcanca as rotas internas pelo dominio do Atende Ai', async () => {
+  // O lojista da ao agente o dominio que ele conhece. Se o /interno caisse
+  // na pagina de venda, o agente leria HTML no lugar da base e responderia o
+  // cliente com nada, sem erro nenhum aparecer em lugar nenhum.
+  const r = await pedir('/interno/numero/5541900000000', 'atendeai.teste');
+  assert.notEqual(r.status, 302, 'nao pode virar redirecionamento para a oferta');
+  assert.equal(r.status, 401, 'sem a chave de servico, recusa de autorizacao');
+
+  const base = await pedir('/interno/base/00000000-0000-0000-0000-000000000000', 'atendeai.teste');
+  assert.equal(base.status, 401);
+});
+
 test('endereco errado volta para a oferta, nao para uma tela de erro', async () => {
   const r = await pedir('/promocao-que-nao-existe', 'atendeai.teste');
   assert.equal(r.status, 302);

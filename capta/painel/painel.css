@@ -564,3 +564,15 @@ pre{background:var(--escuro);color:var(--superficie);padding:13px;border-radius:
 .ac-mic svg{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .ac-mic:hover{border-color:var(--acento);color:var(--acento-texto)}
 .ac-mic.ouvindo{background:var(--ruim-fundo);border-color:var(--ruim);color:var(--ruim)}
+
+/* O rotulo que separa o que e do Capta dentro do menu do Atende Ai. */
+.grupo-menu{font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--fraco);padding:14px 12px 5px;margin-top:4px;border-top:1px solid var(--linha)}
+
+/* O aviso de franquia perto do fim: antes dos numeros, porque e o unico
+   que pede decisao hoje. */
+.faixa-aviso{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;
+  background:var(--atencao-fundo);border:1px solid var(--atencao);border-radius:12px;
+  padding:13px 16px;margin-bottom:16px;font-size:14px;color:var(--atencao)}
+.faixa-aviso.ruim{background:var(--ruim-fundo);border-color:var(--ruim);color:var(--ruim)}
+.faixa-aviso button{flex:none;padding:7px 14px;font-size:13px}

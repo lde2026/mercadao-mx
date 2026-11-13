@@ -326,40 +326,118 @@
 
   // ------------------------------------------------------------------ hoje ---
 
+  /*
+   * Os cartoes do Atende Ai, na frente de tudo.
+   *
+   * O que o lojista precisa saber ao abrir o painel e se o atendimento esta
+   * de pe e quanto do plano ele ja gastou. Descobrir que a franquia acabou
+   * pela fatura do mes seguinte e a pior hora de descobrir, entao o aviso sai
+   * aos 80% e ja leva para onde se resolve.
+   */
+  function cartoesDoAtendeAi(dados) {
+    var c = dados.consumo || {};
+    var pausado = dados.pausa && dados.pausa.pausado;
+    var cartoes = [];
+
+    cartoes.push(cartaoNumero({
+      rotulo: 'Atendimento', valor: pausado ? 'Parado' : 'No ar',
+      nomeIcone: 'chat', tom: pausado ? 'ruim' : 'bom',
+      detalhe: pausado ? 'o agente não está respondendo' : 'o agente responde com a sua base',
+      rodape: { texto: pausado ? 'Voltar a atender' : 'Abrir o assistente', acao: 'Ir' },
+      aoClicarRodape: function () { location.hash = '#/assistente'; },
+    }));
+
+    if (!c.atualizadoEm) {
+      cartoes.push(cartaoNumero({
+        rotulo: 'Conversas no mês', valor: '—', nomeIcone: 'leads',
+        detalhe: 'ainda não recebi contagem do atendimento',
+        rodape: { texto: 'A contagem vem do agente' },
+      }));
+      return cartoes;
+    }
+
+    var estourou = c.excedente && c.excedente.mensagens > 0;
+    cartoes.push(cartaoNumero({
+      rotulo: 'Mensagens no mês',
+      valor: c.enviadas.toLocaleString('pt-BR') + ' de ' + c.incluidas.toLocaleString('pt-BR'),
+      nomeIcone: 'leads', tom: estourou ? 'ruim' : c.avisar ? '' : 'bom',
+      detalhe: estourou
+        ? c.excedente.mensagens.toLocaleString('pt-BR') + ' acima, ' + dinheiro(c.excedente.valor) + ' no mês'
+        : 'faltam ' + c.sobrando.toLocaleString('pt-BR') + ' no plano ' + c.nome,
+      rodape: { texto: c.avisar ? 'Aumentar o plano' : 'Plano ' + c.nome, acao: c.avisar ? 'Ver' : null },
+      aoClicarRodape: c.avisar ? function () { location.hash = '#/financeiro'; } : null,
+    }));
+    return cartoes;
+  }
+
   function verHoje() {
     var alvo = pintar('Resumo', 'O que entrou, o que saiu e o que precisa de você.');
-    Promise.all([api('/hoje'), api('/alertas'), api('/leads?situacao=a_contatar&limite=1')])
+    var comAtendeAi = eu && eu.modulos && eu.modulos.atendimento;
+    var temCapta = !eu || !eu.modulos || eu.modulos.capta !== false;
+    Promise.all([
+      api('/hoje'), api('/alertas'), api('/leads?situacao=a_contatar&limite=1'),
+      comAtendeAi ? api('/atendimento').catch(function () { return null; }) : null,
+    ])
       .then(function (r) {
         var lojas = r[0].lojas || [];
         var alertas = r[1] || [];
         var contagem = r[2].contagem;
+        var atende = r[3];
         var soma = function (c) { return lojas.reduce(function (t, l) { return t + Number(l[c] || 0); }, 0); };
 
+        // O aviso de franquia perto do fim vem antes dos numeros: ele e o
+        // unico que pede uma decisao hoje.
+        if (atende && atende.consumo && atende.consumo.avisar) {
+          var c = atende.consumo;
+          var faixa = el('div', null, 'faixa-aviso' + (c.excedente.mensagens ? ' ruim' : ''));
+          faixa.appendChild(el('span', c.excedente.mensagens
+            ? 'Você passou do plano ' + c.nome + ': ' + c.excedente.mensagens.toLocaleString('pt-BR')
+              + ' mensagens a mais, ' + dinheiro(c.excedente.valor) + ' neste mês.'
+            : 'O plano ' + c.nome + ' está acabando: faltam '
+              + c.sobrando.toLocaleString('pt-BR') + ' mensagens este mês.'));
+          var ir = el('button', 'Aumentar o plano', 'secundario');
+          ir.type = 'button';
+          ir.addEventListener('click', function () { location.hash = '#/financeiro'; });
+          faixa.appendChild(ir);
+          alvo.appendChild(faixa);
+        }
+
         var grade = el('div', null, 'grade-num');
-        grade.appendChild(cartaoNumero({
-          rotulo: 'Leads hoje', valor: String(soma('leads')), nomeIcone: 'leads', tom: 'acento',
-          detalhe: contagem.novos + ' nas últimas 24h',
-          rodape: { texto: contagem.a_contatar + ' esperando contato', acao: 'Ver a fila' },
-          aoClicarRodape: function () { abaLeads = 'a_contatar'; location.hash = '#/leads'; },
-        }));
-        grade.appendChild(cartaoNumero({
-          rotulo: 'Cupons entregues', valor: String(soma('cupons_ok')), nomeIcone: 'cupom', tom: 'bom',
-          detalhe: 'de ' + (soma('cupons_ok') + soma('cupons_falhos')) + ' tentativas hoje',
-          rodape: { texto: 'Um cupom único por pessoa' },
-        }));
-        grade.appendChild(cartaoNumero({
-          rotulo: 'Cupons que falharam', valor: String(soma('cupons_falhos')),
-          nomeIcone: 'alerta', tom: soma('cupons_falhos') ? 'ruim' : '',
-          detalhe: soma('cupons_falhos') ? 'lead sem a recompensa prometida' : 'nenhum problema hoje',
-          rodape: { texto: 'Nova tentativa a cada 15 min' },
-        }));
-        grade.appendChild(cartaoNumero({
-          rotulo: 'Lojas conectadas', valor: String(lojas.length), nomeIcone: 'loja',
-          detalhe: 'com o widget publicado',
-          rodape: { texto: 'Modos de instalação', acao: 'Ver integrações' },
-          aoClicarRodape: function () { location.hash = '#/integracoes'; },
-        }));
+        if (atende) {
+          cartoesDoAtendeAi(atende).forEach(function (c) { grade.appendChild(c); });
+        }
+        /*
+         * Os cartoes de cupom e de loja so aparecem para quem tem loja
+         * conectada. Numa conta que assina so o Atende Ai eles seriam quatro
+         * zeros contando a historia de um produto que ela nao comprou.
+         */
+        if (temCapta) {
+          grade.appendChild(cartaoNumero({
+            rotulo: 'Leads hoje', valor: String(soma('leads')), nomeIcone: 'leads', tom: 'acento',
+            detalhe: contagem.novos + ' nas últimas 24h',
+            rodape: { texto: contagem.a_contatar + ' esperando contato', acao: 'Ver a fila' },
+            aoClicarRodape: function () { abaLeads = 'a_contatar'; location.hash = '#/leads'; },
+          }));
+          grade.appendChild(cartaoNumero({
+            rotulo: 'Cupons entregues', valor: String(soma('cupons_ok')), nomeIcone: 'cupom', tom: 'bom',
+            detalhe: 'de ' + (soma('cupons_ok') + soma('cupons_falhos')) + ' tentativas hoje',
+            rodape: { texto: 'Um cupom único por pessoa' },
+          }));
+          grade.appendChild(cartaoNumero({
+            rotulo: 'Cupons que falharam', valor: String(soma('cupons_falhos')),
+            nomeIcone: 'alerta', tom: soma('cupons_falhos') ? 'ruim' : '',
+            detalhe: soma('cupons_falhos') ? 'lead sem a recompensa prometida' : 'nenhum problema hoje',
+            rodape: { texto: 'Nova tentativa a cada 15 min' },
+          }));
+          grade.appendChild(cartaoNumero({
+            rotulo: 'Lojas conectadas', valor: String(lojas.length), nomeIcone: 'loja',
+            detalhe: 'com o widget publicado',
+            rodape: { texto: 'Modos de instalação', acao: 'Ver integrações' },
+            aoClicarRodape: function () { location.hash = '#/integracoes'; },
+          }));
+        }
         alvo.appendChild(grade);
+        if (!temCapta) return;
 
         if (alertas.length) {
           var caixa = el('div', null, 'cartao');
@@ -1873,8 +1951,72 @@
   var cicloEscolhido = 'mensal';
 
   function verFinanceiro() {
-    var alvo = pintar('Financeiro', 'Seu plano, suas cotas de leads e de lojas, e as cobranças do Captapp.');
-    api('/financeiro').then(function (dados) { desenharFinanceiro(alvo, dados); });
+    var alvo = pintar('Financeiro', 'Seus planos, o que você já usou no mês e as cobranças.');
+    var comAtendeAi = eu && eu.modulos && eu.modulos.atendimento;
+    Promise.all([
+      api('/financeiro'),
+      comAtendeAi ? api('/atendimento').catch(function () { return null; }) : null,
+    ]).then(function (r) {
+      if (r[1]) alvo.appendChild(planoDoAtendeAi(r[1]));
+      desenharFinanceiro(alvo, r[0]);
+    });
+  }
+
+  /*
+   * O plano do Atende Ai.
+   *
+   * Vem antes do plano do Captapp porque e o que o lojista assina primeiro
+   * agora. Os precos sao os do codigo, e nao numeros escritos na tela: preco
+   * que a pagina mostra diferente do que a fatura cobra e problema de
+   * consumidor, nao de layout.
+   */
+  function planoDoAtendeAi(dados) {
+    var c = dados.consumo || {};
+    var faixas = dados.faixas || {};
+    var caixa = el('div', null, 'cartao');
+    caixa.appendChild(el('div', 'Atende Aí', 'rotulo'));
+    caixa.appendChild(el('p', 'O plano é por mensagem que o agente envia no mês. Passou do teto, o excedente entra na fatura, e o atendimento não para.', 'legenda'));
+
+    if (c.atualizadoEm) {
+      var resumo = el('div', null, 'consumo');
+      var topo = el('div', null, 'topo');
+      topo.appendChild(el('strong', c.enviadas.toLocaleString('pt-BR')));
+      topo.appendChild(el('span', 'de ' + c.incluidas.toLocaleString('pt-BR')
+        + ' mensagens no plano ' + c.nome, 'hora'));
+      resumo.appendChild(topo);
+      var medidor = el('div', null, 'medidor' + (c.avisar ? ' cheio' : ''));
+      var dentro = el('span');
+      dentro.style.width = Math.min(100, Math.round((c.fatia || 0) * 100)) + '%';
+      medidor.appendChild(dentro);
+      resumo.appendChild(medidor);
+      if (c.excedente && c.excedente.mensagens) {
+        resumo.appendChild(el('span', c.excedente.mensagens.toLocaleString('pt-BR')
+          + ' acima do plano, ' + dinheiro(c.excedente.valor)
+          + ' a mais nesta fatura, a ' + dinheiro(dados.excedente) + ' por mensagem', 'hora'));
+      }
+      caixa.appendChild(resumo);
+    }
+
+    var linhas = Object.keys(faixas).map(function (nome) {
+      var f = faixas[nome];
+      var atual = nome === c.faixa;
+      return { celulas: [
+        atual ? selo(f.nome, 'criado') : f.nome,
+        f.mensagens.toLocaleString('pt-BR') + ' mensagens',
+        dinheiro(f.mensal) + '/mês',
+        dinheiro(Math.round(f.mensal * (1 - (dados.descontoAnual || 0)) * 100) / 100) + '/mês no anual',
+      ] };
+    });
+    caixa.appendChild(tabela(['Plano', 'Inclui', 'Mensal', 'Anual'], linhas));
+
+    var ativacoes = dados.ativacoes || {};
+    if (ativacoes.simples) {
+      caixa.appendChild(el('p', 'Ativação: ' + dinheiro(ativacoes.simples.valor)
+        + ', ou ' + dinheiro(ativacoes.acompanhada.valor) + ' com '
+        + ativacoes.acompanhada.dias + ' dias de acompanhamento. Cobrança única, no começo.', 'legenda'));
+    }
+    caixa.appendChild(el('p', 'Para mudar de plano, fale com a gente. A troca vale a partir da próxima fatura.', 'legenda'));
+    return caixa;
   }
 
   function desenharFinanceiro(alvo, dados) {
@@ -3203,6 +3345,12 @@
       // rota responde 404 de qualquer jeito.
       document.getElementById('menu-atendimento').hidden = !(dados.modulos && dados.modulos.atendimento);
       document.getElementById('menu-assistente').hidden = !(dados.modulos && dados.modulos.atendimento);
+      // Quem assina so o Atende Ai nao tem loja conectada: tela de widget e
+      // de cupom ali e menu que nunca leva a lugar nenhum.
+      var temCapta = !dados.modulos || dados.modulos.capta !== false;
+      document.getElementById('grupo-capta').hidden = !temCapta;
+      var doCapta = document.querySelectorAll('.item-capta');
+      for (var i = 0; i < doCapta.length; i += 1) doCapta[i].hidden = !temCapta;
 
       var faixa = document.getElementById('faixa');
       if (dados.aviso) {
