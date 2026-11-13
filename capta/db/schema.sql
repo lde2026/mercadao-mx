@@ -534,3 +534,38 @@ create table if not exists atendimento_falas (
 );
 create index if not exists atendimento_falas_idx
   on atendimento_falas (atendimento_id, criado_em);
+
+/*
+ * A cobranca do Atende Ai.
+ *
+ * A assinatura dele nao entra na tabela assinaturas porque aquela e dos
+ * planos do Capta, com cota de leads e de lojas que nao existem aqui. O que
+ * define o preco e a faixa que ja esta na conta; o que falta e o ciclo e o
+ * id da assinatura no Asaas, para trocar de faixa sem criar duas cobrando
+ * junto.
+ */
+alter table contas add column if not exists ciclo_atendimento text;
+alter table contas add column if not exists assinatura_atendimento text;
+
+/*
+ * Os dois tipos novos de cobranca: a ativacao, que e unica, e o excedente,
+ * que e por mes e so existe quando a loja passou do teto da faixa.
+ *
+ * A regua de inadimplencia nao muda com isso: ela corta rastreamento, widget
+ * e script, que sao coisas do Capta. Quem assina so o Atende Ai e atrasa
+ * recebe o aviso no painel e o agente continua respondendo os clientes dele,
+ * porque quem ficaria no vacuo seria o consumidor final, que nao tem nada a
+ * ver com a fatura.
+ */
+alter table cobrancas drop constraint if exists cobrancas_tipo_check;
+alter table cobrancas add constraint cobrancas_tipo_check
+  check (tipo in ('assinatura','implantacao','ativacao','excedente'));
+
+/*
+ * Marca que o excedente daquele mes ja virou fatura.
+ *
+ * Sem isto, a tarefa que fecha o mes criaria uma cobranca nova a cada vez que
+ * rodasse, e ela roda de seis em seis horas: o lojista receberia quatro
+ * faturas por dia do mesmo excedente.
+ */
+alter table consumo_atendimento add column if not exists excedente_cobrado boolean not null default false;

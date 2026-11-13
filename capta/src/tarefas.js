@@ -7,6 +7,8 @@ import { enviar, cupomAtrasado } from './email.js';
 import * as repo from './repositorio.js';
 import { credenciaisProntas } from './credenciais.js';
 import { avisarCobranca } from './avisos.js';
+import * as asaas from './billing/asaas.js';
+import * as atendeai from './billing/atendeai.js';
 
 /**
  * Trabalho de fundo. Duas tarefas, as duas por falta de alternativa:
@@ -207,5 +209,63 @@ export function agendar() {
   setInterval(() => { avisarInadimplentes().catch(() => {}); }, 6 * 3600 * 1000).unref();
   setInterval(() => { repo.limparLimites().catch(() => {}); }, 3600 * 1000).unref();
   setInterval(() => { repo.limparConexoesPendentes().catch(() => {}); }, 6 * 3600 * 1000).unref();
+  // De seis em seis horas, e nao uma vez por mes: o processo reinicia a cada
+  // deploy, e um agendamento mensal em memoria nunca chegaria no dia certo.
+  // A marca no consumo e que garante uma fatura so.
+  setInterval(() => { fecharExcedentes().catch(() => {}); }, 6 * 3600 * 1000).unref();
   log.info('tarefas.agendadas', { varredura_minutos: MINUTOS_VARREDURA });
+}
+
+/**
+ * Fecha o excedente do mes anterior e manda para a fatura.
+ *
+ * O excedente nao pode ser assinatura: o valor muda todo mes e quase sempre e
+ * zero. Entao ele vira cobranca avulsa, uma vez, depois que o mes fechou, e a
+ * marca no consumo garante que rodar de novo nao cria a segunda.
+ *
+ * So fecha mes que ja acabou. Cobrar o mes corrente seria cobrar por
+ * mensagem que ainda vai ser enviada.
+ */
+export async function fecharExcedentes(hoje = new Date()) {
+  if (!asaas.configurado()) return { fechados: 0, motivo: 'asaas nao configurado' };
+
+  const competencia = new Date(Date.UTC(hoje.getUTCFullYear(), hoje.getUTCMonth() - 1, 1))
+    .toISOString().slice(0, 10);
+  const contas = await repo.contasComAtendimentoCobravel();
+  let fechados = 0;
+
+  for (const conta of contas) {
+    try {
+      const marca = await repo.consumoDoMesDaConta(conta.id, competencia);
+      if (!marca || marca.excedente_cobrado) continue;
+
+      const situacao = atendeai.situacao(marca.enviadas, conta.faixa_atendimento);
+      if (!situacao.excedente.mensagens) {
+        // Sem excedente tambem se marca: evita reler o mesmo mes para sempre.
+        await repo.marcarExcedenteCobrado(conta.id, competencia);
+        continue;
+      }
+
+      const venceEm = new Date(Date.now() + 5 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+      const cobranca = await asaas.cobrarExcedente({
+        clienteExterno: conta.cliente_externo,
+        venceEm,
+        mensagens: situacao.excedente.mensagens,
+        valor: situacao.excedente.valor,
+        competencia: competencia.slice(0, 7),
+      });
+      await repo.registrarCobranca({
+        contaId: conta.id, tipo: 'excedente', valor: situacao.excedente.valor,
+        origem: 'asaas', idExterno: cobranca.id, venceEm,
+      });
+      await repo.marcarExcedenteCobrado(conta.id, competencia);
+      fechados += 1;
+      log.info('excedente.cobrado', { conta_id: conta.id, competencia });
+    } catch (erro) {
+      // Uma conta que falha nao pode travar o fecho das outras.
+      log.erro('excedente.falhou', { conta_id: conta.id, motivo: erro.message });
+    }
+  }
+
+  return { fechados, competencia };
 }

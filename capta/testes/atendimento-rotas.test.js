@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import http from 'node:http';
 import { prepararBanco, contaDeTeste } from './ajuda.js';
 
 process.env.NODE_ENV = 'test';
@@ -585,6 +586,75 @@ test('o Admin conta a recorrencia do Atende Ai pela faixa, separada do Capta', a
   assert.equal(resumo.json.mrr, 0, 'conta sem assinatura nao pode virar receita do Capta');
   assert.deepEqual(resumo.json.atendimento, [{ faixa: 'escala', n: 1 }]);
   assert.equal(resumo.json.faixas.escala.mensal, 797);
+});
+
+/*
+ * Ligar a cobranca do Atende Ai.
+ *
+ * O Asaas e trocado por um servidor local: o que se testa aqui e a nossa
+ * sequencia (cliente, assinatura da faixa, cobranca unica da ativacao) e o
+ * valor que sai, nao o Asaas. Mandar o preco errado aqui e mandar a fatura
+ * errada para o cliente do Pierre.
+ */
+test('o operador liga a cobranca da faixa e a ativacao sai uma vez so', async () => {
+  const pedidos = [];
+  const asaasFalso = http.createServer((req, res) => {
+    let corpo = '';
+    req.on('data', (p) => { corpo += p; });
+    req.on('end', () => {
+      pedidos.push({ caminho: req.url, corpo: corpo ? JSON.parse(corpo) : null });
+      res.setHeader('content-type', 'application/json');
+      res.end(JSON.stringify({ id: `ext_${pedidos.length}` }));
+    });
+  });
+  await new Promise((ok) => asaasFalso.listen(0, ok));
+  process.env.ASAAS_BASE = `http://127.0.0.1:${asaasFalso.address().port}`;
+  process.env.ASAAS_API_KEY = 'chave-de-teste';
+
+  try {
+    await consultar('update contas set modulo_atendimento = true where id = $1', [contaB.id]);
+
+    const ligou = await pedir(`/api/admin/contas/${contaB.id}/cobranca`, {
+      metodo: 'POST', cookie: operador.cookie,
+      corpo: { faixa: 'crescimento', ciclo: 'mensal', ativacao: 'acompanhada', documento: '12345678909' },
+    });
+    assert.equal(ligou.status, 200, JSON.stringify(ligou.json));
+    assert.equal(ligou.json.faixa, 'crescimento');
+    assert.equal(ligou.json.ativacao.valor, 1890);
+
+    const assinatura = pedidos.find((p) => p.caminho.includes('/subscriptions'));
+    assert.equal(assinatura.corpo.value, 397, 'Crescimento mensal sao R$ 397');
+    assert.equal(assinatura.corpo.cycle, 'MONTHLY');
+    const ativacao = pedidos.find((p) => p.caminho.includes('/payments'));
+    assert.equal(ativacao.corpo.value, 1890);
+
+    // De novo: a assinatura e refeita, a ativacao nao se repete.
+    const outraVez = await pedir(`/api/admin/contas/${contaB.id}/cobranca`, {
+      metodo: 'POST', cookie: operador.cookie,
+      corpo: { faixa: 'escala', ciclo: 'anual', ativacao: 'acompanhada' },
+    });
+    assert.equal(outraVez.status, 200);
+    assert.equal(outraVez.json.ativacao, null, 'ativacao e cobranca unica');
+    const cobrancas = await consultar(
+      `select tipo from cobrancas where conta_id = $1`, [contaB.id],
+    );
+    assert.equal(cobrancas.rows.length, 1);
+
+    const anual = pedidos.filter((p) => p.caminho.includes('/subscriptions')).pop();
+    assert.equal(anual.corpo.cycle, 'YEARLY');
+    // Escala anual: 797 com 20% de desconto, vezes doze.
+    assert.equal(anual.corpo.value, 7651.2);
+
+    const faixaTorta = await pedir(`/api/admin/contas/${contaB.id}/cobranca`, {
+      metodo: 'POST', cookie: operador.cookie, corpo: { faixa: 'inventada' },
+    });
+    assert.equal(faixaTorta.status, 400);
+  } finally {
+    asaasFalso.close();
+    delete process.env.ASAAS_API_KEY;
+    delete process.env.ASAAS_BASE;
+    await consultar('update contas set modulo_atendimento = false where id = $1', [contaB.id]);
+  }
 });
 
 test.after(async () => {

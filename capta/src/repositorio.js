@@ -1164,3 +1164,59 @@ export async function contarAtendimentos(contaId) {
   );
   return rows[0];
 }
+
+/**
+ * Guarda a assinatura do Atende Ai da conta.
+ *
+ * A faixa vem junto porque e ela que define o preco: gravar as duas na mesma
+ * transacao evita a conta ficar com faixa Escala na tela e assinatura de
+ * Essencial no Asaas.
+ */
+export async function definirCobrancaAtendimento(contaId, { faixa, ciclo, assinaturaExterna }) {
+  const { rows } = await consultar(
+    `update contas
+        set faixa_atendimento = $2,
+            ciclo_atendimento = $3,
+            assinatura_atendimento = $4,
+            atualizado_em = now()
+      where id = $1
+      returning id, faixa_atendimento, ciclo_atendimento, assinatura_atendimento`,
+    [contaId, faixa, ciclo, assinaturaExterna],
+  );
+  return rows[0] || null;
+}
+
+export async function jaCobrouAtivacao(contaId) {
+  const { rows } = await consultar(
+    `select 1 from cobrancas where conta_id = $1 and tipo = 'ativacao' limit 1`,
+    [contaId],
+  );
+  return rows.length > 0;
+}
+
+/** As contas com o Atende Ai ligado e cliente no Asaas. Usada pelo fecho do mes. */
+export async function contasComAtendimentoCobravel() {
+  const { rows } = await consultar(
+    `select id, nome, faixa_atendimento, cliente_externo
+       from contas
+      where modulo_atendimento = true and cliente_externo is not null`,
+  );
+  return rows;
+}
+
+export async function consumoDoMesDaConta(contaId, competencia) {
+  const { rows } = await consultar(
+    `select conta_id, competencia, enviadas, excedente_cobrado
+       from consumo_atendimento where conta_id = $1 and competencia = $2`,
+    [contaId, competencia],
+  );
+  return rows[0] || null;
+}
+
+export async function marcarExcedenteCobrado(contaId, competencia) {
+  await consultar(
+    `update consumo_atendimento set excedente_cobrado = true, atualizado_em = now()
+      where conta_id = $1 and competencia = $2`,
+    [contaId, competencia],
+  );
+}

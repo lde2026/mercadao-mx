@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import { pedir } from '../adapters/http.js';
 import { log } from '../log.js';
 import { precoDoPlano, precoDaImplantacao } from './planos.js';
+import { precoDaFaixa, precoDaAtivacao } from './atendeai.js';
 import * as repo from '../repositorio.js';
 
 /**
@@ -159,4 +160,73 @@ export async function cancelarAssinatura(idExterno) {
 
 export function configurado() {
   return Boolean(process.env.ASAAS_API_KEY);
+}
+
+/*
+ * A assinatura do Atende Ai.
+ *
+ * Separada da do Capta porque o preco vem da faixa, e nao do plano, e porque
+ * ela convive com a outra: uma loja pode assinar os dois, e cada um tem a sua
+ * assinatura no Asaas. Misturar faria a troca de faixa cancelar o plano do
+ * Capta da mesma conta.
+ */
+export async function criarAssinaturaAtendeAi({
+  clienteExterno, faixa, ciclo = 'mensal', formaPagamento = 'UNDEFINED',
+}) {
+  const preco = precoDaFaixa(faixa, ciclo);
+  if (!preco) throw new Error('faixa invalida');
+  const proximo = new Date(Date.now() + 24 * 3600 * 1000).toISOString().slice(0, 10);
+  return pedir(`${base()}/subscriptions`, {
+    method: 'POST',
+    headers: cabecalhos(),
+    body: JSON.stringify({
+      customer: clienteExterno,
+      billingType: formaPagamento,
+      // No anual o Asaas cobra o total uma vez por ano; no mensal, o mensal.
+      value: preco.ciclo === 'anual' ? preco.total : preco.mensal,
+      nextDueDate: proximo,
+      cycle: preco.ciclo === 'anual' ? 'YEARLY' : 'MONTHLY',
+      description: `Atende Ai ${preco.nome} ${preco.ciclo}`,
+    }),
+  }, { plataforma: 'asaas' });
+}
+
+/** A ativacao: cobranca unica, no comeco. Simples ou acompanhada por 30 dias. */
+export async function cobrarAtivacao({ clienteExterno, venceEm, tipo = 'simples' }) {
+  const ativacao = precoDaAtivacao(tipo);
+  if (!ativacao) throw new Error('tipo de ativacao invalido');
+  return pedir(`${base()}/payments`, {
+    method: 'POST',
+    headers: cabecalhos(),
+    body: JSON.stringify({
+      customer: clienteExterno,
+      billingType: 'UNDEFINED',
+      value: ativacao.valor,
+      dueDate: venceEm,
+      description: tipo === 'acompanhada'
+        ? `Ativacao Atende Ai acompanhada, ${ativacao.dias} dias`
+        : 'Ativacao Atende Ai',
+    }),
+  }, { plataforma: 'asaas' });
+}
+
+/*
+ * O excedente do mes.
+ *
+ * Nao pode ser assinatura: o valor muda todo mes e em muitos meses e zero.
+ * Vai como cobranca avulsa, com a competencia na descricao, para o lojista
+ * conseguir conferir a fatura contra o medidor que ele ve no painel.
+ */
+export async function cobrarExcedente({ clienteExterno, venceEm, mensagens, valor, competencia }) {
+  return pedir(`${base()}/payments`, {
+    method: 'POST',
+    headers: cabecalhos(),
+    body: JSON.stringify({
+      customer: clienteExterno,
+      billingType: 'UNDEFINED',
+      value: valor,
+      dueDate: venceEm,
+      description: `Atende Ai, ${mensagens} mensagens acima do plano em ${competencia}`,
+    }),
+  }, { plataforma: 'asaas' });
 }

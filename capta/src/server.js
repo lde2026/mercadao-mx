@@ -1914,6 +1914,86 @@ app.get('/api/alertas', async (req, res) => {
 
 // -------------------------------------------------------------- operador ---
 
+/*
+ * Ligar a cobranca do Atende Ai de uma conta.
+ *
+ * So o operador: o Atende Ai e vendido por nos, com ativacao feita por nos, e
+ * o lojista nao escolhe faixa sozinho numa tela. O que esta rota faz e criar
+ * o cliente no Asaas se ainda nao existir, abrir a assinatura da faixa e,
+ * na primeira vez, lancar a cobranca da ativacao.
+ *
+ * Trocar de faixa cancela a assinatura anterior antes de abrir a nova, senao
+ * a conta ficaria com duas correndo e pagaria as duas.
+ */
+app.post('/api/admin/contas/:id/cobranca', exigirOperador, async (req, res) => {
+  const { faixa, ciclo = 'mensal', ativacao = 'simples', documento } = req.body || {};
+  if (!atendeai.ehFaixa(faixa)) return res.status(400).json({ erro: 'faixa invalida' });
+  if (!['mensal', 'anual'].includes(ciclo)) return res.status(400).json({ erro: 'ciclo invalido' });
+  if (!['simples', 'acompanhada', 'nenhuma'].includes(ativacao)) {
+    return res.status(400).json({ erro: 'ativacao invalida' });
+  }
+  if (!asaas.configurado()) {
+    return res.status(503).json({
+      erro: 'a cobranca automatica nao esta ligada',
+      explicacao: 'Falta a ASAAS_API_KEY no servidor.',
+    });
+  }
+
+  const conta = await repo.buscarConta(req.params.id);
+  if (!conta) return res.status(404).json({ erro: 'nao encontrada' });
+  if (!conta.modulo_atendimento) {
+    return res.status(409).json({
+      erro: 'esta conta esta sem o Atende Ai',
+      explicacao: 'Ligue o módulo antes de abrir a cobrança.',
+    });
+  }
+
+  try {
+    let clienteExterno = conta.cliente_externo;
+    if (!clienteExterno) {
+      const doc = String(documento || conta.documento || '').replace(/\D/g, '');
+      if (!doc) return res.status(400).json({ erro: 'informe o CPF ou CNPJ para a cobranca' });
+      const cliente = await asaas.criarCliente({ nome: conta.nome, email: conta.email, cpfCnpj: doc });
+      clienteExterno = cliente.id;
+      await repo.salvarClienteExterno(conta.id, { clienteExterno, documento: doc });
+    }
+
+    if (conta.assinatura_atendimento) {
+      await asaas.cancelarAssinatura(conta.assinatura_atendimento);
+    }
+    const criada = await asaas.criarAssinaturaAtendeAi({ clienteExterno, faixa, ciclo });
+    const salva = await repo.definirCobrancaAtendimento(conta.id, {
+      faixa, ciclo, assinaturaExterna: criada.id,
+    });
+
+    let cobrancaAtivacao = null;
+    if (ativacao !== 'nenhuma' && !(await repo.jaCobrouAtivacao(conta.id))) {
+      const venceEm = new Date(Date.now() + 3 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+      const preco = atendeai.precoDaAtivacao(ativacao);
+      const cobranca = await asaas.cobrarAtivacao({ clienteExterno, venceEm, tipo: ativacao });
+      await repo.registrarCobranca({
+        contaId: conta.id, tipo: 'ativacao', valor: preco.valor,
+        origem: 'asaas', idExterno: cobranca.id, venceEm,
+      });
+      cobrancaAtivacao = { valor: preco.valor, venceEm };
+    }
+
+    log.info('atendeai.cobranca_ligada', { conta_id: conta.id, faixa, ciclo });
+    res.json({
+      faixa: salva.faixa_atendimento,
+      ciclo: salva.ciclo_atendimento,
+      assinatura: salva.assinatura_atendimento,
+      ativacao: cobrancaAtivacao,
+    });
+  } catch (erro) {
+    log.erro('atendeai.cobranca_falhou', { conta_id: conta.id, motivo: erro.message });
+    res.status(502).json({
+      erro: 'o Asaas recusou a cobranca',
+      explicacao: 'Confira os dados da conta no Asaas e tente de novo.',
+    });
+  }
+});
+
 app.get('/api/admin/resumo', exigirOperador, async (_req, res) => {
   const resumo = await repo.resumoGeral();
   // Receita mensal recorrente: mensal conta o preco, anual conta um doze avos.
