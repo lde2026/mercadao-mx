@@ -2692,16 +2692,24 @@
     var p = atendimento.pausa || {};
     var caixa = el('div', null, 'freio' + (p.pausado ? ' parado' : ''));
 
+    // Sem numero conectado nao chega conversa nenhuma, entao dizer que o
+    // agente esta respondendo seria promessa que a tela nao cumpre.
+    var ligado = Boolean((atendimento.prontidao || {}).numero);
     var texto = el('div', null, 'dizer');
-    texto.appendChild(el('div', p.pausado ? 'Atendimento pausado' : 'Atendimento no ar', 'rotulo'));
+    texto.appendChild(el('div', p.pausado ? 'Atendimento pausado'
+      : ligado ? 'Atendimento no ar' : 'Aguardando a conexão', 'rotulo'));
     texto.appendChild(el('p', p.pausado
       ? 'O agente não está respondendo ninguém no WhatsApp.'
-      : 'O agente está respondendo os seus clientes com a base desta tela.', 'hora'));
+      : ligado
+        ? 'O agente está respondendo os seus clientes com a base desta tela.'
+        : 'Assim que o número estiver conectado, o agente começa a responder com a base desta tela.', 'hora'));
     caixa.appendChild(texto);
 
     var botao = el('button', p.pausado ? 'Voltar a atender' : 'Pausar atendimento',
       p.pausado ? '' : 'secundario');
     botao.type = 'button';
+    // Pausar o que ainda nao comecou e botao que nao faz nada visivel.
+    botao.hidden = !ligado && !p.pausado;
     botao.addEventListener('click', function () {
       var parar = !p.pausado;
       if (parar && !confirm('Pausar o atendimento?\n\nO agente para de responder no WhatsApp até você religar. Nada da base é apagado.')) return;
